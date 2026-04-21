@@ -14,6 +14,10 @@ let fullDatabase = null; // Cache local do banco completo
 let syncInProgress = false;
 let cart = JSON.parse(localStorage.getItem('holandesVoadorCart')) || [];
 let cartCount = cart.reduce((acc, item) => acc + (item.qtd || 1), 0);
+let currentChat = null;
+let chats = JSON.parse(localStorage.getItem('electro_chats')) || [];
+let orders = JSON.parse(localStorage.getItem('electro_orders')) || [];
+let chatRefreshInterval = null;
 let dbCache = null; // Cache IndexedDB
 
 // ============================================
@@ -170,10 +174,13 @@ async function fetchGoogleShoppingProducts(query, onProgress, onSourceUpdate) {
         let products = fullDatabase.products || [];
         const info = getSavedCadastro();
 
-        // Se for VENDEDOR e estiver na visualização inicial, mostra apenas o estoque dele
-        if (info && info.tipo === 'VENDEDOR' && query === 'eletronicos') {
+        // Se o usuário logado for um VENDEDOR, ele vê apenas os SEUS produtos em toda a plataforma
+        if (info && info.tipo === 'VENDEDOR') {
             products = products.filter(p => p.vendedor_id === info.id);
-        } else if (query && query !== 'eletronicos') {
+        }
+
+        // Aplica o filtro de busca ou categoria se o termo não for o padrão
+        if (query && query !== 'eletronicos') {
             products = products.filter(p => 
                 p.titulo.toLowerCase().includes(query.toLowerCase()) || 
                 p.loja.toLowerCase().includes(query.toLowerCase())
@@ -1232,7 +1239,7 @@ window.renderCart = function() {
             </div>
             <div class="d-flex justify-content-between mt-2 gap-2">
                 <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="window.removeFromCart(${index})"><i class="bi bi-trash"></i></button>
-                <button class="btn btn-sm btn-success flex-grow-1" onclick="alert('Comprando: ${item.titulo}')"><i class="bi bi-bag-check"></i> Comprar</button>
+                <button class="btn btn-sm btn-success flex-grow-1" onclick="window.finalizarCompraMock(${index})"><i class="bi bi-bag-check"></i> Comprar</button>
             </div>
         </div>`;
     }).join('');
@@ -1293,6 +1300,236 @@ window.shareProduct = function(productId) {
             alert('Link do produto copiado para a área de transferência!');
         });
     }
+};
+// ============================================
+// SISTEMA DE CHAT E PEDIDOS (PÓS-COMPRA)
+// ============================================
+
+window.showChat = function(chatId = null) {
+    const info = getSavedCadastro();
+    if (!info) {
+        alert("Faça login para acessar suas mensagens.");
+        return;
+    }
+    const modal = new bootstrap.Modal(document.getElementById('chatModal'));
+    modal.show();
+    loadChatContacts();
+    if (chatId) selectChat(chatId);
+};
+
+function loadChatContacts() {
+    const info = getSavedCadastro();
+    const container = document.getElementById('chatContactsList');
+    const userChats = chats.filter(c => c.participants.includes(info.id));
+
+    if (userChats.length === 0) {
+        container.innerHTML = '<div class="p-4 text-center text-muted small">Nenhuma conversa ativa.</div>';
+        return;
+    }
+
+    container.innerHTML = userChats.map(chat => {
+        const otherUserId = chat.participants.find(id => id !== info.id);
+        const otherUserName = chat.sellerId === info.id ? chat.buyerName : chat.sellerName;
+        const lastMsg = chat.messages[chat.messages.length - 1];
+        
+        return `
+            <div class="chat-contact-item ${currentChat === chat.id ? 'active' : ''}" onclick="selectChat('${chat.id}')">
+                <div class="position-relative">
+                    <div class="bg-secondary rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                        ${otherUserName.charAt(0)}
+                    </div>
+                    <span class="online-indicator position-absolute bottom-0 end-0"></span>
+                </div>
+                <div class="flex-grow-1 overflow-hidden">
+                    <div class="d-flex justify-content-between">
+                        <strong class="small text-truncate">${otherUserName}</strong>
+                        <small style="font-size: 9px;">${lastMsg ? formatTime(lastMsg.timestamp) : ''}</small>
+                    </div>
+                    <div class="small text-muted text-truncate">${lastMsg ? lastMsg.text : 'Pedido criado'}</div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function selectChat(chatId) {
+    currentChat = chatId;
+    const chat = chats.find(c => c.id === chatId);
+    const info = getSavedCadastro();
+    
+    document.getElementById('chatEmptyState').style.display = 'none';
+    document.getElementById('chatActiveContent').style.display = 'flex';
+    
+    const otherUserName = chat.sellerId === info.id ? chat.buyerName : chat.sellerName;
+    document.getElementById('chatPartnerName').textContent = otherUserName;
+    document.getElementById('chatPartnerAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUserName)}&background=random`;
+
+    renderMessages(chat);
+    updateOrderStatusBar(chat.orderId);
+    loadChatContacts();
+}
+
+function renderMessages(chat) {
+    const container = document.getElementById('chatMessagesContainer');
+    const info = getSavedCadastro();
+    
+    container.innerHTML = chat.messages.map(msg => {
+        if (msg.type === 'system') return `<div class="message-system"><span class="badge">${msg.text}</span></div>`;
+        const isMe = msg.senderId === info.id;
+        return `
+            <div class="chat-message ${isMe ? 'message-sent' : 'message-received'}">
+                <div class="message-bubble shadow-sm">
+                    <div>${msg.text}</div>
+                    <div class="message-time">${formatTime(msg.timestamp)}</div>
+                </div>
+            </div>`;
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+}
+
+window.sendChatMessage = function(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatMessageInput');
+    const text = input.value.trim();
+    if (!text || !currentChat) return;
+
+    const info = getSavedCadastro();
+    const chat = chats.find(c => c.id === currentChat);
+    
+    chat.messages.push({
+        senderId: info.id,
+        text: text,
+        timestamp: new Date().toISOString(),
+        type: 'message'
+    });
+
+    localStorage.setItem('electro_chats', JSON.stringify(chats));
+    input.value = '';
+    renderMessages(chat);
+};
+
+function updateOrderStatusBar(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    const info = getSavedCadastro();
+    const container = document.getElementById('orderStatusBar');
+    if (!order) return;
+
+    const steps = ['pending', 'accepted', 'shipped', 'delivered'];
+    const currentIdx = steps.indexOf(order.status);
+    const isSeller = order.sellerId === info.id;
+
+    let actionBtn = '';
+    if (isSeller && order.status === 'pending') {
+        actionBtn = `<button class="btn btn-sm btn-success w-100 mt-2" onclick="updateOrderStatus('${orderId}', 'accepted')">Aceitar Pedido</button>`;
+    } else if (isSeller && order.status === 'accepted') {
+        actionBtn = `<button class="btn btn-sm btn-primary w-100 mt-2" onclick="updateOrderStatus('${orderId}', 'shipped')">Marcar como Enviado</button>`;
+    } else if (!isSeller && order.status === 'shipped') {
+        actionBtn = `<button class="btn btn-sm btn-success w-100 mt-2" onclick="updateOrderStatus('${orderId}', 'delivered')">Confirmar Recebimento</button>`;
+    }
+
+    container.innerHTML = `
+        <div class="order-status-bar">
+            <div class="status-step ${currentIdx >= 0 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-cart"></i></div><small>Pedido</small></div>
+            <div class="status-step ${currentIdx >= 1 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-check-lg"></i></div><small>Aceito</small></div>
+            <div class="status-step ${currentIdx >= 2 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-truck"></i></div><small>Enviado</small></div>
+            <div class="status-step ${currentIdx >= 3 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-house-heart"></i></div><small>Entregue</small></div>
+        </div>
+        ${actionBtn}
+    `;
+}
+
+window.updateOrderStatus = function(orderId, newStatus) {
+    const order = orders.find(o => o.id === orderId);
+    const chat = chats.find(c => c.orderId === orderId);
+    if (!order || !chat) return;
+
+    order.status = newStatus;
+    const statusTexts = { 
+        accepted: "✅ O vendedor aceitou seu pedido!", 
+        shipped: "📦 O produto foi postado e está a caminho.", 
+        delivered: "🎉 Pedido finalizado com sucesso!" 
+    };
+
+    chat.messages.push({ senderId: 'system', text: statusTexts[newStatus], timestamp: new Date().toISOString(), type: 'system' });
+    
+    localStorage.setItem('electro_orders', JSON.stringify(orders));
+    localStorage.setItem('electro_chats', JSON.stringify(chats));
+    
+    addNotification("Status do Pedido", statusTexts[newStatus], "bi-info-circle", "info");
+    selectChat(chat.id);
+};
+
+window.createChatForOrder = function(order) {
+    const chatId = `chat_${order.id}`;
+    const newChat = {
+        id: chatId,
+        orderId: order.id,
+        sellerId: order.sellerId,
+        sellerName: order.sellerName,
+        buyerId: order.buyerId,
+        buyerName: order.buyerName,
+        participants: [order.buyerId, order.sellerId],
+        messages: [{ senderId: 'system', text: `🛒 Novo pedido #${order.id.slice(-4)} gerado.`, timestamp: new Date().toISOString(), type: 'system' }]
+    };
+    chats.push(newChat);
+    localStorage.setItem('electro_chats', JSON.stringify(chats));
+    return chatId;
+};
+
+window.viewOrderDetails = function() {
+    if (!currentChat) return;
+    const chat = chats.find(c => c.id === currentChat);
+    const order = orders.find(o => o.id === chat.orderId);
+    const content = document.getElementById('orderDetailsContent');
+    
+    content.innerHTML = `
+        <div class="small">
+            <p><strong>Pedido:</strong> #${order.id.slice(-8)}</p>
+            <p><strong>Produto:</strong> ${order.productTitle}</p>
+            <p><strong>Vendedor:</strong> ${order.sellerName}</p>
+            <p><strong>Valor:</strong> R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+            <hr>
+            <p class="mb-0 text-muted">Acompanhe as atualizações de status diretamente no chat.</p>
+        </div>`;
+    new bootstrap.Modal(document.getElementById('orderDetailsModal')).show();
+};
+
+function formatTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+window.toggleChatSidebar = function() {
+    document.getElementById('chatSidebar').classList.toggle('show');
+};
+
+// Modifique a função de finalização de compra (onde você tiver o alert de compra)
+// Para chamar a criação de pedido e chat. Exemplo para o botão do carrinho:
+window.finalizarCompraMock = function(itemIndex) {
+    const item = cart[itemIndex];
+    const info = getSavedCadastro();
+    if (!info) {
+        alert("Por favor, faça login para finalizar a compra.");
+        const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+        modal.show();
+        return;
+    }
+    const order = {
+        id: `ord_${Date.now()}`,
+        sellerId: item.vendedor_id || 'vendedor_demo',
+        sellerName: item.loja || 'Vendedor Oficial',
+        buyerId: info.id,
+        buyerName: info.nome,
+        productTitle: item.titulo,
+        total: item.preco,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+    };
+    orders.push(order);
+    localStorage.setItem('electro_orders', JSON.stringify(orders));
+    window.createChatForOrder(order);
+    window.removeFromCart(itemIndex);
+    alert("Pedido realizado! Clique em 'Mensagens' para falar com o vendedor.");
+    window.showChat(`chat_${order.id}`);
 };
 
 // Exports
