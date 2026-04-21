@@ -41,14 +41,20 @@
                     <div class="user-nav d-flex align-items-center gap-2">
                         <button class="btn btn-simple role-guest" data-bs-toggle="modal" data-bs-target="#cadastroModal">Cadastre-se</button>
                         <button class="btn btn-simple btn-solid role-guest" data-bs-toggle="modal" data-bs-target="#loginModal">Entre</button>
-                        <button class="btn btn-simple btn-solid role-logged-in d-none" onclick="logout()">Sair</button>
+                        
+                        <!-- Container de Perfil Logado (Foto + Nome) -->
+                        <div class="role-logged-in d-none d-flex align-items-center gap-2 cursor-pointer" onclick="window.showProfileEdit()" style="cursor: pointer;" title="Meu Perfil">
+                            <img id="navUserAvatar" src="" class="rounded-circle border" width="32" height="32" style="object-fit: cover; display: none;">
+                            <i id="navUserIcon" class="bi bi-person-circle fs-4 text-white"></i>
+                            <span id="navUserName" class="text-white fw-bold small">Usuário</span>
+                        </div>
+
                         <button class="btn btn-theme" id="themeToggle" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
-                        <a href="#" class="btn btn-icon btn-simple role-logged-in d-none" title="Perfil" onclick="window.showProfileEdit()"><i class="bi bi-person-circle"></i></a>
                         <a href="#" class="btn btn-icon btn-simple position-relative" title="Notificações" data-bs-toggle="modal" data-bs-target="#notificacoesModal">
                             <i class="bi bi-bell"></i>
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBadgeDesktop">2</span>
                         </a>
-                        <a href="#" class="btn btn-icon btn-simple position-relative" title="Carrinho">
+                        <a href="#" class="btn btn-icon btn-simple position-relative" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
                             <i class="bi bi-cart2"></i>
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="cartBadgeDesktop">0</span>
                         </a>
@@ -121,6 +127,18 @@
         </div>
         <div class="offcanvas-body">
             <div class="filter-sidebar">
+                <!-- Ordenação -->
+                <div class="filter-group mb-4">
+                    <h6 class="fw-bold small text-uppercase">Ordenar por</h6>
+                    <select id="sortOrder" class="form-select form-select-sm mt-2" onchange="applyFilters()">
+                        <option value="default">Destaques</option>
+                        <option value="recent">Mais recentes</option>
+                        <option value="rating">Mais avaliados</option>
+                        <option value="priceAsc">Menor Preço</option>
+                        <option value="priceDesc">Maior Preço</option>
+                    </select>
+                </div>
+
                 <!-- Faixa de Preço -->
                 <div class="filter-group mb-4">
                     <h6 class="fw-bold small text-uppercase">Faixa de Preço</h6>
@@ -163,7 +181,7 @@
         <div class="row">
             <div class="col-12">
                 <h2 class="section-title mb-4 fs-4" id="gridTitle">Recomendados para você</h2>
-                <div class="row row-cols-1 row-cols-md-3 g-4" id="productsGrid" style="min-height: 50vh;">
+                <div id="productsGrid" style="min-height: 50vh;">
                     <!-- Barra de Carregamento Injetada via JS -->
                     <div class="col-12 d-flex align-items-center justify-content-center py-5">
                         <div class="card border-0 shadow-sm p-5 text-center" style="max-width: 600px; width: 100%; background: #fff; border-radius: 12px;">
@@ -180,6 +198,26 @@
         </div>
     </main>
 
+    <!-- Aba Lateral do Carrinho (Esquerda) -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartOffcanvasLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title fw-bold" id="cartOffcanvasLabel"><i class="bi bi-cart-check me-2 text-success"></i>Meu Carrinho</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column">
+            <div id="cartItemsList" class="flex-grow-1 overflow-auto pe-2">
+                <!-- Itens injetados via JS -->
+            </div>
+            <div id="cartFooter" class="border-top pt-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0 fw-bold">Total:</h5>
+                    <h5 class="mb-0 fw-bold text-success" id="cartTotalValue">R$ 0,00</h5>
+                </div>
+                <button class="btn btn-success w-100 py-3 fw-bold rounded-3 shadow-sm" onclick="alert('Finalizando compra total...')">FINALIZAR TUDO</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Detalhes do Produto (Estilo Amazon/ML) -->
     <div class="modal fade" id="productDetailModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -195,9 +233,6 @@
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" id="btnGoToStore" class="btn btn-success fw-bold px-4">
-                        Ir para a Loja <i class="bi bi-box-arrow-up-right ms-1"></i>
-                    </button>
                 </div>
             </div>
         </div>
@@ -652,7 +687,7 @@
             <div class="footer-links d-flex gap-3">
                 <a href="#" class="text-decoration-none text-muted">Sobre</a>
                 <a href="#" class="text-decoration-none text-muted">Ajuda</a>
-                <a href="#" class="text-decoration-none text-muted">Contato</a>
+                <a href="https://github.com/danielbarbosabr" target="_blank" class="text-decoration-none text-muted">Contato</a>
             </div>
     <!-- Offcanvas Editar Perfil -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="profileEditOffcanvas" aria-labelledby="profileEditOffcanvasLabel" style="width: 400px; max-width: 90%;">
@@ -708,6 +743,7 @@
                 </div>
                 
                 <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="background-color: #3a81f8; border: none;">SALVAR ALTERAÇÕES</button>
+                <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="logout()">SAIR DA CONTA</button>
             </form>
         </div>
     </div>
