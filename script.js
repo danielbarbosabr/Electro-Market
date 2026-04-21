@@ -12,7 +12,8 @@ const API_CONFIG = {
 let allProductsCache = [];
 let fullDatabase = null; // Cache local do banco completo
 let syncInProgress = false;
-let cartCount = parseInt(localStorage.getItem('holandesVoadorCartCount')) || 0;
+let cart = JSON.parse(localStorage.getItem('holandesVoadorCart')) || [];
+let cartCount = cart.reduce((acc, item) => acc + (item.qtd || 1), 0);
 let dbCache = null; // Cache IndexedDB
 
 // ============================================
@@ -272,6 +273,22 @@ function updateVisibilityByRole() {
     guestItems.forEach(el => el.classList.toggle('d-none', isLoggedIn));
     loggedInItems.forEach(el => el.classList.toggle('d-none', !isLoggedIn));
 
+    // Atualiza Nome e Foto na Navbar principal
+    const navName = document.getElementById('navUserName');
+    const navAvatar = document.getElementById('navUserAvatar');
+    const navIcon = document.getElementById('navUserIcon');
+    if (navName && isLoggedIn) {
+        navName.textContent = info.nome.split(' ')[0];
+        if (info.avatar) {
+            navAvatar.src = info.avatar;
+            navAvatar.style.display = 'block';
+            navIcon.style.display = 'none';
+        } else {
+            navAvatar.style.display = 'none';
+            navIcon.style.display = 'block';
+        }
+    }
+
     const mobileName = document.getElementById('mobileWelcomeName');
     if (mobileName) {
         mobileName.textContent = isLoggedIn ? `Olá, ${info.nome.split(' ')[0]}` : 'Bem-vindo';
@@ -319,42 +336,69 @@ function updateVisibilityByRole() {
     if (typeof renderNotifications === 'function') renderNotifications();
 }
 
+function addNotification(titulo, texto, icone = 'bi-info-circle', cor = 'primary') {
+    const info = getSavedCadastro();
+    if (!info) return;
+
+    // Busca notificações existentes ou cria array vazio
+    let notifications = JSON.parse(localStorage.getItem(`notifications_${info.id}`)) || [];
+    
+    const newNotif = {
+        id: Date.now(),
+        titulo,
+        texto,
+        icone,
+        cor,
+        data: new Date().toISOString()
+    };
+    
+    // Adiciona ao início da lista e limita a 50 itens
+    notifications.unshift(newNotif);
+    localStorage.setItem(`notifications_${info.id}`, JSON.stringify(notifications.slice(0, 50)));
+    
+    renderNotifications();
+}
+
 function renderNotifications() {
     const info = getSavedCadastro();
-    const role = info?.tipo || 'CLIENTE';
     const container = document.getElementById('notificacoesList');
     const badgeDesktop = document.getElementById('notifBadgeDesktop');
     const badgeMobile = document.getElementById('notifBadgeMobile');
 
-    if (!container) return;
+    if (!container || !info) {
+        if (badgeDesktop) badgeDesktop.textContent = '0';
+        if (badgeMobile) badgeMobile.textContent = '0';
+        return;
+    }
 
-    const notifications = role === 'VENDEDOR' ? [
-        { titulo: "Confirmação de Venda", texto: "Alguém quer comprar seu produto!", icone: "bi-bag-check-fill", cor: "primary" }
-    ] : [
-        { titulo: "Status do Pedido", texto: "Seu produto está sendo preparado!", icone: "bi-truck", cor: "success" }
-    ];
+    const notifications = JSON.parse(localStorage.getItem(`notifications_${info.id}`)) || [];
 
-    container.innerHTML = notifications.map(n => `
-        <div class="list-group-item border-0 p-3">
-            <div class="d-flex gap-3">
-                <div class="bg-${n.cor} bg-opacity-10 p-2 rounded-circle text-${n.cor}"><i class="bi ${n.icone}"></i></div>
-                <div><h6 class="mb-1 fw-bold small">${n.titulo}</h6><p class="mb-0 text-muted" style="font-size: 0.8rem;">${n.texto}</p></div>
-            </div>
-        </div>`).join('');
+    if (notifications.length === 0) {
+        container.innerHTML = '<div class="p-4 text-center text-muted small">Nenhuma atividade recente.</div>';
+    } else {
+        container.innerHTML = notifications.map(n => {
+            const time = new Date(n.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return `
+            <div class="list-group-item border-0 p-3">
+                <div class="d-flex gap-3">
+                    <div class="bg-${n.cor} bg-opacity-10 p-2 rounded-circle text-${n.cor}" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi ${n.icone}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-bold small">${n.titulo}</h6>
+                            <small class="text-muted" style="font-size: 0.65rem;">${time}</small>
+                        </div>
+                        <p class="mb-0 text-muted" style="font-size: 0.75rem;">${n.texto}</p>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
 
     const count = notifications.length;
     if (badgeDesktop) badgeDesktop.textContent = count;
     if (badgeMobile) badgeMobile.textContent = count;
-}
-
-function updateCartBadge() {
-    const badges = [document.getElementById('cartBadgeDesktop'), document.getElementById('cartBadgeMobile')];
-    badges.forEach(badge => {
-        if (badge) {
-            badge.textContent = cartCount;
-            badge.classList.toggle('d-none', cartCount === 0);
-        }
-    });
 }
 
 window.logout = function() {
@@ -386,6 +430,7 @@ async function handleAnnounceSubmit(event) {
         fullDatabase.products.push(announceData);
         const success = await updateFullDatabase(fullDatabase);
         if (success) {
+            addNotification("Novo Anúncio", `Você publicou o produto: ${announceData.titulo}`, "bi-plus-circle", "warning");
             alert('Produto anunciado com sucesso!');
             bootstrap.Modal.getInstance(document.getElementById('announceModal'))?.hide();
             loadPage('eletronicos');
@@ -415,6 +460,7 @@ async function handleLoginSubmit(event) {
             updateShippingAddress();
             updateVisibilityByRole();
             
+            addNotification("Acesso", `Bem-vindo de volta, ${user.nome}!`, "bi-person-check", "primary");
             bootstrap.Modal.getInstance(document.getElementById('loginModal'))?.hide();
             document.getElementById('loginForm')?.reset();
             alert(`Bem-vindo de volta, ${user.nome}!`);
@@ -475,6 +521,7 @@ async function handleCadastroSubmit(event) {
     updateVisibilityByRole();
 
     const modal = bootstrap.Modal.getInstance(document.getElementById('cadastroModal'));
+    addNotification("Boas-vindas", "Sua conta foi criada com sucesso no ElectroMarket!", "bi-stars", "success");
     if (modal) modal.hide();
     document.getElementById('cadastroForm')?.reset();
     alert(`Bem-vindo, ${nome}! Cadastro realizado com sucesso.`);
@@ -574,51 +621,53 @@ function renderCard(item) {
     const info = getSavedCadastro();
     const isSeller = info?.tipo === 'VENDEDOR';
 
+    const productImg = item.img 
+        ? `<img src="${item.img}" alt="${item.titulo}">`
+        : `<div class="img-placeholder-icon">
+             <i class="bi bi-box-seam"></i>
+             <span class="small" style="font-size: 10px;">Sem foto</span>
+           </div>`;
+
     const sellerMeta = isSeller ? `
-        <div class="mt-2 border-top pt-2" style="font-size: 12px; color: #666;">
+        <div class="mt-2 border-top pt-2" style="font-size: 12px; color: var(--text-muted);">
             <div class="d-flex justify-content-between mb-1">
                 <span>Estoque: <strong>${item.quantidade || 0}</strong></span>
-                <span class="${item.realizaEntrega ? 'text-success' : 'text-muted'}">${item.realizaEntrega ? 'Entrega ativa' : 'Apenas retirada'}</span>
             </div>
             <div>Cat: <span class="badge bg-light text-dark border fw-normal">${item.categoria || 'Geral'}</span></div>
         </div>
     ` : '';
     
     return `
-        <div class="col mb-4">
-            <div class="card h-100 border-0 shadow-sm product-card-ml" 
-                 onclick="window.showProductDetail('${productId}')"
-                 style="cursor: pointer; background: #fff; border-radius: 10px; transition: transform 0.3s ease; font-family: 'Sora', sans-serif;">
+        <div class="card product-card-ml" onclick="window.showProductDetail('${productId}')">
+            <div class="overlay">
+                <button class="btn btn-action" onclick="event.stopPropagation(); window.toggleLike('${productId}')" title="Curtir">
+                    <i class="bi bi-heart"></i>
+                </button>
+                <button class="btn btn-action" onclick="event.stopPropagation(); window.shareProduct('${productId}')" title="Compartilhar">
+                    <i class="bi bi-share"></i>
+                </button>
+            </div>
+
+            <div class="product-card-img-container">
+                ${productImg}
+            </div>
+            
+            <div class="card-body product-card-body">
+                <p class="product-title-grid">
+                    ${item.titulo}
+                </p>
                 
-                <div class="position-relative p-3 border-bottom d-flex align-items-center justify-content-center" style="height: 200px; background-color: #fff; border-radius: 10px 10px 0 0;">
-                    <img src="${item.img || 'https://via.placeholder.com/400?text=Sem+Imagem'}" 
-                         class="card-img-top" 
-                         alt="${item.titulo}"
-                         style="max-height: 100%; width: auto; object-fit: contain;"
-                         onerror="this.src='https://via.placeholder.com/400?text=Sem+Imagem'">
-                </div>
+                ${precoOriginalFormatado ? `<span class="preco-antigo text-decoration-line-through small text-muted">R$ ${precoOriginalFormatado}</span>` : ''}
                 
-                <div class="card-body d-flex flex-column p-3" style="min-height: 180px; text-align: left;">
-                    ${precoOriginalFormatado ? `<span class="preco-antigo" style="text-decoration: line-through; color: #888; font-size: 12px;">R$ ${precoOriginalFormatado}</span>` : '<div style="height: 18px;"></div>'}
-                    
-                    <div class="d-flex align-items-baseline gap-1 mb-1">
-                        <h3 style="color: #00a650; font-size: 24px; font-weight: 700; margin: 0;">R$ ${precoInteiro}<small style="font-size: 14px; vertical-align: super;">${precoCentavos}</small></h3>
-                        ${item.tag ? `<span style="color: #00a650; font-weight: 600; font-size: 14px; margin-left: 5px;">${item.tag}</span>` : ''}
-                    </div>
-
-                    <div style="font-size: 13px; color: #333; margin-bottom: 4px; font-weight: 400;">
-                        ${item.installments || `em 10x R$ ${((item.preco || 0)/10).toFixed(2).replace('.', ',')} sem juros`}
-                    </div>
-
-                    <div style="color: #00a650; font-size: 14px; font-weight: 600; margin-bottom: 8px;">
-                        <i class="bi bi-lightning-charge-fill" style="font-size: 12px;"></i> <span style="font-style: italic; font-weight: 800; font-size: 12px;">FULL</span>
-                    </div>
-
-                    <p style="font-size: 14px; color: #333; line-height: 1.2; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin: 0;">
-                        ${item.titulo}
-                    </p>
-                    ${sellerMeta}
+                <div class="price-container mb-2">
+                    <h3 class="current-price">R$ ${precoInteiro}<small style="font-size: 12px; vertical-align: super;">${precoCentavos}</small></h3>
                 </div>
+
+                <div class="shipping-tag ${item.realizaEntrega ? 'text-success' : 'text-muted'} small fw-bold">
+                    <i class="bi ${item.realizaEntrega ? 'bi-truck' : 'bi-geo-alt'}"></i> 
+                    ${item.realizaEntrega ? 'Realiza entrega' : 'Apenas retirada'}
+                </div>
+                ${sellerMeta}
             </div>
         </div>
     `;
@@ -660,45 +709,52 @@ window.showProductDetail = function(productId) {
                          style="object-fit: contain; max-height: 400px;">
                     ${item.tag ? `<span class="badge bg-danger position-absolute top-0 end-0 m-2 fs-6">${item.tag}</span>` : ''}
                 </div>
-                <div class="d-flex justify-content-center mt-3 gap-2">
-                    <button class="btn btn-outline-danger rounded-pill px-3 py-2" onclick="mostrarNotificacao('Adicionado aos curtidos!', 'sucesso')">
-                        <i class="bi bi-heart-fill me-1"></i> Curtir
-                    </button>
-                    <button class="btn btn-outline-secondary rounded-pill px-3 py-2"><i class="bi bi-share"></i></button>
-                </div>
             </div>
             <div class="col-md-7">
                 ${alertDemo}
                 
                 <div class="d-flex align-items-center gap-2 mb-3" style="font-family: 'Sora', sans-serif;">
-                    <span class="badge" style="background-color: #131673;">${item.loja}</span>
-                    <span class="badge" style="background-color: #00a650;">Novo</span>
+                    <span class="badge" style="background-color: var(--market-color);">Vendedor: ${item.loja}</span>
+                    <span class="badge bg-secondary">Novo</span>
                     ${item.source && item.source !== 'DEMO' ? `<span class="badge bg-info">Via ${item.source}</span>` : ''}
                 </div>
                 
-                <h4 style="font-family: 'Sora', sans-serif; font-weight: 600; color: #333;" class="mb-3">${item.titulo}</h4>
+                <h4 class="mb-3 fw-bold">${item.titulo}</h4>
                 
-                <div class="d-flex align-items-center mb-3">
+                <div class="d-flex align-items-center mb-2">
                     <span class="text-warning fs-4 me-2">${'★'.repeat(Math.floor(item.rating || 0))}</span>
-                    <span style="color: #888; font-family: 'Sora', sans-serif;">(${item.reviews || 0} avaliações)</span>
+                    <span class="text-muted small">(${item.reviews || 0} avaliações)</span>
+                </div>
+
+                <div class="text-muted small mb-3">
+                    Disponível em estoque: <strong>${item.quantidade || 0} unidades</strong>
                 </div>
                 
                 <div class="mb-4">
                     ${precoOriginalFormatado ? `<h4 class="text-muted text-decoration-line-through mb-0">R$ ${precoOriginalFormatado}</h4>` : ''}
-                    <h2 class="text-success fw-bold mb-2">R$ ${precoFormatado}</h2>
-                    ${item.delivery ? `<div class="text-success"><i class="bi bi-truck"></i> ${item.delivery}</div>` : ''}
+                    <h2 class="fw-bold mb-2" style="color: var(--text-main);">R$ ${precoFormatado}</h2>
+                    <div class="${item.realizaEntrega ? 'text-success' : 'text-warning'} fw-bold small">
+                        <i class="bi ${item.realizaEntrega ? 'bi-truck' : 'bi-geo-alt'}"></i> 
+                        ${item.realizaEntrega ? 'Este vendedor realiza entregas' : 'Disponível apenas para retirada'}
+                    </div>
                 </div>
 
-                <div class="p-3 bg-light rounded mb-4 border">
-                    <h6 class="fw-bold small mb-2 text-uppercase">Descrição do Vendedor</h6>
+                <div class="p-3 rounded mb-4 border bg-opacity-10" style="background-color: var(--bg-color);">
+                    <h6 class="fw-bold small mb-2 text-uppercase">Descrição do produto</h6>
                     <p class="mb-0 small text-secondary" style="white-space: pre-line;">${item.descricao || 'O vendedor não forneceu uma descrição detalhada para este item.'}</p>
                 </div>
                 
-                <div class="d-grid gap-2" style="font-family: 'Sora', sans-serif;">
-                    <button class="btn btn-primary btn-lg py-3 fw-bold" style="background-color: var(--primary-blue);">COMPRAR AGORA</button>
-                    <button class="btn btn-outline-primary btn-lg py-3 fw-bold" onclick="window.addToCart()">ADICIONAR AO CARRINHO</button>
-                    <button class="btn btn-link btn-sm text-muted mt-2" onclick="window.open('https://www.google.com/search?tbm=shop&q=${encodeURIComponent(item.titulo)}', '_blank')">
-                        <i class="bi bi-search me-1"></i> Pesquisar preço no Google
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-lg py-3 fw-bold">COMPRAR AGORA</button>
+                    <button class="btn btn-outline-primary btn-lg py-3 fw-bold" onclick="window.addToCart('${item.productKey}')">ADICIONAR AO CARRINHO</button>
+                </div>
+
+                <div class="d-flex justify-content-center mt-3 gap-4">
+                    <button class="btn btn-link text-decoration-none text-danger fw-bold p-0" onclick="window.toggleLike('${productId}')">
+                        <i class="bi bi-heart me-1"></i> Curtir
+                    </button>
+                    <button class="btn btn-link text-decoration-none text-secondary fw-bold p-0" onclick="window.shareProduct('${productId}')">
+                        <i class="bi bi-share me-1"></i> Compartilhar
                     </button>
                 </div>
             </div>
@@ -716,14 +772,28 @@ window.showProductDetail = function(productId) {
 function applyFilters() {
     const min = parseFloat(document.getElementById('minPrice')?.value) || 0;
     const max = parseFloat(document.getElementById('maxPrice')?.value) || Infinity;
+    const sort = document.getElementById('sortOrder')?.value || 'default';
     
     const selectedStores = Array.from(document.querySelectorAll('.store-checkbox:checked')).map(cb => cb.value);
     
-    const filtered = allProductsCache.filter(p => {
+    let filtered = allProductsCache.filter(p => {
         const priceMatch = (p.preco || 0) >= min && (p.preco || 0) <= max;
         const storeMatch = selectedStores.length === 0 || selectedStores.includes(p.loja);
         return priceMatch && storeMatch;
     });
+
+    // Lógica de Ordenação
+    if (sort === 'recent') {
+        // Ordena por data de criação (do mais novo para o mais antigo)
+        filtered.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    } else if (sort === 'rating') {
+        // Ordena por nota de avaliação (do maior para o menor)
+        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (sort === 'priceAsc') {
+        filtered.sort((a, b) => (a.preco || 0) - (b.preco || 0));
+    } else if (sort === 'priceDesc') {
+        filtered.sort((a, b) => (b.preco || 0) - (a.preco || 0));
+    }
     
     renderFilteredGrid(filtered);
 }
@@ -744,10 +814,8 @@ function renderFilteredGrid(products) {
         return;
     }
     
-    const hasDemo = products.some(p => p.isMock || p.source === 'DEMO');
-    
     let html = '';
-    if (hasDemo) {
+    if (products.some(p => p.isMock || p.source === 'DEMO')) {
         html += `
             <div class="col-12 mb-4">
                 <div class="alert alert-info alert-dismissible fade show" role="alert">
@@ -763,9 +831,7 @@ function renderFilteredGrid(products) {
             </div>`;
     }
     
-    html += `<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">`;
     html += products.map(item => renderCard(item)).join('');
-    html += `</div>`;
     
     grid.innerHTML = html;
 }
@@ -791,6 +857,7 @@ function updateStoreFilterUI() {
 function clearFilters() {
     document.getElementById('minPrice').value = '';
     document.getElementById('maxPrice').value = '';
+    if (document.getElementById('sortOrder')) document.getElementById('sortOrder').value = 'default';
     document.querySelectorAll('.store-checkbox').forEach(cb => cb.checked = true);
     renderFilteredGrid(allProductsCache);
 }
@@ -1071,6 +1138,7 @@ async function handleProfileUpdate(event) {
         updateShippingAddress();
         updateVisibilityByRole();
         
+        addNotification("Perfil Atualizado", "Suas informações de conta foram salvas.", "bi-person-gear", "info");
         alert('Perfil atualizado com sucesso!');
         bootstrap.Offcanvas.getInstance(document.getElementById('profileEditOffcanvas'))?.hide();
     } catch (e) {
@@ -1113,7 +1181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(getSavedTheme());
     updateShippingAddress();
     updateVisibilityByRole();
-    updateCartBadge();
+    renderCart(); // Inicializa e exibe o estado atual do carrinho
 
     // Configura o evento do botão de administração
     const btnInit = document.getElementById('btnInitDb');
@@ -1126,8 +1194,109 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPage('eletronicos');
 });
 
+function updateCartBadge() {
+    cartCount = cart.reduce((acc, item) => acc + (item.qtd || 1), 0);
+    const badges = [document.getElementById('cartBadgeDesktop'), document.getElementById('cartBadgeMobile')];
+    badges.forEach(badge => {
+        if (badge) {
+            badge.textContent = cartCount;
+            badge.classList.toggle('d-none', cartCount === 0);
+        }
+    });
+}
+
+window.renderCart = function() {
+    const list = document.getElementById('cartItemsList');
+    const totalEl = document.getElementById('cartTotalValue');
+    if (!list) return;
+
+    if (cart.length === 0) {
+        list.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-cart-x fs-1 d-block mb-3"></i>Seu carrinho está vazio</div>`;
+        totalEl.textContent = 'R$ 0,00';
+        updateCartBadge();
+        return;
+    }
+
+    let total = 0;
+    list.innerHTML = cart.map((item, index) => {
+        total += item.preco * (item.qtd || 1);
+        return `
+        <div class="cart-item border rounded p-2 mb-2">
+            <div class="d-flex gap-3 align-items-center">
+                <img src="${item.img}" class="cart-item-img border rounded">
+                <div class="flex-grow-1 overflow-hidden">
+                    <div class="cart-item-title text-truncate-2">${item.titulo}</div>
+                    <div class="fw-bold text-success">R$ ${item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    <div class="small text-muted">Qtd: ${item.qtd || 1}</div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mt-2 gap-2">
+                <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="window.removeFromCart(${index})"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-success flex-grow-1" onclick="alert('Comprando: ${item.titulo}')"><i class="bi bi-bag-check"></i> Comprar</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    totalEl.textContent = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    updateCartBadge();
+    localStorage.setItem('holandesVoadorCart', JSON.stringify(cart));
+};
+
+// ============================================
+// FUNÇÕES DE INTERAÇÃO E CARRINHO
+// ============================================
+
+window.addToCart = function(productId) {
+    const product = allProductsCache.find(p => p.productKey === productId);
+    if (!product) return;
+
+    const existing = cart.find(item => item.productKey === productId);
+    if (existing) {
+        existing.qtd = (existing.qtd || 1) + 1;
+    } else {
+        cart.push({ ...product, qtd: 1 });
+    }
+
+    addNotification("Carrinho", `${product.titulo} foi adicionado.`, "bi-cart-plus", "success");
+    renderCart();
+    
+    const cartOffcanvas = document.getElementById('cartOffcanvas');
+    if (cartOffcanvas) {
+        const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(cartOffcanvas);
+        bsOffcanvas.show();
+    }
+};
+
+window.removeFromCart = function(index) {
+    cart.splice(index, 1);
+    renderCart();
+};
+
+window.toggleLike = function(productId) {
+    const product = allProductsCache.find(p => p.productKey === productId);
+    const name = product ? product.titulo : 'Produto';
+    addNotification("Favorito", `Você curtiu: ${name}`, "bi-heart-fill", "danger");
+    alert(`"${name}" adicionado aos seus favoritos!`);
+};
+
+window.shareProduct = function(productId) {
+    addNotification("Compartilhamento", "Link do produto copiado.", "bi-share", "secondary");
+    const url = window.location.href;
+    if (navigator.share) {
+        navigator.share({
+            title: 'ElectroMarket',
+            text: 'Olha que oferta legal que encontrei no ElectroMarket!',
+            url: url
+        }).catch(console.error);
+    } else {
+        navigator.clipboard.writeText(url).then(() => {
+            alert('Link do produto copiado para a área de transferência!');
+        });
+    }
+};
+
 // Exports
 window.loadPage = loadPage;
 window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
-window.showProductDetail = window.showProductDetail;
+window.toggleTheme = toggleTheme;
