@@ -16,7 +16,7 @@
 <body>
     <!-- Header Estilo Mercado Livre (Azul e Verde) -->
     <header class="header-main">
-        <div class="container py-1">
+        <div class="container py-2">
             <!-- Linha Superior: Logo e Busca -->
             <div class="row align-items-center g-2 g-md-4">
                 <div class="col-md-2 d-flex align-items-center">
@@ -53,6 +53,9 @@
                         <a href="#" class="btn btn-icon btn-simple position-relative" title="Notificações" data-bs-toggle="modal" data-bs-target="#notificacoesModal">
                             <i class="bi bi-bell"></i>
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBadgeDesktop">2</span>
+                        </a>
+                        <a href="#" class="btn btn-icon btn-simple role-client d-none" title="Minhas Compras" onclick="window.renderOrderManagement('buyer')">
+                            <i class="bi bi-bag-check"></i>
                         </a>
                         <a href="#" class="btn btn-icon btn-simple position-relative" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
                             <i class="bi bi-cart2"></i>
@@ -91,7 +94,7 @@
                         </div>
                         <a href="#" class="text-white text-decoration-none role-client" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas"><i class="bi bi-filter-left me-1"></i> Filtros</a>
                         <a href="#" class="text-white text-decoration-none role-client" onclick="loadPage('Smartphone')"><i class="bi bi-tag me-1"></i> Ofertas</a>
-                        <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderOrderManagement('buyer')"><i class="bi bi-bag-check me-1"></i> Minhas Compras</a>
+                        <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderLikedProducts()"><i class="bi bi-heart me-1"></i> Curtidos</a>
                         <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderAccessHistory()"><i class="bi bi-clock-history me-1"></i> Histórico</a>
                         <a href="#" class="text-white-50 text-decoration-none role-seller" data-bs-toggle="modal" data-bs-target="#announceModal"><i class="bi bi-plus-circle me-1"></i> Vender Agora</a>
                         <a href="#" class="text-white text-decoration-none role-seller" onclick="window.renderSellerPanel('pending')"><i class="bi bi-shop me-1"></i> Minhas Vendas</a>
