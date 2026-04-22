@@ -17,8 +17,23 @@ let cartCount = cart.reduce((acc, item) => acc + (item.qtd || 1), 0);
 let currentChat = null;
 let chats = JSON.parse(localStorage.getItem('electro_chats')) || [];
 let orders = JSON.parse(localStorage.getItem('electro_orders')) || [];
+let accessHistory = JSON.parse(localStorage.getItem('electro_access_history')) || [];
 let chatRefreshInterval = null;
 let dbCache = null; // Cache IndexedDB
+
+// Mapeamento amigável de Status
+const ORDER_STATUS_MAP = {
+    'pending': { label: 'Solicitado', class: 'status-pending' },
+    'accepted': { label: 'Aceito (Chat)', class: 'status-accepted' },
+    'agreement': { label: 'Aguardando Confirmação', class: 'status-accepted' },
+    'shipping': { label: 'Em Envio', class: 'status-shipping' },
+    'awaiting_pickup': { label: 'Aguardando Retirada', class: 'status-shipping' },
+    'shipped': { label: 'Enviado', class: 'status-shipping' },
+    'received': { label: 'Recebido', class: 'status-finished' },
+    'finished': { label: 'Finalizado', class: 'status-finished' },
+    'cancelled': { label: 'Cancelado', class: 'status-dispute' },
+    'dispute': { label: 'Em Análise Admin', class: 'status-dispute' }
+};
 
 // ============================================
 // CACHE SYSTEM (IndexedDB)
@@ -684,85 +699,140 @@ function renderCard(item) {
 // MODAL E INTERAÇÃO
 // ============================================
 
+window.renderAccessHistory = function() {
+    const grid = document.getElementById('productsGrid');
+    const gridTitle = document.getElementById('gridTitle');
+    gridTitle.textContent = "Produtos que você viu recentemente";
+    
+    // Filtra os produtos do cache que estão no array de IDs do histórico
+    const historyProducts = accessHistory
+        .map(id => allProductsCache.find(p => p.productKey === id))
+        .filter(Boolean)
+        .reverse(); // Mais recentes primeiro
+
+    if (historyProducts.length === 0) {
+        grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Seu histórico está vazio.</h5></div>`;
+        return;
+    }
+    grid.innerHTML = historyProducts.map(item => renderCard(item)).join('');
+};
+
 window.showProductDetail = function(productId) {
     const item = allProductsCache.find(p => String(p.productKey) === String(productId) || String(p.id) === String(productId));
     if (!item) return;
     
-    const modalContent = document.getElementById('productDetailContent');
-    const precoFormatado = item.preco 
-        ? item.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-        : '---';
+    // Adiciona ao histórico (evitando duplicatas)
+    accessHistory = accessHistory.filter(id => id !== item.productKey);
+    accessHistory.push(item.productKey);
+    if (accessHistory.length > 20) accessHistory.shift(); // Limita a 20 itens
+    localStorage.setItem('electro_access_history', JSON.stringify(accessHistory));
     
-    const precoOriginalFormatado = item.preco_original 
-        ? item.preco_original.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-        : null;
+    const modalContent = document.getElementById('productDetailContent');
+    
+    // Lógica de Preço Quebrado (Cifrão, Inteiro e Centavos)
+    const preco = item.preco || 0;
+    const precoInteiro = Math.floor(preco).toLocaleString('pt-BR');
+    const precoCentavos = (preco % 1).toFixed(2).substring(2);
+    const precoOriginal = item.preco_original ? item.preco_original.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : null;
     
     const isDemo = item.isMock || item.source === 'DEMO';
-    
-    const alertDemo = isDemo 
-        ? `<div class="alert alert-warning alert-dismissible fade show" role="alert">
-             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-             <strong>Modo Demonstração:</strong> Dados simulados. Clique "Ver no Google Shopping" para preços reais.
-             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-           </div>`
-        : '';
+    const userInfo = getSavedCadastro();
     
     modalContent.innerHTML = `
-        <div class="row g-4">
-            <div class="col-md-5">
-                <div class="position-relative">
+        <div class="row g-0 g-md-5">
+            <!-- Coluna 1: Imagens -->
+            <div class="col-md-7 border-end pe-md-4">
+                <div class="product-gallery text-center mb-4">
                     <img src="${item.img || 'https://via.placeholder.com/400'}" 
-                         class="img-fluid rounded border w-100" 
-                         style="object-fit: contain; max-height: 400px;">
-                    ${item.tag ? `<span class="badge bg-danger position-absolute top-0 end-0 m-2 fs-6">${item.tag}</span>` : ''}
+                         class="img-fluid" 
+                         style="max-height: 450px; object-fit: contain;">
+                </div>
+                
+                <div class="description-section-ml d-none d-md-block">
+                    <h3>Descrição</h3>
+                    <p class="text-secondary" style="white-space: pre-line; font-size: 1.1rem;">${item.descricao || 'Este vendedor não incluiu uma descrição para o produto.'}</p>
                 </div>
             </div>
-            <div class="col-md-7">
-                ${alertDemo}
+
+            <!-- Coluna 2: Info de Venda -->
+            <div class="col-md-5">
+                <div class="product-detail-condition">Novo  |  +50 vendidos</div>
+                <h1 class="product-detail-title">${item.titulo}</h1>
                 
-                <div class="d-flex align-items-center gap-2 mb-3" style="font-family: 'Sora', sans-serif;">
-                    <span class="badge" style="background-color: var(--market-color);">Vendedor: ${item.loja}</span>
-                    <span class="badge bg-secondary">Novo</span>
-                    ${item.source && item.source !== 'DEMO' ? `<span class="badge bg-info">Via ${item.source}</span>` : ''}
-                </div>
-                
-                <h4 class="mb-3 fw-bold">${item.titulo}</h4>
-                
-                <div class="d-flex align-items-center mb-2">
-                    <span class="text-warning fs-4 me-2">${'★'.repeat(Math.floor(item.rating || 0))}</span>
-                    <span class="text-muted small">(${item.reviews || 0} avaliações)</span>
+                <div class="d-flex align-items-center mb-3 gap-2" id="likesCounterContainer">
+                    <span class="text-danger small"><i class="bi bi-heart-fill"></i></span>
+                    <span class="text-muted small">${item.likes || 0} pessoas curtiram este produto</span>
                 </div>
 
-                <div class="text-muted small mb-3">
-                    Disponível em estoque: <strong>${item.quantidade || 0} unidades</strong>
-                </div>
-                
-                <div class="mb-4">
-                    ${precoOriginalFormatado ? `<h4 class="text-muted text-decoration-line-through mb-0">R$ ${precoOriginalFormatado}</h4>` : ''}
-                    <h2 class="fw-bold mb-2" style="color: var(--text-main);">R$ ${precoFormatado}</h2>
-                    <div class="${item.realizaEntrega ? 'text-success' : 'text-warning'} fw-bold small">
-                        <i class="bi ${item.realizaEntrega ? 'bi-truck' : 'bi-geo-alt'}"></i> 
-                        ${item.realizaEntrega ? 'Este vendedor realiza entregas' : 'Disponível apenas para retirada'}
+                <div class="price-area">
+                    ${precoOriginal ? `<del class="text-muted small">R$ ${precoOriginal}</del>` : ''}
+                    <div class="product-detail-price">
+                        <span class="currency">R$</span>
+                        <span class="integer">${precoInteiro}</span>
+                        <span class="cents">${precoCentavos}</span>
                     </div>
                 </div>
 
-                <div class="p-3 rounded mb-4 border bg-opacity-10" style="background-color: var(--bg-color);">
-                    <h6 class="fw-bold small mb-2 text-uppercase">Descrição do produto</h6>
-                    <p class="mb-0 small text-secondary" style="white-space: pre-line;">${item.descricao || 'O vendedor não forneceu uma descrição detalhada para este item.'}</p>
-                </div>
-                
-                <div class="d-grid gap-2">
-                    <button class="btn btn-primary btn-lg py-3 fw-bold">COMPRAR AGORA</button>
-                    <button class="btn btn-outline-primary btn-lg py-3 fw-bold" onclick="window.addToCart('${item.productKey}')">ADICIONAR AO CARRINHO</button>
+                <div class="shipping-card-detail">
+                    ${item.realizaEntrega ? `
+                        <div class="d-flex gap-2">
+                            <i class="bi bi-truck text-success"></i>
+                            <div>
+                                <div class="text-success fw-bold">Frete Grátis</div>
+                                <div class="small text-muted">Chegará entre amanhã e quarta-feira em <b>${userInfo?.cidade || 'sua região'}</b></div>
+                                <span class="small text-muted">Envio prioritário ElectroMarket.</span>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="d-flex gap-2">
+                            <i class="bi bi-geo-alt text-warning"></i>
+                            <div>
+                                <div class="text-warning fw-bold">Retirada no local</div>
+                                <div class="small text-muted">Combine local e horário com o vendedor em <b>${item.cidade || 'região do vendedor'}</b></div>
+                                <span class="small text-muted d-block">Este vendedor não realiza entregas.</span>
+                            </div>
+                        </div>
+                    `}
                 </div>
 
-                <div class="d-flex justify-content-center mt-3 gap-4">
-                    <button class="btn btn-link text-decoration-none text-danger fw-bold p-0" onclick="window.toggleLike('${productId}')">
-                        <i class="bi bi-heart me-1"></i> Curtir
-                    </button>
-                    <button class="btn btn-link text-decoration-none text-secondary fw-bold p-0" onclick="window.shareProduct('${productId}')">
-                        <i class="bi bi-share me-1"></i> Compartilhar
-                    </button>
+                <div class="seller-reputation-card">
+                    <p class="mb-1 small">Vendido por <span class="text-primary">${item.loja}</span></p>
+                    <div class="reputation-bar">
+                        ${Array(5).fill(0).map((_, i) => `<div class="reputation-step ${i < Math.floor(item.vendedor_rating || 5) ? 'active-green' : ''}"></div>`).join('')}
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-warning small">${'★'.repeat(Math.floor(item.vendedor_rating || 5))}</span>
+                        <span class="small text-muted">${item.vendedor_rating ? item.vendedor_rating.toFixed(1) : '5.0'} | Pontuação do Vendedor</span>
+                    </div>
+                </div>
+
+                <p class="small mb-3">Estoque disponível: <b>${item.quantidade || 1} unidades</b></p>
+
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn-buy-now" onclick="window.finalizarCompraMock(0)">Solicitar Compra</button>
+                    <button class="btn-add-to-cart-ml" onclick="window.addToCart('${item.productKey}')">Adicionar ao carrinho</button>
+                </div>
+                <button class="btn btn-link text-decoration-none w-100 text-secondary fw-bold small mb-4" onclick="window.shareProduct('${item.productKey}')">
+                    <i class="bi bi-share me-2"></i>Compartilhar produto
+                </button>
+
+                <div class="benefits-list">
+                    <div class="benefit-item-ml">
+                        <i class="bi bi-arrow-return-left"></i>
+                        <div><span class="text-primary">Devolução grátis.</span> Você tem 30 dias a partir do recebimento.</div>
+                    </div>
+                    <div class="benefit-item-ml">
+                        <i class="bi bi-shield-check"></i>
+                        <div><span class="text-primary">Compra Garantida</span>, receba o produto que está esperando ou devolvemos o dinheiro.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Descrição Mobile -->
+            <div class="col-12 d-md-none mt-4">
+                <div class="description-section-ml">
+                    <h3>Descrição</h3>
+                    <p class="text-secondary">${item.descricao || 'Sem descrição.'}</p>
                 </div>
             </div>
         </div>
@@ -1279,11 +1349,25 @@ window.removeFromCart = function(index) {
     renderCart();
 };
 
-window.toggleLike = function(productId) {
+window.toggleLike = async function(productId) {
     const product = allProductsCache.find(p => p.productKey === productId);
-    const name = product ? product.titulo : 'Produto';
-    addNotification("Favorito", `Você curtiu: ${name}`, "bi-heart-fill", "danger");
-    alert(`"${name}" adicionado aos seus favoritos!`);
+    if (!product) return;
+
+    // Incrementa no banco de dados real
+    product.likes = (product.likes || 0) + 1;
+    
+    if (fullDatabase) {
+        const dbIndex = fullDatabase.products.findIndex(p => getProductKey(p) === productId);
+        if (dbIndex !== -1) {
+            fullDatabase.products[dbIndex].likes = product.likes;
+            await updateFullDatabase(fullDatabase);
+        }
+    }
+
+    addNotification("Favorito", `Você curtiu: ${product.titulo}`, "bi-heart-fill", "danger");
+    // Atualiza o contador se o modal estiver aberto
+    const counter = document.querySelector('#likesCounterContainer span.text-muted');
+    if (counter) counter.textContent = `${product.likes} pessoas curtiram este produto`;
 };
 
 window.shareProduct = function(productId) {
@@ -1368,23 +1452,302 @@ function selectChat(chatId) {
     loadChatContacts();
 }
 
+window.renderOrderManagement = function(type = 'buyer') {
+    const info = getSavedCadastro();
+    if (!info) return alert("Faça login para gerenciar pedidos.");
+
+    const grid = document.getElementById('productsGrid');
+    const gridTitle = document.getElementById('gridTitle');
+    
+    let filteredOrders = [];
+    if (type === 'buyer') {
+        filteredOrders = orders.filter(o => o.buyerId === info.id);
+        gridTitle.textContent = "Minhas Compras";
+    } else if (type === 'seller') {
+        filteredOrders = orders.filter(o => o.sellerId === info.id);
+        gridTitle.textContent = "Minhas Vendas (Solicitações)";
+    } else if (type === 'admin') {
+        filteredOrders = orders.filter(o => o.status === 'dispute');
+        gridTitle.textContent = "Painel Administrativo - Disputas";
+    }
+
+    // Atualiza badge de pendentes se existir
+    const pendingBadge = document.getElementById('pendingOrdersBadge');
+    if (pendingBadge && type === 'seller') {
+        const count = orders.filter(o => o.sellerId === info.id && o.status === 'pending').length;
+        pendingBadge.textContent = count;
+        pendingBadge.classList.toggle('d-none', count === 0);
+    }
+
+    if (filteredOrders.length === 0) {
+        grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Nenhum pedido encontrado.</h5></div>`;
+        return;
+    }
+
+    grid.innerHTML = filteredOrders.map(order => `
+        <div class="col-12 mb-3">
+            <div class="card order-management-card p-3 shadow-sm ${order.status === 'dispute' ? 'dispute-alert' : ''}">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <span class="status-badge ${ORDER_STATUS_MAP[order.status].class}">${ORDER_STATUS_MAP[order.status].label}</span>
+                        <h6 class="mt-2 mb-1 fw-bold">${order.productTitle}</h6>
+                        <p class="small text-muted mb-0">ID: #${order.id.slice(-8)} | ${new Date(order.createdAt).toLocaleDateString()}</p>
+                        <p class="small mb-0"><strong>${type === 'seller' ? 'Comprador' : 'Vendedor'}:</strong> ${type === 'seller' ? order.buyerName : order.sellerName}</p>
+                        <p class="small mb-0"><strong>Entrega:</strong> ${order.realizaEntrega ? 'Realiza Entrega' : 'Apenas Retirada'}</p>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="fw-bold text-success">R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')">Ver Chat</button>
+                            ${order.status === 'accepted' ? `
+                                <button class="btn btn-sm btn-success" onclick="window.quickConfirmAgreement('${order.id}')">
+                                    ✅ Confirmar Acordo
+                                </button>
+                            ` : ''}
+                            ${order.status === 'pending' && type === 'seller' ? `
+                                <button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
+                                <button class="btn btn-sm btn-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
+                            ` : ''}
+                            ${order.status === 'dispute' && type === 'admin' ? `
+                                <button class="btn btn-sm btn-warning" onclick="window.resolveDispute('${order.id}', 'finished')">Finalizar</button>
+                                <button class="btn btn-sm btn-danger" onclick="window.resolveDispute('${order.id}', 'cancelled')">Reembolsar</button>
+                            ` : ''}
+                            ${type === 'admin' ? `
+                                <button class="btn btn-sm btn-info text-white" onclick="window.showOrderDetailsAdmin('${order.id}')">Detalhes</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+};
+
+window.renderSellerPanel = function(filterStatus = 'pending') {
+    const info = getSavedCadastro();
+    if (!info || info.tipo !== 'VENDEDOR') return;
+    
+    const grid = document.getElementById('productsGrid');
+    const gridTitle = document.getElementById('gridTitle');
+    gridTitle.textContent = "Painel do Vendedor - Solicitações";
+    
+    let filteredOrders = orders.filter(o => o.sellerId === info.id);
+    
+    const tabsHtml = `
+        <div class="col-12 mb-4">
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <a class="nav-link ${filterStatus === 'pending' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('pending')">Pendentes</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link ${filterStatus === 'accepted' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('accepted')">Aceitos/Aguardando</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link ${filterStatus === 'shipping' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('shipping')">Em Andamento</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link ${filterStatus === 'finished' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('finished')">Finalizados</a>
+                </li>
+            </ul>
+        </div>
+    `;
+    
+    if (filterStatus === 'pending') filteredOrders = filteredOrders.filter(o => o.status === 'pending');
+    else if (filterStatus === 'accepted') filteredOrders = filteredOrders.filter(o => o.status === 'accepted' || o.status === 'agreement');
+    else if (filterStatus === 'shipping') filteredOrders = filteredOrders.filter(o => ['shipping', 'awaiting_pickup', 'shipped'].includes(o.status));
+    else if (filterStatus === 'finished') filteredOrders = filteredOrders.filter(o => ['finished', 'cancelled'].includes(o.status));
+    
+    grid.innerHTML = tabsHtml + filteredOrders.map(order => `
+        <div class="col-12 mb-3">
+            <div class="card order-management-card p-3 shadow-sm">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <span class="status-badge ${ORDER_STATUS_MAP[order.status].class}">${ORDER_STATUS_MAP[order.status].label}</span>
+                        <h6 class="mt-2 mb-1 fw-bold">${order.productTitle}</h6>
+                        <p class="small text-muted mb-0">ID: #${order.id.slice(-8)}</p>
+                        <p class="small mb-0"><strong>Comprador:</strong> ${order.buyerName}</p>
+                        <p class="small mb-0"><strong>Entrega:</strong> ${order.realizaEntrega ? 'Entrega' : 'Retirada'}</p>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="fw-bold text-success">R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')">Chat</button>
+                            ${order.status === 'pending' ? `
+                                <button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
+                                <button class="btn btn-sm btn-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
+                            ` : ''}
+                            ${order.status === 'accepted' ? `<button class="btn btn-sm btn-success" onclick="window.quickConfirmAgreement('${order.id}')">Confirmar Acordo</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    if (filteredOrders.length === 0) grid.innerHTML += `<div class="col-12 text-center py-5"><h5>Nenhum pedido encontrado.</h5></div>`;
+};
+
+window.quickConfirmAgreement = function(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    const info = getSavedCadastro();
+    const chat = chats.find(c => c.orderId === orderId);
+    if (!chat) return alert("Erro: Chat não encontrado.");
+
+    if (info.id === order.buyerId) order.agreeBuyer = true;
+    if (info.id === order.sellerId) order.agreeSeller = true;
+
+    chat.messages.push({ senderId: 'system', text: `📢 ${info.nome} confirmou o acordo.`, timestamp: new Date().toISOString(), type: 'system' });
+
+    if (order.agreeBuyer && order.agreeSeller) {
+        const entrega = chat.realizaEntrega || order.realizaEntrega;
+        order.status = entrega ? 'shipping' : 'awaiting_pickup';
+        chat.messages.push({ senderId: 'system', text: `🚀 Acordo mútuo! O pedido agora está em fase de ${entrega ? 'envio' : 'retirada'}.`, timestamp: new Date().toISOString(), type: 'system' });
+        addNotification("Pedido Avançado", `O pedido está em ${entrega ? 'envio' : 'retirada'}.`, "bi-check-circle", "success");
+    } else {
+        addNotification("Confirmação Registrada", "Aguardando confirmação da outra parte.", "bi-clock", "info");
+    }
+
+    saveAndRefresh(chat);
+    window.renderOrderManagement(info.tipo === 'VENDEDOR' ? 'seller' : 'buyer');
+};
+
+window.showOrderDetailsAdmin = function(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    const chat = chats.find(c => c.orderId === orderId);
+    const modalHtml = `
+        <div class="modal fade" id="adminOrderDetailModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Detalhes do Pedido #${order.id.slice(-8)}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 border-end">
+                                <p><strong>Produto:</strong> ${order.productTitle}</p>
+                                <p><strong>Cliente:</strong> ${order.buyerName}</p>
+                                <p><strong>Vendedor:</strong> ${order.sellerName}</p>
+                                <p><strong>Status:</strong> ${order.status}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Histórico do Chat:</strong></p>
+                                <div class="p-2 bg-light small" style="height:150px; overflow-y:auto;">
+                                    ${chat ? chat.messages.map(m => `<div>[${m.senderId}] ${m.text}</div>`).join('') : 'Sem chat'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('adminOrderDetailModal')).show();
+};
+
 function renderMessages(chat) {
     const container = document.getElementById('chatMessagesContainer');
+    const actionsContainer = document.getElementById('chatActionButtons');
+    const order = orders.find(o => o.id === chat.orderId);
     const info = getSavedCadastro();
     
+    // Renderiza mensagens
     container.innerHTML = chat.messages.map(msg => {
         if (msg.type === 'system') return `<div class="message-system"><span class="badge">${msg.text}</span></div>`;
         const isMe = msg.senderId === info.id;
         return `
             <div class="chat-message ${isMe ? 'message-sent' : 'message-received'}">
                 <div class="message-bubble shadow-sm">
-                    <div>${msg.text}</div>
+                    <div style="word-break: break-word;">${msg.text}</div>
                     <div class="message-time">${formatTime(msg.timestamp)}</div>
                 </div>
             </div>`;
     }).join('');
+    
+    // Lógica de Botões de Acordo e Confirmação
+    actionsContainer.innerHTML = '';
+    if (order && order.status === 'accepted') {
+        const hasAgreed = (info.id === order.buyerId && order.agreeBuyer) || (info.id === order.sellerId && order.agreeSeller);
+        actionsContainer.innerHTML = `
+            <button class="btn btn-warning fw-bold" onclick="window.confirmAgreement('${order.id}')" ${hasAgreed ? 'disabled' : ''}>
+                ${hasAgreed ? '✅ Você Confirmou o Acordo' : '🤝 Confirmar Acordo de Entrega'}
+            </button>
+        `;
+    } else if (order && (order.status === 'shipping' || order.status === 'shipped' || order.status === 'awaiting_pickup')) {
+        if (info.id === order.sellerId) {
+            actionsContainer.innerHTML = `<button class="btn btn-primary fw-bold" onclick="window.updateOrderStatus('${order.id}', 'shipped')">📦 Marcar como Enviado/Entregue</button>`;
+        } else {
+            actionsContainer.innerHTML = `
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success flex-grow-1 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'finished')">✅ Recebi o Produto</button>
+                    <button class="btn btn-danger flex-grow-1 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'dispute')">❌ Não Recebi / Problema</button>
+                </div>
+            `;
+        }
+    }
+
     container.scrollTop = container.scrollHeight;
 }
+
+window.confirmAgreement = function(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    const info = getSavedCadastro();
+    const chat = chats.find(c => c.orderId === orderId);
+
+    if (info.id === order.buyerId) order.agreeBuyer = true;
+    if (info.id === order.sellerId) order.agreeSeller = true;
+
+    const realizaEntrega = chat?.realizaEntrega || order.realizaEntrega || false;
+
+    chat.messages.push({ 
+        senderId: 'system', 
+        text: `📢 ${info.nome} confirmou o acordo.`, 
+        timestamp: new Date().toISOString(), 
+        type: 'system' 
+    });
+
+    if (order.agreeBuyer && order.agreeSeller) {
+        order.status = realizaEntrega ? 'shipping' : 'awaiting_pickup';
+        chat.messages.push({ 
+            senderId: 'system', 
+            text: `🚀 Acordo mútuo! O pedido agora está em fase de ${realizaEntrega ? 'envio' : 'retirada'}.`, 
+            timestamp: new Date().toISOString(), 
+            type: 'system' 
+        });
+    }
+
+    saveAndRefresh(chat);
+};
+
+function saveAndRefresh(chat) {
+    localStorage.setItem('electro_orders', JSON.stringify(orders));
+    localStorage.setItem('electro_chats', JSON.stringify(chats));
+    if (chat) renderMessages(chat);
+}
+
+window.updateOrderStatus = function(orderId, newStatus) {
+    const order = orders.find(o => o.id === orderId);
+    const chat = chats.find(c => c.orderId === orderId);
+    if (!order) return;
+
+    order.status = newStatus;
+    const msg = {
+        'accepted': "✅ O vendedor aceitou seu pedido! Chat liberado.",
+        'cancelled': "❌ O pedido foi cancelado/recusado.",
+        'shipped': "📦 Produto postado/disponível!",
+        'finished': "🎉 Pedido finalizado com sucesso!",
+        'dispute': "⚠️ Problema relatado. O pedido foi enviado para análise administrativa."
+    };
+
+    if (chat) {
+        chat.messages.push({ senderId: 'system', text: msg[newStatus] || `Status alterado para: ${newStatus}`, timestamp: new Date().toISOString(), type: 'system' });
+    }
+    
+    saveAndRefresh(chat);
+    addNotification("Status do Pedido", msg[newStatus], "bi-info-circle", newStatus === 'dispute' ? "danger" : "info");
+    if (newStatus === 'accepted') addNotification("Chat Liberado", "Você já pode combinar a entrega no chat.", "bi-chat-dots", "success");
+    if (currentChat) selectChat(currentChat);
+    else renderOrderManagement(getSavedCadastro().tipo === 'VENDEDOR' ? 'seller' : 'buyer');
+};
 
 window.sendChatMessage = function(e) {
     e.preventDefault();
@@ -1428,34 +1791,27 @@ function updateOrderStatusBar(orderId) {
 
     container.innerHTML = `
         <div class="order-status-bar">
-            <div class="status-step ${currentIdx >= 0 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-cart"></i></div><small>Pedido</small></div>
-            <div class="status-step ${currentIdx >= 1 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-check-lg"></i></div><small>Aceito</small></div>
-            <div class="status-step ${currentIdx >= 2 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-truck"></i></div><small>Enviado</small></div>
-            <div class="status-step ${currentIdx >= 3 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-house-heart"></i></div><small>Entregue</small></div>
+            <div class="status-step ${currentIdx >= 0 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-cart"></i></div><small>Solicitado</small></div>
+            <div class="status-step ${currentIdx >= 1 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-check-lg"></i></div><small>Aprovado</small></div>
+            <div class="status-step ${currentIdx >= 2 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-truck"></i></div><small>Envio</small></div>
+            <div class="status-step ${currentIdx >= 3 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-house-heart"></i></div><small>Finalizado</small></div>
         </div>
         ${actionBtn}
     `;
 }
 
-window.updateOrderStatus = function(orderId, newStatus) {
+window.resolveDispute = function(orderId, newStatus) {
     const order = orders.find(o => o.id === orderId);
     const chat = chats.find(c => c.orderId === orderId);
-    if (!order || !chat) return;
-
+    if (!order) return;
     order.status = newStatus;
-    const statusTexts = { 
-        accepted: "✅ O vendedor aceitou seu pedido!", 
-        shipped: "📦 O produto foi postado e está a caminho.", 
-        delivered: "🎉 Pedido finalizado com sucesso!" 
-    };
-
-    chat.messages.push({ senderId: 'system', text: statusTexts[newStatus], timestamp: new Date().toISOString(), type: 'system' });
-    
-    localStorage.setItem('electro_orders', JSON.stringify(orders));
-    localStorage.setItem('electro_chats', JSON.stringify(chats));
-    
-    addNotification("Status do Pedido", statusTexts[newStatus], "bi-info-circle", "info");
-    selectChat(chat.id);
+    const msg = newStatus === 'finished' ? "✅ Pedido finalizado pela administração." : "❌ Pedido cancelado pela administração.";
+    if (chat) {
+        chat.messages.push({ senderId: 'system', text: msg, timestamp: new Date().toISOString(), type: 'system' });
+    }
+    saveAndRefresh(chat);
+    addNotification("Disputa Resolvida", msg, "bi-shield-check", "success");
+    renderOrderManagement('admin');
 };
 
 window.createChatForOrder = function(order) {
@@ -1467,7 +1823,8 @@ window.createChatForOrder = function(order) {
         sellerName: order.sellerName,
         buyerId: order.buyerId,
         buyerName: order.buyerName,
-        participants: [order.buyerId, order.sellerId],
+        participants: [String(order.buyerId), String(order.sellerId)],
+        realizaEntrega: order.realizaEntrega || false,
         messages: [{ senderId: 'system', text: `🛒 Novo pedido #${order.id.slice(-4)} gerado.`, timestamp: new Date().toISOString(), type: 'system' }]
     };
     chats.push(newChat);
@@ -1522,6 +1879,7 @@ window.finalizarCompraMock = function(itemIndex) {
         productTitle: item.titulo,
         total: item.preco,
         status: 'pending',
+        realizaEntrega: item.realizaEntrega || false,
         createdAt: new Date().toISOString()
     };
     orders.push(order);
