@@ -18,6 +18,7 @@ let currentChat = null;
 let chats = JSON.parse(localStorage.getItem('electro_chats')) || [];
 let orders = JSON.parse(localStorage.getItem('electro_orders')) || [];
 let accessHistory = JSON.parse(localStorage.getItem('electro_access_history')) || [];
+let likedProducts = JSON.parse(localStorage.getItem('electro_liked_products')) || [];
 let chatRefreshInterval = null;
 let dbCache = null; // Cache IndexedDB
 
@@ -717,6 +718,22 @@ window.renderAccessHistory = function() {
     grid.innerHTML = historyProducts.map(item => renderCard(item)).join('');
 };
 
+window.renderLikedProducts = function() {
+    const grid = document.getElementById('productsGrid');
+    const gridTitle = document.getElementById('gridTitle');
+    gridTitle.textContent = "Seus Favoritos (Curtidos)";
+    
+    const likedItems = likedProducts
+        .map(id => allProductsCache.find(p => p.productKey === id))
+        .filter(Boolean);
+
+    if (likedItems.length === 0) {
+        grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Você ainda não curtiu nenhum produto.</h5></div>`;
+        return;
+    }
+    grid.innerHTML = likedItems.map(item => renderCard(item)).join('');
+};
+
 window.showProductDetail = function(productId) {
     const item = allProductsCache.find(p => String(p.productKey) === String(productId) || String(p.id) === String(productId));
     if (!item) return;
@@ -1356,6 +1373,12 @@ window.toggleLike = async function(productId) {
     // Incrementa no banco de dados real
     product.likes = (product.likes || 0) + 1;
     
+    // Adiciona à lista pessoal de curtidos
+    if (!likedProducts.includes(productId)) {
+        likedProducts.push(productId);
+        localStorage.setItem('electro_liked_products', JSON.stringify(likedProducts));
+    }
+    
     if (fullDatabase) {
         const dbIndex = fullDatabase.products.findIndex(p => getProductKey(p) === productId);
         if (dbIndex !== -1) {
@@ -1745,8 +1768,85 @@ window.updateOrderStatus = function(orderId, newStatus) {
     saveAndRefresh(chat);
     addNotification("Status do Pedido", msg[newStatus], "bi-info-circle", newStatus === 'dispute' ? "danger" : "info");
     if (newStatus === 'accepted') addNotification("Chat Liberado", "Você já pode combinar a entrega no chat.", "bi-chat-dots", "success");
+    
+    // Se o pedido foi finalizado pelo comprador, abre modal de avaliação
+    if (newStatus === 'finished') {
+        const info = getSavedCadastro();
+        if (info.id === order.buyerId) {
+            window.showSellerRatingModal(order.sellerId, order.sellerName);
+        }
+    }
+
     if (currentChat) selectChat(currentChat);
     else renderOrderManagement(getSavedCadastro().tipo === 'VENDEDOR' ? 'seller' : 'buyer');
+};
+
+// --- SISTEMA DE AVALIAÇÃO DE VENDEDOR ---
+window.showSellerRatingModal = function(sellerId, sellerName) {
+    const modalHtml = `
+        <div class="modal fade" id="sellerRatingModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title fw-bold">Avaliar Vendedor</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center p-4">
+                        <h6>Como foi sua experiência com <strong>${sellerName}</strong>?</h6>
+                        <div class="fs-2 text-warning my-4" id="sellerStarRating">
+                            <i class="bi bi-star cursor-pointer" data-value="1" onclick="window.setRatingStars(1)"></i>
+                            <i class="bi bi-star cursor-pointer" data-value="2" onclick="window.setRatingStars(2)"></i>
+                            <i class="bi bi-star cursor-pointer" data-value="3" onclick="window.setRatingStars(3)"></i>
+                            <i class="bi bi-star cursor-pointer" data-value="4" onclick="window.setRatingStars(4)"></i>
+                            <i class="bi bi-star cursor-pointer" data-value="5" onclick="window.setRatingStars(5)"></i>
+                        </div>
+                        <input type="hidden" id="ratingValue" value="0">
+                        <input type="hidden" id="ratedSellerId" value="${sellerId}">
+                        <button class="btn btn-success w-100 fw-bold py-2" onclick="window.submitSellerRating()">Enviar Avaliação</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    const existing = document.getElementById('sellerRatingModal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('sellerRatingModal')).show();
+};
+
+window.setRatingStars = function(val) {
+    document.getElementById('ratingValue').value = val;
+    const stars = document.querySelectorAll('#sellerStarRating i');
+    stars.forEach((s, i) => {
+        s.className = i < val ? "bi bi-star-fill cursor-pointer" : "bi bi-star cursor-pointer";
+    });
+};
+
+window.submitSellerRating = async function() {
+    const val = parseInt(document.getElementById('ratingValue').value);
+    const sellerId = document.getElementById('ratedSellerId').value;
+    if (val === 0) return alert("Selecione pelo menos uma estrela.");
+
+    if (fullDatabase && fullDatabase.users) {
+        const sIdx = fullDatabase.users.findIndex(u => u.id === sellerId);
+        if (sIdx !== -1) {
+            const seller = fullDatabase.users[sIdx];
+            const totalRates = (seller.rating_count || 0) + 1;
+            const currentTotal = (seller.vendedor_rating || 5) * (seller.rating_count || 1);
+            seller.vendedor_rating = (currentTotal + val) / (totalRates + (seller.rating_count ? 0 : 1));
+            seller.rating_count = totalRates;
+            
+            // Atualiza também nos produtos desse vendedor para refletir no modal de detalhes
+            fullDatabase.products.forEach(p => {
+                if (p.vendedor_id === sellerId) p.vendedor_rating = seller.vendedor_rating;
+            });
+
+            await updateFullDatabase(fullDatabase);
+            addNotification("Avaliação Enviada", "Obrigado por avaliar o vendedor!", "bi-check-circle", "success");
+        }
+    }
+    bootstrap.Modal.getInstance(document.getElementById('sellerRatingModal')).hide();
+    alert("Avaliação registrada com sucesso!");
 };
 
 window.sendChatMessage = function(e) {
