@@ -363,14 +363,74 @@ body.dark-theme .hero-banner {
 .message-system { text-align: center; margin: 15px 0; }
 .message-system .badge { background: #e9ecef; color: #666; font-weight: 500; }
 
+/* Estilos Detalhe do Produto (Mercado Livre Style) */
+.product-detail-condition { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+.product-detail-title { font-size: 1.4rem; font-weight: 600; line-height: 1.2; margin-bottom: 12px; color: var(--text-main); }
+.product-detail-price { display: flex; align-items: flex-start; color: var(--text-main); font-size: 2.2rem; font-weight: 300; margin-bottom: 4px; }
+.product-detail-price .currency { font-size: 1.1rem; margin-top: 8px; margin-right: 4px; }
+.product-detail-price .cents { font-size: 1.1rem; margin-top: 8px; }
+.installments-promo { color: #00a650; font-size: 1rem; margin-bottom: 20px; }
+
+.shipping-card-detail { background-color: #f5f5f5; border-radius: 8px; padding: 15px; margin-bottom: 20px; border: 1px solid var(--border-light); }
+.shipping-card-detail i { color: #00a650; font-size: 1.2rem; }
+
+.seller-reputation-card { border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+.reputation-bar { display: flex; gap: 4px; height: 8px; margin: 12px 0; }
+.reputation-step { flex: 1; background-color: #eee; border-radius: 2px; }
+.reputation-step.active-green { background-color: #00a650; }
+.reputation-step.active-yellow { background-color: #fff159; }
+
+.btn-buy-now { 
+    background-color: #3483fa; 
+    color: #fff !important; 
+    border: none; 
+    border-radius: 6px; 
+    padding: 14px; 
+    font-weight: 600; 
+    width: 100%; 
+    transition: background 0.2s;
+}
+.btn-buy-now:hover { background-color: #2968c8; }
+
+.btn-add-to-cart-ml { 
+    background-color: rgba(65,137,230,.1); 
+    color: #3483fa !important; 
+    border: none; 
+    border-radius: 6px; 
+    padding: 14px; 
+    font-weight: 600; 
+    width: 100%; 
+    transition: background 0.2s;
+}
+.btn-add-to-cart-ml:hover { background-color: rgba(65,137,230,.2); }
+
+.benefit-item-ml { display: flex; gap: 10px; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+.benefit-item-ml i { color: #3483fa; font-size: 1rem; }
+
+.description-section-ml { border-top: 1px solid var(--border-light); padding-top: 25px; margin-top: 30px; }
+.description-section-ml h3 { font-size: 1.5rem; margin-bottom: 20px; }
+
 /* Status do Pedido no Chat */
-.order-status-bar { display: flex; justify-content: space-between; position: relative; padding: 10px 0; }
-.order-status-bar::before { content: ''; position: absolute; top: 25px; left: 10%; right: 10%; height: 2px; background: #dee2e6; z-index: 1; }
+.order-status-bar { display: flex; justify-content: space-between; position: relative; padding: 15px 0; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; }
+.order-status-bar::before { content: ''; position: absolute; top: 30px; left: 10%; right: 10%; height: 2px; background: #dee2e6; z-index: 1; }
 .status-step { text-align: center; z-index: 2; flex: 1; position: relative; background: #f8f9fa; }
 .status-icon { width: 30px; height: 30px; border-radius: 50%; background: white; border: 2px solid #dee2e6; display: flex; align-items: center; justify-content: center; margin: 0 auto 5px; font-size: 12px; }
 .status-step.active .status-icon { background: var(--market-color); color: white; border-color: var(--market-color); }
 .status-step.active small { color: var(--market-color); font-weight: bold; }
 
+/* Cores de Status Customizadas */
+.status-badge { font-size: 0.7rem; padding: 4px 8px; border-radius: 20px; font-weight: 700; text-uppercase; }
+.status-pending { background: #fff3cd; color: #856404; }
+.status-accepted { background: #d4edda; color: #155724; }
+.status-shipping { background: #cce5ff; color: #004085; }
+.status-finished { background: #d1ecf1; color: #0c5460; }
+.status-dispute { background: #f8d7da; color: #721c24; }
+
+/* Ajustes para Dashboards */
+.order-management-card { transition: transform 0.2s; border-left: 4px solid var(--primary-blue); }
+.order-management-card:hover { transform: translateX(5px); }
+.dispute-alert { border: 2px solid #dc3545 !important; animation: pulse-red 2s infinite; }
+@keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
 /* Sidebar Contatos */
 .chat-contact-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; cursor: pointer; transition: 0.2s; border-bottom: 1px solid var(--border-light); }
 .chat-contact-item:hover { background: rgba(0,0,0,0.03); }
