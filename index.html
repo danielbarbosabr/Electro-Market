@@ -90,16 +90,31 @@
                             </ul>
                         </div>
                         <a href="#" class="text-white text-decoration-none role-client" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas"><i class="bi bi-filter-left me-1"></i> Filtros</a>
-                        <a href="#" class="text-white-50 text-decoration-none role-client" onclick="loadPage('Ofertas')"><i class="bi bi-tag me-1"></i> Ofertas</a>
-                        <a href="#" class="text-white-50 text-decoration-none role-client"><i class="bi bi-heart me-1"></i> Curtidos</a>
-                        <a href="#" class="text-white-50 text-decoration-none role-client"><i class="bi bi-clock-history me-1"></i> Histórico</a>
+                        <a href="#" class="text-white text-decoration-none role-client" onclick="loadPage('Smartphone')"><i class="bi bi-tag me-1"></i> Ofertas</a>
+                        <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderOrderManagement('buyer')"><i class="bi bi-bag-check me-1"></i> Minhas Compras</a>
+                        <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderAccessHistory()"><i class="bi bi-clock-history me-1"></i> Histórico</a>
                         <a href="#" class="text-white-50 text-decoration-none role-seller" data-bs-toggle="modal" data-bs-target="#announceModal"><i class="bi bi-plus-circle me-1"></i> Vender Agora</a>
-                        <a href="#" class="text-white-50 text-decoration-none" onclick="window.showChat()"><i class="bi bi-chat-dots me-1"></i> Mensagens</a>
+                        <a href="#" class="text-white text-decoration-none role-seller" onclick="window.renderSellerPanel('pending')"><i class="bi bi-shop me-1"></i> Minhas Vendas</a>
+                        <a href="#" class="text-white text-decoration-none role-admin d-none" onclick="window.renderOrderManagement('admin')"><i class="bi bi-shield-lock me-1"></i> Painel Admin</a>
                     </nav>
                 </div>
             </div>
         </div>
     </header>
+
+    <!-- Submenu do Vendedor -->
+    <div class="role-seller d-none bg-light py-2 border-bottom">
+        <div class="container">
+            <div class="d-flex gap-4 small">
+                <a href="#" class="text-decoration-none text-dark fw-bold" onclick="window.renderSellerPanel('pending')">
+                    <i class="bi bi-clock-history me-1"></i> Pendentes <span class="badge bg-danger ms-1" id="pendingOrdersBadge">0</span>
+                </a>
+                <a href="#" class="text-decoration-none text-dark" onclick="window.renderSellerPanel('accepted')">Aguardando Acordo</a>
+                <a href="#" class="text-decoration-none text-dark" onclick="window.renderSellerPanel('shipping')">Em Envio/Retirada</a>
+                <a href="#" class="text-decoration-none text-dark" onclick="window.renderSellerPanel('finished')">Finalizados</a>
+            </div>
+        </div>
+    </div>
 
     <!-- Banner principal com categorias integradas -->
     <section class="hero-banner py-4 py-md-5 text-white text-center">
@@ -223,7 +238,7 @@
     <div class="modal fade" id="productDetailModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0">
-                <div class="modal-header text-white">
+                <div class="modal-header text-white" style="background-color: var(--header-bg);">
                     <h5 class="modal-title fw-bold">Detalhes do Produto</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -637,6 +652,7 @@
                                 <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto;"></div>
                                 <div class="chat-input-area p-3 border-top bg-white">
                                     <div id="orderStatusBar" class="mb-3"></div>
+                                    <div id="chatActionButtons" class="mb-3 d-grid gap-2"></div>
                                     <form id="chatMessageForm" onsubmit="window.sendChatMessage(event)">
                                         <div class="input-group">
                                             <input type="text" class="form-control" id="chatMessageInput" placeholder="Mensagem..." required>
