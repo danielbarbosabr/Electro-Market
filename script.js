@@ -287,6 +287,14 @@ function updateVisibilityByRole() {
     const isLoggedIn = !!info;
     const role = info?.tipo || 'CLIENTE';
 
+    // Atualiza Badges de Vendedor
+    const pendingCount = orders.filter(o => o.sellerId === info?.id && o.status === 'pending').length;
+    const pendingBadge = document.getElementById('pendingBadgeNav');
+    if (pendingBadge) {
+        pendingBadge.textContent = pendingCount;
+        pendingBadge.classList.toggle('d-none', pendingCount === 0);
+    }
+
     const clientItems = document.querySelectorAll('.role-client');
     const sellerItems = document.querySelectorAll('.role-seller');
     const adminItems = document.querySelectorAll('.role-admin');
@@ -323,6 +331,7 @@ function updateVisibilityByRole() {
             `<i class="bi bi-person-circle fs-1 text-dark"></i>`;
     }
 
+    // Ajustar títulos conforme o papel
     const heroTitle = document.getElementById('heroTitle');
     const heroSubtitle = document.getElementById('heroSubtitle');
     const heroCategories = document.getElementById('heroCategories');
@@ -333,7 +342,7 @@ function updateVisibilityByRole() {
     }
     if (heroSubtitle) {
         heroSubtitle.textContent = role === 'VENDEDOR' 
-            ? 'Gerencie seu estoque, acompanhe suas vendas e publique novos anúncios para seus clientes.' 
+            ? 'Gerencie seu estoque, acompanhe suas vendas e publique novos anúncios.' 
             : 'Navegue por ofertas, compare preços e descubra produtos com frete rápido.';
     }
     if (heroCategories) {
@@ -343,6 +352,7 @@ function updateVisibilityByRole() {
         gridTitle.textContent = role === 'VENDEDOR' ? 'Meu Estoque' : 'Recomendados para você';
     }
 
+    // Visibilidade dos itens por papel
     if (role === 'VENDEDOR') {
         clientItems.forEach(el => el.classList.add('d-none'));
         sellerItems.forEach(el => el.classList.remove('d-none'));
@@ -356,15 +366,16 @@ function updateVisibilityByRole() {
         sellerItems.forEach(el => el.classList.add('d-none'));
         adminItems.forEach(el => el.classList.add('d-none'));
     }
+    
     if (typeof renderNotifications === 'function') renderNotifications();
 }
 
-function addNotification(titulo, texto, icone = 'bi-info-circle', cor = 'primary') {
-    const info = getSavedCadastro();
-    if (!info) return;
+function addNotification(titulo, texto, icone = 'bi-info-circle', cor = 'primary', targetUserId = null) {
+    const currentInfo = getSavedCadastro();
+    const finalUserId = targetUserId || currentInfo?.id;
+    if (!finalUserId) return;
 
-    // Busca notificações existentes ou cria array vazio
-    let notifications = JSON.parse(localStorage.getItem(`notifications_${info.id}`)) || [];
+    let notifications = JSON.parse(localStorage.getItem(`notifications_${finalUserId}`)) || [];
     
     const newNotif = {
         id: Date.now(),
@@ -375,9 +386,8 @@ function addNotification(titulo, texto, icone = 'bi-info-circle', cor = 'primary
         data: new Date().toISOString()
     };
     
-    // Adiciona ao início da lista e limita a 50 itens
     notifications.unshift(newNotif);
-    localStorage.setItem(`notifications_${info.id}`, JSON.stringify(notifications.slice(0, 50)));
+    localStorage.setItem(`notifications_${finalUserId}`, JSON.stringify(notifications.slice(0, 50)));
     
     renderNotifications();
 }
@@ -1408,9 +1418,57 @@ window.shareProduct = function(productId) {
         });
     }
 };
+
+// Exports
+window.loadPage = loadPage;
+window.applyFilters = applyFilters;
+
 // ============================================
-// SISTEMA DE CHAT E PEDIDOS (PÓS-COMPRA)
+// SISTEMA DE CHAT E PEDIDOS (LÓGICA INTEGRADA)
 // ============================================
+
+window.finalizarCompraMock = function(itemIndex) {
+    const item = cart[itemIndex];
+    const info = getSavedCadastro();
+    if (!info) {
+        alert("Por favor, faça login para finalizar a compra.");
+        new bootstrap.Modal(document.getElementById('loginModal')).show();
+        return;
+    }
+    
+    const order = {
+        id: `ord_${Date.now()}`,
+        sellerId: item.vendedor_id || 'vendedor_demo',
+        sellerName: item.loja || 'Vendedor Oficial',
+        buyerId: info.id,
+        buyerName: info.nome,
+        productTitle: item.titulo,
+        productImg: item.img,
+        total: item.preco,
+        quantity: item.qtd || 1,
+        status: 'pending',
+        realizaEntrega: item.realizaEntrega || false,
+        createdAt: new Date().toISOString(),
+        agreeBuyer: false, agreeSeller: false
+    };
+    
+    orders.push(order);
+    localStorage.setItem('electro_orders', JSON.stringify(orders));
+    
+    const chatId = `chat_${order.id}`;
+    chats.push({
+        id: chatId, orderId: order.id, sellerId: order.sellerId, buyerId: order.buyerId,
+        participants: [String(order.buyerId), String(order.sellerId)],
+        messages: [{ senderId: 'system', text: `🛒 Solicitação de compra #${order.id.slice(-8)}`, timestamp: new Date().toISOString(), type: 'system' }]
+    });
+    localStorage.setItem('electro_chats', JSON.stringify(chats));
+    
+    addNotification("Nova Solicitação", `${info.nome} quer comprar: ${item.titulo}`, "bi-bag-plus", "warning", order.sellerId);
+    window.removeFromCart(itemIndex);
+    bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
+    alert("✅ Solicitação enviada! Acompanhe em 'Minhas Compras'.");
+    renderOrderManagement('buyer');
+};
 
 window.showChat = function(chatId = null) {
     const info = getSavedCadastro();
@@ -1464,10 +1522,11 @@ function selectChat(chatId) {
     const info = getSavedCadastro();
     
     document.getElementById('chatEmptyState').style.display = 'none';
+    document.getElementById('chatActiveContent').classList.remove('d-none');
     document.getElementById('chatActiveContent').style.display = 'flex';
     
     const otherUserName = chat.sellerId === info.id ? chat.buyerName : chat.sellerName;
-    document.getElementById('chatPartnerName').textContent = otherUserName;
+    document.getElementById('chatPartnerNameHeader').textContent = otherUserName;
     document.getElementById('chatPartnerAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUserName)}&background=random`;
 
     renderMessages(chat);
@@ -1477,205 +1536,105 @@ function selectChat(chatId) {
 
 window.renderOrderManagement = function(type = 'buyer') {
     const info = getSavedCadastro();
-    if (!info) return alert("Faça login para gerenciar pedidos.");
-
+    if (!info) return;
     const grid = document.getElementById('productsGrid');
     const gridTitle = document.getElementById('gridTitle');
-    
-    let filteredOrders = [];
-    if (type === 'buyer') {
-        filteredOrders = orders.filter(o => o.buyerId === info.id);
-        gridTitle.textContent = "Minhas Compras";
-    } else if (type === 'seller') {
-        filteredOrders = orders.filter(o => o.sellerId === info.id);
-        gridTitle.textContent = "Minhas Vendas (Solicitações)";
-    } else if (type === 'admin') {
-        filteredOrders = orders.filter(o => o.status === 'dispute');
-        gridTitle.textContent = "Painel Administrativo - Disputas";
-    }
-
-    // Atualiza badge de pendentes se existir
-    const pendingBadge = document.getElementById('pendingOrdersBadge');
-    if (pendingBadge && type === 'seller') {
-        const count = orders.filter(o => o.sellerId === info.id && o.status === 'pending').length;
-        pendingBadge.textContent = count;
-        pendingBadge.classList.toggle('d-none', count === 0);
-    }
+    let filteredOrders = orders.filter(o => type === 'buyer' ? o.buyerId === info.id : (type === 'seller' ? o.sellerId === info.id : o.status === 'dispute'));
+    gridTitle.textContent = type === 'buyer' ? "Minhas Compras" : (type === 'seller' ? "Minhas Vendas" : "Painel de Disputas");
 
     if (filteredOrders.length === 0) {
         grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Nenhum pedido encontrado.</h5></div>`;
         return;
     }
+    filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    grid.innerHTML = filteredOrders.map(order => `
+    grid.innerHTML = filteredOrders.map(order => {
+        const statusInfo = ORDER_STATUS_MAP[order.status] || { label: order.status, class: '' };
+        return `
         <div class="col-12 mb-3">
-            <div class="card order-management-card p-3 shadow-sm ${order.status === 'dispute' ? 'dispute-alert' : ''}">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                    <div>
-                        <span class="status-badge ${ORDER_STATUS_MAP[order.status].class}">${ORDER_STATUS_MAP[order.status].label}</span>
-                        <h6 class="mt-2 mb-1 fw-bold">${order.productTitle}</h6>
-                        <p class="small text-muted mb-0">ID: #${order.id.slice(-8)} | ${new Date(order.createdAt).toLocaleDateString()}</p>
-                        <p class="small mb-0"><strong>${type === 'seller' ? 'Comprador' : 'Vendedor'}:</strong> ${type === 'seller' ? order.buyerName : order.sellerName}</p>
-                        <p class="small mb-0"><strong>Entrega:</strong> ${order.realizaEntrega ? 'Realiza Entrega' : 'Apenas Retirada'}</p>
-                    </div>
-                    <div class="text-end">
-                        <h5 class="fw-bold text-success">R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h5>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')">Ver Chat</button>
-                            ${order.status === 'accepted' ? `
-                                <button class="btn btn-sm btn-success" onclick="window.quickConfirmAgreement('${order.id}')">
-                                    ✅ Confirmar Acordo
-                                </button>
-                            ` : ''}
+            <div class="card order-card p-3 shadow-sm border-0">
+                <div class="d-flex gap-3">
+                    <img src="${order.productImg || 'https://via.placeholder.com/80'}" class="rounded" style="width: 80px; height: 80px; object-fit: cover;">
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge ${statusInfo.class} mb-2">${statusInfo.label}</span>
+                                <h6 class="fw-bold mb-1">${order.productTitle}</h6>
+                                <p class="small text-muted mb-0">Pedido #${order.id.slice(-8)} • ${type === 'seller' ? 'Comprador: ' + order.buyerName : 'Vendedor: ' + order.sellerName}</p>
+                            </div>
+                            <h5 class="fw-bold text-success">R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h5>
+                        </div>
+                        <div class="d-flex gap-2 mt-3 justify-content-end">
+                            ${order.status !== 'pending' ? `<button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')">Chat</button>` : ''}
                             ${order.status === 'pending' && type === 'seller' ? `
                                 <button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
-                                <button class="btn btn-sm btn-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
-                            ` : ''}
-                            ${order.status === 'dispute' && type === 'admin' ? `
-                                <button class="btn btn-sm btn-warning" onclick="window.resolveDispute('${order.id}', 'finished')">Finalizar</button>
-                                <button class="btn btn-sm btn-danger" onclick="window.resolveDispute('${order.id}', 'cancelled')">Reembolsar</button>
-                            ` : ''}
-                            ${type === 'admin' ? `
-                                <button class="btn btn-sm btn-info text-white" onclick="window.showOrderDetailsAdmin('${order.id}')">Detalhes</button>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-};
-
-window.renderSellerPanel = function(filterStatus = 'pending') {
-    const info = getSavedCadastro();
-    if (!info || info.tipo !== 'VENDEDOR') return;
-    
-    const grid = document.getElementById('productsGrid');
-    const gridTitle = document.getElementById('gridTitle');
-    gridTitle.textContent = "Painel do Vendedor - Solicitações";
-    
-    let filteredOrders = orders.filter(o => o.sellerId === info.id);
-    
-    const tabsHtml = `
-        <div class="col-12 mb-4">
-            <ul class="nav nav-tabs">
-                <li class="nav-item">
-                    <a class="nav-link ${filterStatus === 'pending' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('pending')">Pendentes</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link ${filterStatus === 'accepted' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('accepted')">Aceitos/Aguardando</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link ${filterStatus === 'shipping' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('shipping')">Em Andamento</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link ${filterStatus === 'finished' ? 'active' : ''}" href="#" onclick="window.renderSellerPanel('finished')">Finalizados</a>
-                </li>
-            </ul>
-        </div>
-    `;
-    
-    if (filterStatus === 'pending') filteredOrders = filteredOrders.filter(o => o.status === 'pending');
-    else if (filterStatus === 'accepted') filteredOrders = filteredOrders.filter(o => o.status === 'accepted' || o.status === 'agreement');
-    else if (filterStatus === 'shipping') filteredOrders = filteredOrders.filter(o => ['shipping', 'awaiting_pickup', 'shipped'].includes(o.status));
-    else if (filterStatus === 'finished') filteredOrders = filteredOrders.filter(o => ['finished', 'cancelled'].includes(o.status));
-    
-    grid.innerHTML = tabsHtml + filteredOrders.map(order => `
-        <div class="col-12 mb-3">
-            <div class="card order-management-card p-3 shadow-sm">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                    <div>
-                        <span class="status-badge ${ORDER_STATUS_MAP[order.status].class}">${ORDER_STATUS_MAP[order.status].label}</span>
-                        <h6 class="mt-2 mb-1 fw-bold">${order.productTitle}</h6>
-                        <p class="small text-muted mb-0">ID: #${order.id.slice(-8)}</p>
-                        <p class="small mb-0"><strong>Comprador:</strong> ${order.buyerName}</p>
-                        <p class="small mb-0"><strong>Entrega:</strong> ${order.realizaEntrega ? 'Entrega' : 'Retirada'}</p>
-                    </div>
-                    <div class="text-end">
-                        <h5 class="fw-bold text-success">R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h5>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')">Chat</button>
-                            ${order.status === 'pending' ? `
-                                <button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
-                                <button class="btn btn-sm btn-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
-                            ` : ''}
-                            ${order.status === 'accepted' ? `<button class="btn btn-sm btn-success" onclick="window.quickConfirmAgreement('${order.id}')">Confirmar Acordo</button>` : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-    if (filteredOrders.length === 0) grid.innerHTML += `<div class="col-12 text-center py-5"><h5>Nenhum pedido encontrado.</h5></div>`;
-};
-
-window.quickConfirmAgreement = function(orderId) {
-    const order = orders.find(o => o.id === orderId);
-    const info = getSavedCadastro();
-    const chat = chats.find(c => c.orderId === orderId);
-    if (!chat) return alert("Erro: Chat não encontrado.");
-
-    if (info.id === order.buyerId) order.agreeBuyer = true;
-    if (info.id === order.sellerId) order.agreeSeller = true;
-
-    chat.messages.push({ senderId: 'system', text: `📢 ${info.nome} confirmou o acordo.`, timestamp: new Date().toISOString(), type: 'system' });
-
-    if (order.agreeBuyer && order.agreeSeller) {
-        const entrega = chat.realizaEntrega || order.realizaEntrega;
-        order.status = entrega ? 'shipping' : 'awaiting_pickup';
-        chat.messages.push({ senderId: 'system', text: `🚀 Acordo mútuo! O pedido agora está em fase de ${entrega ? 'envio' : 'retirada'}.`, timestamp: new Date().toISOString(), type: 'system' });
-        addNotification("Pedido Avançado", `O pedido está em ${entrega ? 'envio' : 'retirada'}.`, "bi-check-circle", "success");
-    } else {
-        addNotification("Confirmação Registrada", "Aguardando confirmação da outra parte.", "bi-clock", "info");
-    }
-
-    saveAndRefresh(chat);
-    window.renderOrderManagement(info.tipo === 'VENDEDOR' ? 'seller' : 'buyer');
-};
-
-window.showOrderDetailsAdmin = function(orderId) {
-    const order = orders.find(o => o.id === orderId);
-    const chat = chats.find(c => c.orderId === orderId);
-    const modalHtml = `
-        <div class="modal fade" id="adminOrderDetailModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">Detalhes do Pedido #${order.id.slice(-8)}</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6 border-end">
-                                <p><strong>Produto:</strong> ${order.productTitle}</p>
-                                <p><strong>Cliente:</strong> ${order.buyerName}</p>
-                                <p><strong>Vendedor:</strong> ${order.sellerName}</p>
-                                <p><strong>Status:</strong> ${order.status}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Histórico do Chat:</strong></p>
-                                <div class="p-2 bg-light small" style="height:150px; overflow-y:auto;">
-                                    ${chat ? chat.messages.map(m => `<div>[${m.senderId}] ${m.text}</div>`).join('') : 'Sem chat'}
-                                </div>
-                            </div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>` : ''}
+                            ${order.status === 'shipping' && type === 'seller' ? `<button class="btn btn-sm btn-primary" onclick="window.updateOrderStatus('${order.id}', 'shipped')">Enviado</button>` : ''}
+                            ${order.status === 'shipped' && type === 'buyer' ? `<button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'finished')">Confirmar Recebimento</button>` : ''}
                         </div>
                     </div>
                 </div>
             </div>
         </div>`;
+    }).join('');
+};
+
+window.reportProblem = function(orderId) {
+    const reason = prompt("Descreva o problema:");
+    if (!reason) return;
+    const order = orders.find(o => o.id === orderId);
+    const chat = chats.find(c => c.orderId === orderId);
+    if (!order) return;
+    order.status = 'dispute';
+    if (chat) chat.messages.push({ senderId: 'system', text: `⚠️ Problema reportado: ${reason}`, timestamp: new Date().toISOString(), type: 'system' });
+    saveAndRefresh(chat);
+    renderOrderManagement(getSavedCadastro().tipo === 'VENDEDOR' ? 'seller' : 'buyer');
+};
+
+window.openExternalDeliveryModal = function(orderId) {
+    const modalHtml = `
+        <div class="modal fade" id="externalDeliveryModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-primary text-white"><h5 class="modal-title">App de Entrega</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body p-4"><div class="d-grid gap-2">
+                        <button class="btn btn-outline-dark p-3" onclick="window.selectExternalService('${orderId}', 'Uber Flash')">Uber Flash</button>
+                        <button class="btn btn-outline-success p-3" onclick="window.selectExternalService('${orderId}', '99 Entrega')">99 Entrega</button>
+                        <button class="btn btn-outline-primary p-3" onclick="window.selectExternalService('${orderId}', 'Loggi')">Loggi</button>
+                    </div></div>
+                </div>
+            </div>
+        </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    new bootstrap.Modal(document.getElementById('adminOrderDetailModal')).show();
+    new bootstrap.Modal(document.getElementById('externalDeliveryModal')).show();
+};
+
+window.selectExternalService = function(orderId, service) {
+    const chat = chats.find(c => c.orderId === orderId);
+    const info = getSavedCadastro();
+    if (chat) chat.messages.push({ senderId: 'system', text: `🚗 ${info.nome} sugeriu usar ${service}`, timestamp: new Date().toISOString(), type: 'system' });
+    saveAndRefresh(chat);
+    bootstrap.Modal.getInstance(document.getElementById('externalDeliveryModal'))?.hide();
+    if (currentChat) selectChat(currentChat);
+};
+
+window.renderSellerPanel = function(filterStatus = 'pending') {
+    const info = getSavedCadastro();
+    if (!info || info.tipo !== 'VENDEDOR') return;
+    window.renderOrderManagement('seller');
 };
 
 function renderMessages(chat) {
     const container = document.getElementById('chatMessagesContainer');
-    const actionsContainer = document.getElementById('chatActionButtons');
+    const logisticsArea = document.getElementById('logisticsAgreementArea');
+    const logisticsButtons = document.getElementById('logisticsButtons');
     const order = orders.find(o => o.id === chat.orderId);
     const info = getSavedCadastro();
     
-    // Renderiza mensagens
+    if (!container) return;
+    
     container.innerHTML = chat.messages.map(msg => {
-        if (msg.type === 'system') return `<div class="message-system"><span class="badge">${msg.text}</span></div>`;
+        if (msg.type === 'system') return `<div class="message-system"><span class="badge bg-light text-dark">${msg.text}</span></div>`;
         const isMe = msg.senderId === info.id;
         return `
             <div class="chat-message ${isMe ? 'message-sent' : 'message-received'}">
@@ -1686,58 +1645,38 @@ function renderMessages(chat) {
             </div>`;
     }).join('');
     
-    // Lógica de Botões de Acordo e Confirmação
-    actionsContainer.innerHTML = '';
-    if (order && order.status === 'accepted') {
-        const hasAgreed = (info.id === order.buyerId && order.agreeBuyer) || (info.id === order.sellerId && order.agreeSeller);
-        actionsContainer.innerHTML = `
-            <button class="btn btn-warning fw-bold" onclick="window.confirmAgreement('${order.id}')" ${hasAgreed ? 'disabled' : ''}>
-                ${hasAgreed ? '✅ Você Confirmou o Acordo' : '🤝 Confirmar Acordo de Entrega'}
-            </button>
-        `;
-    } else if (order && (order.status === 'shipping' || order.status === 'shipped' || order.status === 'awaiting_pickup')) {
-        if (info.id === order.sellerId) {
-            actionsContainer.innerHTML = `<button class="btn btn-primary fw-bold" onclick="window.updateOrderStatus('${order.id}', 'shipped')">📦 Marcar como Enviado/Entregue</button>`;
-        } else {
-            actionsContainer.innerHTML = `
-                <div class="d-flex gap-2">
-                    <button class="btn btn-success flex-grow-1 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'finished')">✅ Recebi o Produto</button>
-                    <button class="btn btn-danger flex-grow-1 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'dispute')">❌ Não Recebi / Problema</button>
-                </div>
-            `;
-        }
+    if (order && logisticsArea) {
+        if (order.status === 'accepted') {
+            logisticsArea.classList.remove('d-none');
+            const hasAgreed = (info.id === order.buyerId && order.agreeBuyer) || (info.id === order.sellerId && order.agreeSeller);
+            if (hasAgreed) {
+                logisticsButtons.innerHTML = `<div class="alert alert-info mb-0 small w-100">Aguardando a outra parte confirmar...</div>`;
+            } else {
+                logisticsButtons.innerHTML = `
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}', 'pickup')">Retirada</button>
+                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}', 'seller_delivery')">Entrega</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="window.openExternalDeliveryModal('${order.id}')">App Entrega</button>`;
+            }
+        } else { logisticsArea.classList.add('d-none'); }
     }
-
     container.scrollTop = container.scrollHeight;
 }
 
-window.confirmAgreement = function(orderId) {
+window.setLogistics = function(orderId, type) {
     const order = orders.find(o => o.id === orderId);
     const info = getSavedCadastro();
     const chat = chats.find(c => c.orderId === orderId);
+    if (!order || !chat) return;
 
+    const labels = { 'pickup': 'Retirada no Local', 'seller_delivery': 'Entrega pelo Vendedor', 'external': 'Entrega via Plataforma' };
     if (info.id === order.buyerId) order.agreeBuyer = true;
     if (info.id === order.sellerId) order.agreeSeller = true;
-
-    const realizaEntrega = chat?.realizaEntrega || order.realizaEntrega || false;
-
-    chat.messages.push({ 
-        senderId: 'system', 
-        text: `📢 ${info.nome} confirmou o acordo.`, 
-        timestamp: new Date().toISOString(), 
-        type: 'system' 
-    });
-
+    
+    chat.messages.push({ senderId: 'system', text: `🤝 ${info.nome} escolheu: ${labels[type]}`, timestamp: new Date().toISOString(), type: 'system' });
     if (order.agreeBuyer && order.agreeSeller) {
-        order.status = realizaEntrega ? 'shipping' : 'awaiting_pickup';
-        chat.messages.push({ 
-            senderId: 'system', 
-            text: `🚀 Acordo mútuo! O pedido agora está em fase de ${realizaEntrega ? 'envio' : 'retirada'}.`, 
-            timestamp: new Date().toISOString(), 
-            type: 'system' 
-        });
+        order.status = (type === 'pickup') ? 'awaiting_pickup' : 'shipping';
+        chat.messages.push({ senderId: 'system', text: `🚀 Acordo fechado! Status: ${ORDER_STATUS_MAP[order.status].label}`, timestamp: new Date().toISOString(), type: 'system' });
     }
-
     saveAndRefresh(chat);
 };
 
@@ -1749,249 +1688,36 @@ function saveAndRefresh(chat) {
 
 window.updateOrderStatus = function(orderId, newStatus) {
     const order = orders.find(o => o.id === orderId);
-    const chat = chats.find(c => c.orderId === orderId);
     if (!order) return;
-
     order.status = newStatus;
-    const msg = {
-        'accepted': "✅ O vendedor aceitou seu pedido! Chat liberado.",
-        'cancelled': "❌ O pedido foi cancelado/recusado.",
-        'shipped': "📦 Produto postado/disponível!",
-        'finished': "🎉 Pedido finalizado com sucesso!",
-        'dispute': "⚠️ Problema relatado. O pedido foi enviado para análise administrativa."
-    };
-
-    if (chat) {
-        chat.messages.push({ senderId: 'system', text: msg[newStatus] || `Status alterado para: ${newStatus}`, timestamp: new Date().toISOString(), type: 'system' });
-    }
-    
+    if (newStatus === 'accepted' && !chats.find(c => c.orderId === orderId)) window.createChatForOrder(order);
+    const chat = chats.find(c => c.orderId === orderId);
+    const msg = { 'accepted': "✅ Vendedor aceitou o pedido!", 'cancelled': "❌ Pedido cancelado.", 'shipped': "📦 Produto enviado!", 'finished': "🎉 Pedido finalizado!", 'dispute': "⚠️ Problema relatado." };
+    if (chat) chat.messages.push({ senderId: 'system', text: msg[newStatus] || `Status: ${newStatus}`, timestamp: new Date().toISOString(), type: 'system' });
     saveAndRefresh(chat);
-    addNotification("Status do Pedido", msg[newStatus], "bi-info-circle", newStatus === 'dispute' ? "danger" : "info");
-    if (newStatus === 'accepted') addNotification("Chat Liberado", "Você já pode combinar a entrega no chat.", "bi-chat-dots", "success");
-    
-    // Se o pedido foi finalizado pelo comprador, abre modal de avaliação
-    if (newStatus === 'finished') {
-        const info = getSavedCadastro();
-        if (info.id === order.buyerId) {
-            window.showSellerRatingModal(order.sellerId, order.sellerName);
-        }
+    if (newStatus === 'accepted') {
+        addNotification("Pedido Aprovado!", "Combine a entrega no chat.", "bi-chat-dots-fill", "success", order.buyerId);
     }
-
     if (currentChat) selectChat(currentChat);
     else renderOrderManagement(getSavedCadastro().tipo === 'VENDEDOR' ? 'seller' : 'buyer');
-};
-
-// --- SISTEMA DE AVALIAÇÃO DE VENDEDOR ---
-window.showSellerRatingModal = function(sellerId, sellerName) {
-    const modalHtml = `
-        <div class="modal fade" id="sellerRatingModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title fw-bold">Avaliar Vendedor</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body text-center p-4">
-                        <h6>Como foi sua experiência com <strong>${sellerName}</strong>?</h6>
-                        <div class="fs-2 text-warning my-4" id="sellerStarRating">
-                            <i class="bi bi-star cursor-pointer" data-value="1" onclick="window.setRatingStars(1)"></i>
-                            <i class="bi bi-star cursor-pointer" data-value="2" onclick="window.setRatingStars(2)"></i>
-                            <i class="bi bi-star cursor-pointer" data-value="3" onclick="window.setRatingStars(3)"></i>
-                            <i class="bi bi-star cursor-pointer" data-value="4" onclick="window.setRatingStars(4)"></i>
-                            <i class="bi bi-star cursor-pointer" data-value="5" onclick="window.setRatingStars(5)"></i>
-                        </div>
-                        <input type="hidden" id="ratingValue" value="0">
-                        <input type="hidden" id="ratedSellerId" value="${sellerId}">
-                        <button class="btn btn-success w-100 fw-bold py-2" onclick="window.submitSellerRating()">Enviar Avaliação</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    
-    const existing = document.getElementById('sellerRatingModal');
-    if (existing) existing.remove();
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    new bootstrap.Modal(document.getElementById('sellerRatingModal')).show();
-};
-
-window.setRatingStars = function(val) {
-    document.getElementById('ratingValue').value = val;
-    const stars = document.querySelectorAll('#sellerStarRating i');
-    stars.forEach((s, i) => {
-        s.className = i < val ? "bi bi-star-fill cursor-pointer" : "bi bi-star cursor-pointer";
-    });
-};
-
-window.submitSellerRating = async function() {
-    const val = parseInt(document.getElementById('ratingValue').value);
-    const sellerId = document.getElementById('ratedSellerId').value;
-    if (val === 0) return alert("Selecione pelo menos uma estrela.");
-
-    if (fullDatabase && fullDatabase.users) {
-        const sIdx = fullDatabase.users.findIndex(u => u.id === sellerId);
-        if (sIdx !== -1) {
-            const seller = fullDatabase.users[sIdx];
-            const totalRates = (seller.rating_count || 0) + 1;
-            const currentTotal = (seller.vendedor_rating || 5) * (seller.rating_count || 1);
-            seller.vendedor_rating = (currentTotal + val) / (totalRates + (seller.rating_count ? 0 : 1));
-            seller.rating_count = totalRates;
-            
-            // Atualiza também nos produtos desse vendedor para refletir no modal de detalhes
-            fullDatabase.products.forEach(p => {
-                if (p.vendedor_id === sellerId) p.vendedor_rating = seller.vendedor_rating;
-            });
-
-            await updateFullDatabase(fullDatabase);
-            addNotification("Avaliação Enviada", "Obrigado por avaliar o vendedor!", "bi-check-circle", "success");
-        }
-    }
-    bootstrap.Modal.getInstance(document.getElementById('sellerRatingModal')).hide();
-    alert("Avaliação registrada com sucesso!");
-};
-
-window.sendChatMessage = function(e) {
-    e.preventDefault();
-    const input = document.getElementById('chatMessageInput');
-    const text = input.value.trim();
-    if (!text || !currentChat) return;
-
-    const info = getSavedCadastro();
-    const chat = chats.find(c => c.id === currentChat);
-    
-    chat.messages.push({
-        senderId: info.id,
-        text: text,
-        timestamp: new Date().toISOString(),
-        type: 'message'
-    });
-
-    localStorage.setItem('electro_chats', JSON.stringify(chats));
-    input.value = '';
-    renderMessages(chat);
 };
 
 function updateOrderStatusBar(orderId) {
     const order = orders.find(o => o.id === orderId);
     const info = getSavedCadastro();
     const container = document.getElementById('orderStatusBar');
-    if (!order) return;
-
-    const steps = ['pending', 'accepted', 'shipped', 'delivered'];
-    const currentIdx = steps.indexOf(order.status);
-    const isSeller = order.sellerId === info.id;
-
-    let actionBtn = '';
-    if (isSeller && order.status === 'pending') {
-        actionBtn = `<button class="btn btn-sm btn-success w-100 mt-2" onclick="updateOrderStatus('${orderId}', 'accepted')">Aceitar Pedido</button>`;
-    } else if (isSeller && order.status === 'accepted') {
-        actionBtn = `<button class="btn btn-sm btn-primary w-100 mt-2" onclick="updateOrderStatus('${orderId}', 'shipped')">Marcar como Enviado</button>`;
-    } else if (!isSeller && order.status === 'shipped') {
-        actionBtn = `<button class="btn btn-sm btn-success w-100 mt-2" onclick="updateOrderStatus('${orderId}', 'delivered')">Confirmar Recebimento</button>`;
-    }
-
-    container.innerHTML = `
-        <div class="order-status-bar">
-            <div class="status-step ${currentIdx >= 0 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-cart"></i></div><small>Solicitado</small></div>
-            <div class="status-step ${currentIdx >= 1 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-check-lg"></i></div><small>Aprovado</small></div>
-            <div class="status-step ${currentIdx >= 2 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-truck"></i></div><small>Envio</small></div>
-            <div class="status-step ${currentIdx >= 3 ? 'active' : ''}"><div class="status-icon"><i class="bi bi-house-heart"></i></div><small>Finalizado</small></div>
-        </div>
-        ${actionBtn}
-    `;
+    if (!order || !container) return;
+    const steps = ['pending', 'accepted', 'shipping', 'finished'];
+    const currentIdx = steps.indexOf(order.status === 'awaiting_pickup' || order.status === 'shipped' ? 'shipping' : order.status);
+    container.innerHTML = `<div class="order-status-bar">${steps.map((s, i) => `<div class="status-step ${i <= currentIdx ? 'active' : ''}"><div class="status-icon"><i class="bi bi-circle"></i></div><small>${ORDER_STATUS_MAP[s]?.label || s}</small></div>`).join('')}</div>`;
 }
 
-window.resolveDispute = function(orderId, newStatus) {
-    const order = orders.find(o => o.id === orderId);
-    const chat = chats.find(c => c.orderId === orderId);
-    if (!order) return;
-    order.status = newStatus;
-    const msg = newStatus === 'finished' ? "✅ Pedido finalizado pela administração." : "❌ Pedido cancelado pela administração.";
-    if (chat) {
-        chat.messages.push({ senderId: 'system', text: msg, timestamp: new Date().toISOString(), type: 'system' });
-    }
-    saveAndRefresh(chat);
-    addNotification("Disputa Resolvida", msg, "bi-shield-check", "success");
-    renderOrderManagement('admin');
-};
+function formatTime(iso) { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
 
 window.createChatForOrder = function(order) {
     const chatId = `chat_${order.id}`;
-    const newChat = {
-        id: chatId,
-        orderId: order.id,
-        sellerId: order.sellerId,
-        sellerName: order.sellerName,
-        buyerId: order.buyerId,
-        buyerName: order.buyerName,
-        participants: [String(order.buyerId), String(order.sellerId)],
-        realizaEntrega: order.realizaEntrega || false,
-        messages: [{ senderId: 'system', text: `🛒 Novo pedido #${order.id.slice(-4)} gerado.`, timestamp: new Date().toISOString(), type: 'system' }]
-    };
-    chats.push(newChat);
+    chats.push({ id: chatId, orderId: order.id, sellerId: order.sellerId, buyerId: order.buyerId, participants: [String(order.buyerId), String(order.sellerId)], messages: [{ senderId: 'system', text: `🛒 Novo pedido #${order.id.slice(-4)} gerado.`, timestamp: new Date().toISOString(), type: 'system' }] });
     localStorage.setItem('electro_chats', JSON.stringify(chats));
-    return chatId;
 };
-
-window.viewOrderDetails = function() {
-    if (!currentChat) return;
-    const chat = chats.find(c => c.id === currentChat);
-    const order = orders.find(o => o.id === chat.orderId);
-    const content = document.getElementById('orderDetailsContent');
-    
-    content.innerHTML = `
-        <div class="small">
-            <p><strong>Pedido:</strong> #${order.id.slice(-8)}</p>
-            <p><strong>Produto:</strong> ${order.productTitle}</p>
-            <p><strong>Vendedor:</strong> ${order.sellerName}</p>
-            <p><strong>Valor:</strong> R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-            <hr>
-            <p class="mb-0 text-muted">Acompanhe as atualizações de status diretamente no chat.</p>
-        </div>`;
-    new bootstrap.Modal(document.getElementById('orderDetailsModal')).show();
-};
-
-function formatTime(iso) {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-window.toggleChatSidebar = function() {
-    document.getElementById('chatSidebar').classList.toggle('show');
-};
-
-// Modifique a função de finalização de compra (onde você tiver o alert de compra)
-// Para chamar a criação de pedido e chat. Exemplo para o botão do carrinho:
-window.finalizarCompraMock = function(itemIndex) {
-    const item = cart[itemIndex];
-    const info = getSavedCadastro();
-    if (!info) {
-        alert("Por favor, faça login para finalizar a compra.");
-        const modal = new bootstrap.Modal(document.getElementById('loginModal'));
-        modal.show();
-        return;
-    }
-    const order = {
-        id: `ord_${Date.now()}`,
-        sellerId: item.vendedor_id || 'vendedor_demo',
-        sellerName: item.loja || 'Vendedor Oficial',
-        buyerId: info.id,
-        buyerName: info.nome,
-        productTitle: item.titulo,
-        total: item.preco,
-        status: 'pending',
-        realizaEntrega: item.realizaEntrega || false,
-        createdAt: new Date().toISOString()
-    };
-    orders.push(order);
-    localStorage.setItem('electro_orders', JSON.stringify(orders));
-    window.createChatForOrder(order);
-    window.removeFromCart(itemIndex);
-    alert("Pedido realizado! Clique em 'Mensagens' para falar com o vendedor.");
-    window.showChat(`chat_${order.id}`);
-};
-
-// Exports
-window.loadPage = loadPage;
-window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
 window.toggleTheme = toggleTheme;
