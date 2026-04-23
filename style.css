@@ -1,26 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Montserrat:wght@700;800&family=Sora:wght@400;600&display=swap');
 
 :root {
-    --header-bg: #003070; /* Azul Profundo */
+    --header-bg: #003070;
     --primary-blue: #003070;
-    --market-color: #2dcc71; /* Verde Electro */
+    --market-color: #2dcc71;
     --primary-action: #004aad;
     --bg-color: #ebebeb;
     --card-bg: #ffffff;
     --text-main: #333333;
     --text-muted: #666666;
     --border-light: #e7eaf3;
+    --input-bg: #ffffff;
+    --modal-bg: #ffffff;
+    --hover-bg: #f5f5f5;
+    --shadow-color: rgba(0,0,0,0.1);
 }
 
 body.dark-theme {
-    --header-bg: #000000;
-    --primary-blue: #1a237e;
-    --primary-action: #E50914; 
-    --bg-color: #111111; 
-    --card-bg: #181818;
-    --text-main: #ffffff; 
-    --text-muted: #aaaaaa;
-    --border-light: #2c2c2c;
+    --header-bg: #0a0a0a;
+    --primary-blue: #1a1a2e;
+    --market-color: #00ff88;
+    --primary-action: #E50914;
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-main: #f0f0f0;
+    --text-muted: #b0b0b0;
+    --border-light: #333333;
+    --input-bg: #2a2a2a;
+    --modal-bg: #1e1e1e;
+    --hover-bg: #2a2a2a;
+    --shadow-color: rgba(0,0,0,0.5);
+}
+
+* {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
 }
 
 body {
@@ -28,30 +41,43 @@ body {
     color: var(--text-main);
     font-family: 'Sora', sans-serif;
     margin: 0;
-    transition: background-color 0.3s ease;
 }
 
-/* Navbar */
+/* ============================================ */
+/* NAVBAR E HEADER                              */
+/* ============================================ */
+
 .header-main {
     background-color: var(--header-bg) !important;
     position: sticky;
     top: 0;
-    z-index: 1020; /* Reduzido para que os menus laterais (offcanvas) fiquem por cima */
+    z-index: 1020; /* Mantido em 1020 para permitir que Offcanvas (1045) fique por cima */
     width: 100%;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     color: #ffffff !important;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 30px var(--shadow-color);
 }
 
-/* Garante que apenas os elementos do topo da navbar sejam brancos */
-.header-main .logo h1, 
-.header-main .nav-links > a, 
+/* Garante que textos da navbar fiquem sempre brancos */
+.header-main,
+.header-main .logo h1,
+.header-main .nav-links > a,
 .header-main .nav-links .dropdown > a,
 .header-main .user-nav .btn,
 .header-main .user-nav i,
 .header-main .shipping-info,
-.header-main .shipping-info span {
+.header-main .shipping-info span,
+.header-main .btn-outline-light {
     color: #ffffff !important;
+}
+
+.header-main .btn-outline-light {
+    border-color: rgba(255,255,255,0.5);
+}
+
+.header-main .btn-outline-light:hover {
+    background-color: rgba(255,255,255,0.1);
+    border-color: #ffffff;
 }
 
 .logo h1 {
@@ -60,7 +86,8 @@ body {
     font-style: italic;
 }
 
-.logo span.market-text, .market-text {
+.logo span.market-text,
+.market-text {
     color: var(--market-color) !important;
 }
 
@@ -68,6 +95,12 @@ body {
 .search-bar .form-control {
     border-radius: 2px 0 0 2px;
     border: none;
+    background-color: var(--input-bg);
+    color: var(--text-main);
+}
+
+.search-bar .form-control::placeholder {
+    color: var(--text-muted);
 }
 
 .btn-search {
@@ -75,6 +108,11 @@ body {
     border: none;
     border-radius: 0 2px 2px 0;
     color: #666;
+}
+
+body.dark-theme .btn-search {
+    background-color: var(--input-bg);
+    color: var(--text-main);
 }
 
 /* Links e Menus */
@@ -89,41 +127,191 @@ body {
     color: var(--market-color) !important;
 }
 
-/* Ajuste de Dropdown e Menus Laterais */
+/* ============================================ */
+/* DROPDOWNS E MENUS                            */
+/* ============================================ */
+
 .dropdown-menu {
     background-color: var(--card-bg);
     border: 1px solid var(--border-light);
     padding: 0.5rem;
+    box-shadow: 0 8px 20px var(--shadow-color);
 }
 
 .dropdown-item {
-    color: var(--text-main) !important; /* Força cor do tema (preto no claro, branco no escuro) */
+    color: var(--text-main) !important;
     border-radius: 4px;
     font-size: 14px;
+    padding: 8px 16px;
 }
 
 .dropdown-item:hover {
     background-color: var(--primary-action);
-    color: #ffffff;
+    color: #ffffff !important;
 }
 
-/* Garante visibilidade das categorias no menu mobile */
-.offcanvas .list-group-item span {
-    color: var(--text-main) !important;
+.dropdown-divider {
+    border-top-color: var(--border-light);
 }
 
-/* Categorias no Menu Mobile */
-.list-group-item {
+/* ============================================ */
+/* MODAIS E OFF CANVAS                          */
+/* ============================================ */
+
+.modal-content {
+    background-color: var(--modal-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-light);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-light);
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+}
+
+body.dark-theme .modal-header .btn-close {
+    filter: invert(1) brightness(2);
+}
+
+.offcanvas {
+    background-color: var(--modal-bg);
+    color: var(--text-main);
+}
+
+.offcanvas-header {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.offcanvas .list-group-item {
     background-color: var(--card-bg) !important;
     color: var(--text-main) !important;
     border-color: var(--border-light) !important;
 }
 
-.list-group-item:hover {
-    background-color: var(--bg-color) !important;
+.offcanvas .list-group-item:hover {
+    background-color: var(--hover-bg) !important;
 }
 
-/* Estilização das Categorias Integradas no Hero */
+.offcanvas .list-group-item span {
+    color: var(--text-main) !important;
+}
+
+.offcanvas .text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* ============================================ */
+/* FORMULÁRIOS E INPUTS                         */
+/* ============================================ */
+
+.form-control,
+.form-select,
+input,
+textarea,
+select {
+    background-color: var(--input-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-light);
+}
+
+.form-control:focus,
+.form-select:focus,
+input:focus,
+textarea:focus {
+    background-color: var(--input-bg);
+    color: var(--text-main);
+    border-color: var(--market-color);
+    box-shadow: 0 0 0 0.2rem rgba(45, 204, 113, 0.25);
+}
+
+.form-control::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.form-label {
+    color: var(--text-main);
+}
+
+.form-check-label {
+    color: var(--text-main);
+}
+
+.form-check-input {
+    background-color: var(--input-bg);
+    border-color: var(--border-light);
+}
+
+.form-check-input:checked {
+    background-color: var(--market-color);
+    border-color: var(--market-color);
+}
+
+/* ============================================ */
+/* ALERTAS E BADGES                             */
+/* ============================================ */
+
+.alert {
+    background-color: var(--card-bg);
+    color: var(--text-main);
+    border-color: var(--border-light);
+}
+
+.alert-info {
+    background-color: rgba(0, 112, 184, 0.1);
+    border-color: rgba(0, 112, 184, 0.3);
+    color: var(--text-main);
+}
+
+.alert-success {
+    background-color: rgba(45, 204, 113, 0.1);
+    border-color: rgba(45, 204, 113, 0.3);
+    color: var(--text-main);
+}
+
+.alert-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-color: rgba(255, 193, 7, 0.3);
+    color: var(--text-main);
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.3);
+    color: var(--text-main);
+}
+
+.badge.bg-light {
+    background-color: var(--hover-bg) !important;
+    color: var(--text-main) !important;
+}
+
+/* ============================================ */
+/* HERO SECTION                                 */
+/* ============================================ */
+
+.hero-banner {
+    background: linear-gradient(135deg, var(--header-bg), #000);
+    color: white;
+    padding: 40px 0;
+    margin-bottom: 2rem;
+}
+
+.hero-banner h1,
+.hero-banner p,
+.hero-banner .text-white {
+    color: #ffffff !important;
+}
+
 .hero-categories {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -153,6 +341,7 @@ body {
     font-size: 0.75rem;
     font-weight: 600;
     margin: 0;
+    color: #ffffff !important;
 }
 
 .hero-cat-item:hover {
@@ -160,24 +349,15 @@ body {
     color: var(--market-color) !important;
 }
 
-/* Hero Section */
-.hero-banner {
-    background: linear-gradient(135deg, var(--header-bg), #000);
-    color: white;
-    padding: 40px 0;
-    margin-bottom: 2rem;
-}
+/* ============================================ */
+/* BOTÕES                                       */
+/* ============================================ */
 
-body.dark-theme .hero-banner {
-    background: linear-gradient(135deg, #440000, #000);
-}
-
-/* Botões */
 .btn-primary {
     background-color: var(--primary-action);
     border: none;
-    transition: letter-spacing 0.2s;
     color: #fff !important;
+    transition: letter-spacing 0.2s;
 }
 
 .btn-primary:hover {
@@ -185,7 +365,42 @@ body.dark-theme .hero-banner {
     letter-spacing: 0.1rem;
 }
 
-/* Grid de produtos corrigido */
+.btn-outline-primary {
+    color: var(--primary-action);
+    border-color: var(--primary-action);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-action);
+    color: #fff !important;
+}
+
+.btn-outline-secondary {
+    color: var(--text-muted);
+    border-color: var(--border-light);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-main);
+}
+
+.btn-link {
+    color: var(--primary-action);
+}
+
+.btn-close {
+    filter: invert(1);
+}
+
+body.dark-theme .btn-close {
+    filter: invert(1) brightness(2);
+}
+
+/* ============================================ */
+/* GRID DE PRODUTOS                             */
+/* ============================================ */
+
 #productsGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -202,19 +417,19 @@ body.dark-theme .hero-banner {
     overflow: hidden;
     height: 100%;
     display: flex;
-    position: relative; /* Necessário para o overlay de ícones */
+    position: relative;
     flex-direction: column;
 }
 
 .product-card-ml:hover {
     transform: translateY(-6px);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+    box-shadow: 0 15px 30px var(--shadow-color) !important;
 }
 
 .product-card-img-container {
     width: 100%;
     aspect-ratio: 1 / 1;
-    background: #ffffff; /* Fundo branco fixo para destacar fotos de produtos */
+    background: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -222,12 +437,15 @@ body.dark-theme .hero-banner {
     border-bottom: 1px solid var(--border-light);
 }
 
-/* Estilo para quando não há imagem */
+body.dark-theme .product-card-img-container {
+    background: #2a2a2a;
+}
+
 .img-placeholder-icon {
     display: flex;
     flex-direction: column;
     align-items: center;
-    color: #ccc;
+    color: var(--text-muted);
     font-size: 3rem;
 }
 
@@ -240,7 +458,7 @@ body.dark-theme .hero-banner {
 .product-card-body {
     padding: 16px;
     flex-grow: 1;
-    display: flex; /* Permite alinhar o conteúdo verticalmente */
+    display: flex;
     flex-direction: column;
 }
 
@@ -256,12 +474,21 @@ body.dark-theme .hero-banner {
     color: var(--text-muted);
     margin-top: 8px;
     line-height: 1.4;
-    height: 44px; /* Altura fixa para 2 linhas de texto */
+    height: 44px;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    flex-grow: 1; /* Empurra o preço para baixo se o título for curto */
+    flex-grow: 1;
+}
+
+.shipping-tag {
+    font-size: 0.8rem;
+    margin-top: 8px;
+}
+
+.shipping-tag.text-success {
+    color: var(--market-color) !important;
 }
 
 .installments-info {
@@ -270,26 +497,7 @@ body.dark-theme .hero-banner {
     margin-bottom: 8px;
 }
 
-/* Heading Style */
-.section-title {
-    border-bottom: 2px solid var(--market-color);
-    margin-bottom: 2rem;
-    padding-bottom: 0;
-    display: flex;
-    align-items: center;
-    font-size: 1.8rem;
- }
-
-.section-title span {
-    padding: 0.5rem 3rem;
-    color: #fff;
-    background: var(--market-color);
-    border-top-right-radius: 2rem;
-    display: inline-block;
-    font-weight: 700;
-}
-
-/* Overlay para Ações Rápidas (Curtir/Compartilhar) */
+/* Overlay de ações (curtir/compartilhar) */
 .product-card-ml .overlay {
     position: absolute;
     top: 10px;
@@ -307,16 +515,17 @@ body.dark-theme .hero-banner {
 }
 
 .product-card-ml .overlay .btn-action {
-    background: white;
+    background: var(--card-bg);
     width: 35px;
     height: 35px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 5px var(--shadow-color);
     color: var(--text-muted);
     transition: all 0.2s;
+    border: 1px solid var(--border-light);
 }
 
 .product-card-ml .overlay .btn-action:hover {
@@ -324,14 +533,40 @@ body.dark-theme .hero-banner {
     transform: scale(1.1);
 }
 
-/* Estilo Itens do Carrinho */
+/* ============================================ */
+/* SEÇÃO DE TÍTULOS                             */
+/* ============================================ */
+
+.section-title {
+    border-bottom: 2px solid var(--market-color);
+    margin-bottom: 2rem;
+    padding-bottom: 0;
+    display: flex;
+    align-items: center;
+    font-size: 1.8rem;
+}
+
+.section-title span {
+    padding: 0.5rem 3rem;
+    color: #fff;
+    background: var(--market-color);
+    border-top-right-radius: 2rem;
+    display: inline-block;
+    font-weight: 700;
+}
+
+/* ============================================ */
+/* CARRINHO                                     */
+/* ============================================ */
+
 .cart-item {
     background: var(--card-bg);
     transition: background 0.2s;
+    border-color: var(--border-light) !important;
 }
 
 .cart-item:hover {
-    background: rgba(0,0,0,0.02);
+    background: var(--hover-bg);
 }
 
 .cart-item-img {
@@ -340,6 +575,11 @@ body.dark-theme .hero-banner {
     object-fit: contain;
     padding: 5px;
     background: white;
+    border-radius: 4px;
+}
+
+body.dark-theme .cart-item-img {
+    background: #2a2a2a;
 }
 
 .cart-item-title {
@@ -349,10 +589,169 @@ body.dark-theme .hero-banner {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    color: var(--text-main);
 }
 
 /* ============================================ */
-/* ESTILOS DO SISTEMA DE CHAT (UNIFICADO)       */
+/* DETALHE DO PRODUTO (Mercado Livre Style)     */
+/* ============================================ */
+
+.product-detail-condition {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.product-detail-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    color: var(--text-main);
+}
+
+.product-detail-price {
+    display: flex;
+    align-items: flex-start;
+    color: var(--text-main);
+    font-size: 2.2rem;
+    font-weight: 300;
+    margin-bottom: 4px;
+}
+
+.product-detail-price .currency {
+    font-size: 1.1rem;
+    margin-top: 8px;
+    margin-right: 4px;
+}
+
+.product-detail-price .cents {
+    font-size: 1.1rem;
+    margin-top: 8px;
+}
+
+.installments-promo {
+    color: #00a650;
+    font-size: 1rem;
+    margin-bottom: 20px;
+}
+
+.price-area del {
+    color: var(--text-muted) !important;
+}
+
+.shipping-card-detail {
+    background-color: var(--hover-bg);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-light);
+}
+
+.shipping-card-detail i {
+    color: var(--market-color);
+    font-size: 1.2rem;
+}
+
+.seller-reputation-card {
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    background-color: var(--card-bg);
+}
+
+.seller-reputation-card p,
+.seller-reputation-card span {
+    color: var(--text-main);
+}
+
+.reputation-bar {
+    display: flex;
+    gap: 4px;
+    height: 8px;
+    margin: 12px 0;
+}
+
+.reputation-step {
+    flex: 1;
+    background-color: var(--border-light);
+    border-radius: 2px;
+}
+
+.reputation-step.active-green {
+    background-color: #00a650;
+}
+
+.reputation-step.active-yellow {
+    background-color: #fff159;
+}
+
+.btn-buy-now {
+    background-color: #3483fa;
+    color: #fff !important;
+    border: none;
+    border-radius: 6px;
+    padding: 14px;
+    font-weight: 600;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-buy-now:hover {
+    background-color: #2968c8;
+}
+
+.btn-add-to-cart-ml {
+    background-color: rgba(65, 137, 230, 0.1);
+    color: #3483fa !important;
+    border: none;
+    border-radius: 6px;
+    padding: 14px;
+    font-weight: 600;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-add-to-cart-ml:hover {
+    background-color: rgba(65, 137, 230, 0.2);
+}
+
+.benefit-item-ml {
+    display: flex;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.benefit-item-ml i {
+    color: #3483fa;
+    font-size: 1rem;
+}
+
+.benefit-item-ml .text-primary {
+    color: #3483fa !important;
+}
+
+.description-section-ml {
+    border-top: 1px solid var(--border-light);
+    padding-top: 25px;
+    margin-top: 30px;
+}
+
+.description-section-ml h3 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: var(--text-main);
+}
+
+.description-section-ml p {
+    color: var(--text-muted);
+}
+
+/* ============================================ */
+/* SISTEMA DE CHAT (CORRIGIDO PARA TEMA ESCURO) */
 /* ============================================ */
 
 .chat-container {
@@ -369,9 +768,13 @@ body.dark-theme .hero-banner {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    background: #f8f9fa;
+    background: var(--bg-color);
     border-radius: 12px;
     max-height: 400px;
+}
+
+body.dark-theme .chat-messages {
+    background: #1a1a1a;
 }
 
 .chat-message {
@@ -381,13 +784,19 @@ body.dark-theme .hero-banner {
     animation: messageSlide 0.2s ease;
 }
 
-@keyframes messageSlide { 
-    from { opacity: 0; transform: translateY(5px); } 
-    to { opacity: 1; transform: translateY(0); } 
+@keyframes messageSlide {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-.message-sent { align-self: flex-end; justify-content: flex-end; }
-.message-received { align-self: flex-start; }
+.message-sent {
+    align-self: flex-end;
+    justify-content: flex-end;
+}
+
+.message-received {
+    align-self: flex-start;
+}
 
 .message-bubble {
     padding: 0.75rem 1rem;
@@ -403,9 +812,9 @@ body.dark-theme .hero-banner {
 }
 
 .message-received .message-bubble {
-    background: white;
-    color: #333;
-    border: 1px solid #e0e0e0;
+    background: var(--card-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-light);
     border-bottom-left-radius: 4px;
 }
 
@@ -416,16 +825,74 @@ body.dark-theme .hero-banner {
     text-align: right;
 }
 
-.message-system { text-align: center; margin: 15px 0; }
+.message-sent .message-time {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.message-received .message-time {
+    color: var(--text-muted);
+}
+
+.message-system {
+    text-align: center;
+    margin: 15px 0;
+}
+
 .message-system .badge {
-    background: #e9ecef;
-    color: #666;
+    background: var(--hover-bg);
+    color: var(--text-main);
     font-weight: normal;
     padding: 0.5rem 1rem;
     border-radius: 20px;
     font-size: 0.75rem;
+    border: 1px solid var(--border-light);
 }
 
+/* Input do Chat */
+.chat-input-container {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 0 0;
+}
+
+.chat-input-container input {
+    flex: 1;
+    border: 2px solid var(--border-light);
+    border-radius: 25px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.9rem;
+    background-color: var(--input-bg);
+    color: var(--text-main);
+}
+
+.chat-input-container input:focus {
+    outline: none;
+    border-color: var(--market-color);
+}
+
+.chat-input-container input::placeholder {
+    color: var(--text-muted);
+}
+
+.chat-input-container button {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--market-color);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.chat-input-container button:hover {
+    background: #25b35e;
+}
+
+/* Lista de Contatos */
 .chat-contact-item {
     display: flex;
     align-items: center;
@@ -437,10 +904,22 @@ body.dark-theme .hero-banner {
     border-bottom: 1px solid var(--border-light);
 }
 
-.chat-contact-item:hover { background: #f0f0f0; }
+.chat-contact-item:hover {
+    background: var(--hover-bg);
+}
+
 .chat-contact-item.active {
-    background: #e8e9ff;
-    border-left: 4px solid #131673;
+    background: rgba(45, 204, 113, 0.1);
+    border-left: 4px solid var(--market-color);
+}
+
+.chat-contact-item strong,
+.chat-contact-item .small {
+    color: var(--text-main);
+}
+
+.chat-contact-item .text-muted {
+    color: var(--text-muted) !important;
 }
 
 .online-indicator {
@@ -448,10 +927,32 @@ body.dark-theme .hero-banner {
     height: 12px;
     background: #4CAF50;
     border-radius: 50%;
-    border: 2px solid white;
+    border: 2px solid var(--card-bg);
 }
 
-/* Status e Pedidos */
+/* Área de Acordo de Entrega */
+.logistics-area {
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.logistics-area p {
+    color: var(--text-main);
+}
+
+.logistics-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* ============================================ */
+/* STATUS DE PEDIDOS                            */
+/* ============================================ */
+
 .status-badge {
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
@@ -473,7 +974,7 @@ body.dark-theme .hero-banner {
     margin: 1rem 0;
     position: relative;
     padding: 15px 0;
-    background: #f8f9fa;
+    background: var(--hover-bg);
     border-radius: 8px;
 }
 
@@ -484,7 +985,7 @@ body.dark-theme .hero-banner {
     left: 10%;
     right: 10%;
     height: 2px;
-    background: #dee2e6;
+    background: var(--border-light);
     z-index: 0;
 }
 
@@ -498,16 +999,20 @@ body.dark-theme .hero-banner {
     flex: 1;
 }
 
+.status-step small {
+    color: var(--text-muted);
+}
+
 .status-icon {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: white;
-    border: 2px solid #dee2e6;
+    background: var(--card-bg);
+    border: 2px solid var(--border-light);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #999;
+    color: var(--text-muted);
     font-size: 12px;
 }
 
@@ -517,59 +1022,256 @@ body.dark-theme .hero-banner {
     color: white;
 }
 
-.order-card { border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s; }
-.order-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-
-/* Ajustes Dashboards */
-.order-management-card { transition: transform 0.2s; border-left: 4px solid var(--primary-blue); }
-.order-management-card:hover { transform: translateX(5px); }
-
-/* Estilos Detalhe do Produto (Mercado Livre Style) */
-.product-detail-condition { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
-.product-detail-title { font-size: 1.4rem; font-weight: 600; line-height: 1.2; margin-bottom: 12px; color: var(--text-main); }
-.product-detail-price { display: flex; align-items: flex-start; color: var(--text-main); font-size: 2.2rem; font-weight: 300; margin-bottom: 4px; }
-.product-detail-price .currency { font-size: 1.1rem; margin-top: 8px; margin-right: 4px; }
-.product-detail-price .cents { font-size: 1.1rem; margin-top: 8px; }
-.installments-promo { color: #00a650; font-size: 1rem; margin-bottom: 20px; }
-
-.shipping-card-detail { background-color: #f5f5f5; border-radius: 8px; padding: 15px; margin-bottom: 20px; border: 1px solid var(--border-light); }
-.shipping-card-detail i { color: #00a650; font-size: 1.2rem; }
-
-.seller-reputation-card { border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-.reputation-bar { display: flex; gap: 4px; height: 8px; margin: 12px 0; }
-.reputation-step { flex: 1; background-color: #eee; border-radius: 2px; }
-.reputation-step.active-green { background-color: #00a650; }
-.reputation-step.active-yellow { background-color: #fff159; }
-
-.btn-buy-now { 
-    background-color: #3483fa; 
-    color: #fff !important; 
-    border: none; 
-    border-radius: 6px; 
-    padding: 14px; 
-    font-weight: 600; 
-    width: 100%; 
-    transition: background 0.2s;
+.status-step.completed .status-icon {
+    background: var(--market-color);
+    border-color: var(--market-color);
+    color: white;
 }
-.btn-buy-now:hover { background-color: #2968c8; }
 
-.btn-add-to-cart-ml { 
-    background-color: rgba(65,137,230,.1); 
-    color: #3483fa !important; 
-    border: none; 
-    border-radius: 6px; 
-    padding: 14px; 
-    font-weight: 600; 
-    width: 100%; 
-    transition: background 0.2s;
+/* Cards de Pedido */
+.order-card,
+.order-management-card {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
-.btn-add-to-cart-ml:hover { background-color: rgba(65,137,230,.2); }
 
-.benefit-item-ml { display: flex; gap: 10px; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
-.benefit-item-ml i { color: #3483fa; font-size: 1rem; }
+.order-card:hover,
+.order-management-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
 
-.description-section-ml { border-top: 1px solid var(--border-light); padding-top: 25px; margin-top: 30px; }
-.description-section-ml h3 { font-size: 1.5rem; margin-bottom: 20px; }
-    .chat-sidebar { position: absolute; z-index: 100; height: 100%; transform: translateX(-100%); transition: 0.3s; }
-    .chat-sidebar.show { transform: translateX(0); }
+.order-management-card {
+    border-left: 4px solid var(--market-color) !important;
+}
+
+.order-management-card h5,
+.order-management-card h6,
+.order-management-card p,
+.order-management-card strong {
+    color: var(--text-main);
+}
+
+.order-management-card .text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* ============================================ */
+/* TABELAS E LISTAS                             */
+/* ============================================ */
+
+.table {
+    color: var(--text-main);
+}
+
+.table-light {
+    background-color: var(--hover-bg);
+    color: var(--text-main);
+}
+
+.list-group-item {
+    background-color: var(--card-bg) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-light) !important;
+}
+
+.list-group-item:hover {
+    background-color: var(--hover-bg) !important;
+}
+
+.list-group-item-action {
+    color: var(--text-main);
+}
+
+.list-group-item-action:hover {
+    background-color: var(--hover-bg);
+}
+
+/* ============================================ */
+/* NAV TABS                                     */
+/* ============================================ */
+
+.nav-tabs {
+    border-bottom-color: var(--border-light);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-muted);
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--text-main);
+    border-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--card-bg);
+    color: var(--market-color);
+    border-color: var(--border-light) var(--border-light) var(--card-bg);
+}
+
+body.dark-theme .nav-tabs .nav-link.active {
+    background-color: var(--card-bg);
+    border-color: var(--border-light) var(--border-light) var(--card-bg);
+}
+
+/* ============================================ */
+/* TEXTOS E UTILITÁRIOS                         */
+/* ============================================ */
+
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.text-dark {
+    color: var(--text-main) !important;
+}
+
+.bg-light {
+    background-color: var(--hover-bg) !important;
+}
+
+.bg-white {
+    background-color: var(--card-bg) !important;
+}
+
+.border {
+    border-color: var(--border-light) !important;
+}
+
+.border-bottom,
+.border-top,
+.border-start,
+.border-end {
+    border-color: var(--border-light) !important;
+}
+
+hr {
+    border-top-color: var(--border-light);
+    opacity: 0.5;
+}
+
+/* ============================================ */
+/* RESPONSIVO                                   */
+/* ============================================ */
+
+@media (max-width: 768px) {
+    .chat-sidebar {
+        position: absolute;
+        z-index: 100;
+        height: 100%;
+        transform: translateX(-100%);
+        transition: 0.3s;
+        background-color: var(--card-bg);
+    }
+    
+    .chat-sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .section-title span {
+        padding: 0.5rem 1.5rem;
+        font-size: 1.2rem;
+    }
+}
+
+/* ============================================ */
+/* SCROLLBAR CUSTOMIZADA                        */
+/* ============================================ */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* ============================================ */
+/* PROGRESS BAR                                 */
+/* ============================================ */
+
+.progress {
+    background-color: var(--hover-bg);
+}
+
+.progress-bar {
+    background-color: var(--market-color);
+}
+
+/* ============================================ */
+/* AVALIAÇÃO (ESTRELAS)                         */
+/* ============================================ */
+
+.rating-stars {
+    font-size: 2rem;
+    color: #ffc107;
+    cursor: pointer;
+}
+
+.rating-stars i {
+    margin: 0 0.25rem;
+    transition: transform 0.1s;
+}
+
+.rating-stars i:hover {
+    transform: scale(1.2);
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+/* ============================================ */
+/* LINKS                                        */
+/* ============================================ */
+
+a {
+    color: var(--primary-action);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--market-color);
+}
+
+/* ============================================ */
+/* SPINNERS E LOADING                           */
+/* ============================================ */
+
+.spinner-border {
+    color: var(--market-color) !important;
+}
+
+/* ============================================ */
+/* FOOTER                                       */
+/* ============================================ */
+
+footer {
+    background-color: var(--header-bg);
+    color: #ffffff;
+}
+
+footer a {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+footer a:hover {
+    color: var(--market-color);
+}
+
+footer .text-muted {
+    color: rgba(255, 255, 255, 0.5) !important;
 }
