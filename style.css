@@ -36,7 +36,7 @@ body {
     background-color: var(--header-bg) !important;
     position: sticky;
     top: 0;
-    z-index: 1050; /* Mantém a navbar acima de todos os cards e overlays */
+    z-index: 1020; /* Reduzido para que os menus laterais (offcanvas) fiquem por cima */
     width: 100%;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     color: #ffffff !important;
@@ -351,17 +351,178 @@ body.dark-theme .hero-banner {
     overflow: hidden;
 }
 
-/* ========== SISTEMA DE CHAT ========== */
-.chat-message { display: flex; margin-bottom: 12px; animation: messageSlide 0.2s ease; }
-@keyframes messageSlide { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+/* ============================================ */
+/* ESTILOS DO SISTEMA DE CHAT (UNIFICADO)       */
+/* ============================================ */
 
-.message-sent { justify-content: flex-end; }
-.message-bubble { max-width: 75%; padding: 10px 14px; border-radius: 15px; position: relative; font-size: 0.9rem; }
-.message-sent .message-bubble { background: var(--header-bg); color: white; border-bottom-right-radius: 2px; }
-.message-received .message-bubble { background: white; color: var(--text-main); border: 1px solid var(--border-light); border-bottom-left-radius: 2px; }
-.message-time { font-size: 10px; margin-top: 4px; opacity: 0.6; text-align: right; }
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 500px;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    max-height: 400px;
+}
+
+.chat-message {
+    display: flex;
+    max-width: 75%;
+    margin-bottom: 12px;
+    animation: messageSlide 0.2s ease;
+}
+
+@keyframes messageSlide { 
+    from { opacity: 0; transform: translateY(5px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+.message-sent { align-self: flex-end; justify-content: flex-end; }
+.message-received { align-self: flex-start; }
+
+.message-bubble {
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+    position: relative;
+    font-size: 0.9rem;
+}
+
+.message-sent .message-bubble {
+    background: linear-gradient(135deg, #131673 0%, #1a1f8a 100%);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message-received .message-bubble {
+    background: white;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+}
+
+.message-time {
+    font-size: 0.65rem;
+    margin-top: 4px;
+    opacity: 0.7;
+    text-align: right;
+}
+
 .message-system { text-align: center; margin: 15px 0; }
-.message-system .badge { background: #e9ecef; color: #666; font-weight: 500; }
+.message-system .badge {
+    background: #e9ecef;
+    color: #666;
+    font-weight: normal;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+}
+
+.chat-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.chat-contact-item:hover { background: #f0f0f0; }
+.chat-contact-item.active {
+    background: #e8e9ff;
+    border-left: 4px solid #131673;
+}
+
+.online-indicator {
+    width: 12px;
+    height: 12px;
+    background: #4CAF50;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+/* Status e Pedidos */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-pending { background: #fff3cd; color: #856404; }
+.status-accepted { background: #cce5ff; color: #004085; }
+.status-shipping { background: #d4edda; color: #155724; }
+.status-finished { background: #d1e7dd; color: #0f5132; }
+.status-dispute { background: #f8d7da; color: #721c24; }
+.status-cancelled { background: #e2e3e5; color: #41464b; }
+
+.order-status-bar {
+    display: flex;
+    justify-content: space-between;
+    margin: 1rem 0;
+    position: relative;
+    padding: 15px 0;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.order-status-bar::before {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #dee2e6;
+    z-index: 0;
+}
+
+.status-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+}
+
+.status-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 12px;
+}
+
+.status-step.active .status-icon {
+    background: var(--market-color);
+    border-color: var(--market-color);
+    color: white;
+}
+
+.order-card { border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s; }
+.order-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+/* Ajustes Dashboards */
+.order-management-card { transition: transform 0.2s; border-left: 4px solid var(--primary-blue); }
+.order-management-card:hover { transform: translateX(5px); }
 
 /* Estilos Detalhe do Produto (Mercado Livre Style) */
 .product-detail-condition { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
@@ -409,35 +570,6 @@ body.dark-theme .hero-banner {
 
 .description-section-ml { border-top: 1px solid var(--border-light); padding-top: 25px; margin-top: 30px; }
 .description-section-ml h3 { font-size: 1.5rem; margin-bottom: 20px; }
-
-/* Status do Pedido no Chat */
-.order-status-bar { display: flex; justify-content: space-between; position: relative; padding: 15px 0; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; }
-.order-status-bar::before { content: ''; position: absolute; top: 30px; left: 10%; right: 10%; height: 2px; background: #dee2e6; z-index: 1; }
-.status-step { text-align: center; z-index: 2; flex: 1; position: relative; background: #f8f9fa; }
-.status-icon { width: 30px; height: 30px; border-radius: 50%; background: white; border: 2px solid #dee2e6; display: flex; align-items: center; justify-content: center; margin: 0 auto 5px; font-size: 12px; }
-.status-step.active .status-icon { background: var(--market-color); color: white; border-color: var(--market-color); }
-.status-step.active small { color: var(--market-color); font-weight: bold; }
-
-/* Cores de Status Customizadas */
-.status-badge { font-size: 0.7rem; padding: 4px 8px; border-radius: 20px; font-weight: 700; text-uppercase; }
-.status-pending { background: #fff3cd; color: #856404; }
-.status-accepted { background: #d4edda; color: #155724; }
-.status-shipping { background: #cce5ff; color: #004085; }
-.status-finished { background: #d1ecf1; color: #0c5460; }
-.status-dispute { background: #f8d7da; color: #721c24; }
-
-/* Ajustes para Dashboards */
-.order-management-card { transition: transform 0.2s; border-left: 4px solid var(--primary-blue); }
-.order-management-card:hover { transform: translateX(5px); }
-.dispute-alert { border: 2px solid #dc3545 !important; animation: pulse-red 2s infinite; }
-@keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
-/* Sidebar Contatos */
-.chat-contact-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; cursor: pointer; transition: 0.2s; border-bottom: 1px solid var(--border-light); }
-.chat-contact-item:hover { background: rgba(0,0,0,0.03); }
-.chat-contact-item.active { background: rgba(0,74,173,0.08); border-left: 4px solid var(--primary-action); }
-.online-indicator { width: 10px; height: 10px; background: #2ecc71; border: 2px solid white; border-radius: 50%; display: inline-block; }
-
-@media (max-width: 768px) {
     .chat-sidebar { position: absolute; z-index: 100; height: 100%; transform: translateX(-100%); transition: 0.3s; }
     .chat-sidebar.show { transform: translateX(0); }
 }
