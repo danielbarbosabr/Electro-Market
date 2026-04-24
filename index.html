@@ -55,7 +55,7 @@
                         <!-- Ícones de Ação (Tema, Carrinho, Notificações) -->
                         <div class="d-flex align-items-center gap-3">
                             <button class="btn btn-theme p-0 border-0 text-white" id="themeToggle" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
-                            <a href="#" class="text-white text-decoration-none position-relative" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+                            <a href="#" class="text-white text-decoration-none position-relative role-client" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
                                 <i class="bi bi-cart2 fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="cartBadgeDesktop" style="font-size: 0.6rem;">0</span>
                             </a>
@@ -81,7 +81,7 @@
                 <div class="col-md-10 d-flex align-items-center">
                     <nav class="nav-links d-flex gap-4">
                         <a href="#" class="text-white text-decoration-none" onclick="loadPage('eletronicos')"><i class="bi bi-house-door me-1"></i> Início</a>
-                        <div class="dropdown">
+                        <div class="dropdown role-client">
                             <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-list me-1"></i> Categorias</a>
                             <ul class="dropdown-menu border-0 shadow">
                                 <li><a class="dropdown-item" href="#" onclick="loadPage('Smartphone')"><i class="bi bi-phone me-2"></i> Celulares</a></li>
@@ -102,19 +102,19 @@
                         <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderOrderManagement('buyer')"><i class="bi bi-bag-check me-1"></i> Minhas Compras</a>
                         
                         <!-- Itens do Vendedor integrados na barra principal -->
-                        <a href="#" class="text-white text-decoration-none role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal">
+                        <a href="#" class="text-white text-decoration-none role-seller d-none" onclick="loadPage('eletronicos')">
+                            <i class="bi bi-box-seam me-1"></i> <strong>Meus Produtos</strong>
+                        </a>
+                        <a href="#" class="text-white text-decoration-none role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal()">
                             <i class="bi bi-plus-circle me-1"></i> <strong>Vender Produto</strong>
                         </a>
-                        <div class="dropdown role-seller d-none">
-                            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-shop me-1"></i> Minhas Vendas</a>
-                            <ul class="dropdown-menu border-0 shadow">
-                                <li><a class="dropdown-item" href="#" onclick="window.renderSellerPanel('pending')">Novas Solicitações <span class="badge bg-danger ms-2" id="pendingBadgeNav">0</span></a></li>
-                                <li><a class="dropdown-item" href="#" onclick="window.renderSellerPanel('accepted')">Aguardando Acordo</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="window.renderSellerPanel('shipping')">Em Trânsito</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#" onclick="window.renderSellerPanel('finished')">Histórico Concluído</a></li>
-                            </ul>
-                        </div>
+                        <a href="#" class="text-white text-decoration-none role-seller d-none position-relative" onclick="window.renderOrderManagement('seller_requests')">
+                            <i class="bi bi-bell me-1"></i> <strong>Solicitações</strong>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="pendingBadgeNav" style="font-size: 0.6rem;">0</span>
+                        </a>
+                        <a href="#" class="text-white text-decoration-none role-seller d-none" onclick="window.renderOrderManagement('seller_sales')">
+                            <i class="bi bi-shop me-1"></i> <strong>Minhas Vendas</strong>
+                        </a>
 
                         <a href="#" class="text-white text-decoration-none role-admin d-none" onclick="window.renderOrderManagement('admin')"><i class="bi bi-shield-lock me-1"></i> Painel Admin</a>
                     </nav>
@@ -478,7 +478,7 @@
                         <span>Curtidos</span>
                     </div>
                 </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="window.closeMobileMenu();">
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.closeMobileMenu();">
                     <div class="d-flex align-items-center">
                         <i class="bi bi-cart-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
                         <span>Carrinho</span>
@@ -492,8 +492,31 @@
                 <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Categorias</small>
             </div>
 
-            <!-- Categorias -->
-            <div class="list-group list-group-flush">
+            <!-- Menu do Vendedor (Mobile) -->
+            <div class="list-group list-group-flush role-seller d-none">
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('eletronicos'); window.closeMobileMenu();">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-box-seam-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
+                        <span>Meus Produtos (Estoque)</span>
+                    </div>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="window.renderOrderManagement('seller_requests'); window.closeMobileMenu();">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-bell-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
+                        <span>Solicitações de Compra</span>
+                        <span class="badge rounded-pill bg-danger ms-auto d-none" id="pendingBadgeMobile">0</span>
+                    </div>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="window.renderOrderManagement('seller_sales'); window.closeMobileMenu();">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-shop me-3 fs-5" style="color: var(--primary-blue);"></i>
+                        <span>Minhas Vendas</span>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Categorias (Cliente) -->
+            <div class="list-group list-group-flush role-client">
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Smartphone'); window.closeMobileMenu();">
                     <div class="d-flex align-items-center">
                         <i class="bi bi-phone-fill me-3 fs-5"></i>
@@ -545,7 +568,7 @@
 
             <!-- Conta e Configurações -->
             <div class="list-group list-group-flush">
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-seller" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.closeMobileMenu();">
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-seller" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); window.closeMobileMenu();">
                     <div class="d-flex align-items-center">
                         <i class="bi bi-plus-circle me-3 fs-5"></i>
                         <span>Vender</span>
