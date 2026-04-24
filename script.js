@@ -14,6 +14,7 @@ let fullDatabase = null; // Cache local do banco completo
 let syncInProgress = false;
 let cart = JSON.parse(localStorage.getItem('holandesVoadorCart')) || [];
 let cartCount = cart.reduce((acc, item) => acc + (item.qtd || 1), 0);
+window.currentEditingId = null; 
 let currentChat = null;
 let chats = JSON.parse(localStorage.getItem('electro_chats')) || [];
 let orders = JSON.parse(localStorage.getItem('electro_orders')) || [];
@@ -125,6 +126,11 @@ async function fetchFullDatabase() {
         
         const data = await response.json();
         fullDatabase = data.record; 
+
+        // Sincroniza pedidos e chats globais para que o vendedor veja solicitações de outros usuários
+        if (fullDatabase.orders) orders = fullDatabase.orders;
+        if (fullDatabase.chats) chats = fullDatabase.chats;
+        updateVisibilityByRole(); // Atualiza contadores de pendências
         
         console.log('[DATABASE] Sincronizado:', {
             produtos: fullDatabase.products?.length || 0,
@@ -143,6 +149,11 @@ async function updateFullDatabase(newData) {
     syncInProgress = true;
     
     try {
+        // Garante que pedidos e chats atuais façam parte do pacote de sincronização
+        newData.orders = orders;
+        newData.chats = chats;
+        newData.last_updated = new Date().toISOString();
+
         const url = `https://api.jsonbin.io/v3/b/${API_CONFIG.JSONBIN_BIN_ID}`;
         const response = await fetch(url, {
             method: 'PUT',
@@ -287,14 +298,6 @@ function updateVisibilityByRole() {
     const isLoggedIn = !!info;
     const role = info?.tipo || 'CLIENTE';
 
-    // Atualiza Badges de Vendedor
-    const pendingCount = orders.filter(o => o.sellerId === info?.id && o.status === 'pending').length;
-    const pendingBadge = document.getElementById('pendingBadgeNav');
-    if (pendingBadge) {
-        pendingBadge.textContent = pendingCount;
-        pendingBadge.classList.toggle('d-none', pendingCount === 0);
-    }
-
     const clientItems = document.querySelectorAll('.role-client');
     const sellerItems = document.querySelectorAll('.role-seller');
     const adminItems = document.querySelectorAll('.role-admin');
@@ -365,6 +368,20 @@ function updateVisibilityByRole() {
         clientItems.forEach(el => el.classList.remove('d-none'));
         sellerItems.forEach(el => el.classList.add('d-none'));
         adminItems.forEach(el => el.classList.add('d-none'));
+    }
+
+    // Atualiza Badges de Vendedor (Solicitações pendentes)
+    const pendingCount = orders.filter(o => o.sellerId === info?.id && o.status === 'pending').length;
+    const pendingBadge = document.getElementById('pendingBadgeNav');
+    const pendingBadgeMobile = document.getElementById('pendingBadgeMobile');
+
+    if (pendingBadge) {
+        pendingBadge.textContent = pendingCount;
+        pendingBadge.classList.toggle('d-none', pendingCount === 0);
+    }
+    if (pendingBadgeMobile) {
+        pendingBadgeMobile.textContent = pendingCount;
+        pendingBadgeMobile.classList.toggle('d-none', pendingCount === 0);
     }
     
     if (typeof renderNotifications === 'function') renderNotifications();
@@ -439,32 +456,112 @@ window.logout = function() {
     location.reload();
 };
 
+window.resetAnnounceModal = function() {
+    window.currentEditingId = null;
+    document.getElementById('announceForm')?.reset();
+    const modalTitle = document.querySelector('#announceModal .modal-title');
+    const submitBtn = document.querySelector('#announceModal button[type="submit"]');
+    if (modalTitle) modalTitle.textContent = 'O que você quer vender?';
+    if (submitBtn) {
+        submitBtn.textContent = 'Publicar Anúncio';
+        submitBtn.className = 'btn btn-warning w-100 fw-bold';
+    }
+};
+
+window.prepareEditProduct = function(productId) {
+    const item = allProductsCache.find(p => p.productKey === productId);
+    if (!item) return;
+
+    window.currentEditingId = productId;
+    
+    // Preenche os campos
+    document.getElementById('prodTitle').value = item.titulo || '';
+    document.getElementById('prodDescription').value = item.descricao || '';
+    document.getElementById('prodPrice').value = item.preco || 0;
+    document.getElementById('prodQuantity').value = item.quantidade || 0;
+    document.getElementById('prodCategory').value = item.categoria || '';
+    document.getElementById('prodDelivery').checked = !!item.realizaEntrega;
+    document.getElementById('prodImage').value = item.img || '';
+
+    // Altera interface do modal
+    const modalTitle = document.querySelector('#announceModal .modal-title');
+    const submitBtn = document.querySelector('#announceModal button[type="submit"]');
+    if (modalTitle) modalTitle.textContent = 'Editar Publicação';
+    if (submitBtn) {
+        submitBtn.textContent = 'Salvar Alterações';
+        submitBtn.className = 'btn btn-primary w-100 fw-bold';
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('productDetailModal'))?.hide();
+    new bootstrap.Modal(document.getElementById('announceModal')).show();
+};
+
+window.deleteProduct = async function(productId) {
+    if (!confirm('Tem certeza que deseja excluir este anúncio permanentemente? Esta ação não pode ser desfeita.')) return;
+
+    if (fullDatabase && fullDatabase.products) {
+        // Encontra o índice do produto no banco global
+        const index = fullDatabase.products.findIndex(p => p.productKey === productId || p.id === productId);
+        
+        if (index !== -1) {
+            fullDatabase.products.splice(index, 1);
+            
+            // Sincroniza a exclusão com o servidor JSONBin
+            const success = await updateFullDatabase(fullDatabase);
+            
+            if (success) {
+                alert('Anúncio excluído com sucesso!');
+                bootstrap.Modal.getInstance(document.getElementById('productDetailModal'))?.hide();
+                loadPage('eletronicos'); // Recarrega a vitrine atualizada
+            }
+        }
+    }
+};
+
 async function handleAnnounceSubmit(event) {
     event.preventDefault();
     const userInfo = getSavedCadastro();
     if (!userInfo) return;
 
-    const announceData = {
-        id: `prod_${Date.now()}`,
-        titulo: document.getElementById('prodTitle')?.value.trim(),
-        descricao: document.getElementById('prodDescription')?.value.trim(),
-        preco: parseFloat(document.getElementById('prodPrice')?.value) || 0,
-        quantidade: parseInt(document.getElementById('prodQuantity')?.value) || 0,
-        categoria: document.getElementById('prodCategory')?.value,
-        realizaEntrega: document.getElementById('prodDelivery')?.checked,
-        img: document.getElementById('prodImage')?.value || 'https://via.placeholder.com/400',
-        loja: userInfo.nome,
-        vendedor_id: userInfo.id,
-        created_at: new Date().toISOString()
-    };
-
     if (fullDatabase) {
         fullDatabase.products = fullDatabase.products || [];
-        fullDatabase.products.push(announceData);
+        
+        const announceData = {
+            titulo: document.getElementById('prodTitle')?.value.trim(),
+            descricao: document.getElementById('prodDescription')?.value.trim(),
+            preco: parseFloat(document.getElementById('prodPrice')?.value) || 0,
+            quantidade: parseInt(document.getElementById('prodQuantity')?.value) || 0,
+            categoria: document.getElementById('prodCategory')?.value,
+            realizaEntrega: document.getElementById('prodDelivery')?.checked,
+            img: document.getElementById('prodImage')?.value || 'https://via.placeholder.com/400'
+        };
+
+        if (window.currentEditingId) {
+            const index = fullDatabase.products.findIndex(p => p.productKey === window.currentEditingId || p.id === window.currentEditingId);
+            if (index !== -1) {
+                fullDatabase.products[index] = { ...fullDatabase.products[index], ...announceData, last_edit: new Date().toISOString() };
+            }
+        } else {
+            const newProd = {
+                id: `prod_${Date.now()}`,
+                ...announceData,
+                loja: userInfo.nome,
+                vendedor_id: userInfo.id,
+                created_at: new Date().toISOString()
+            };
+            fullDatabase.products.push(newProd);
+        }
+        
+        // Inicializa orders e chats se não existirem no banco
+        fullDatabase.orders = orders;
+        fullDatabase.chats = chats;
+
         const success = await updateFullDatabase(fullDatabase);
+
         if (success) {
-            addNotification("Novo Anúncio", `Você publicou o produto: ${announceData.titulo}`, "bi-plus-circle", "warning");
-            alert('Produto anunciado com sucesso!');
+            const msg = window.currentEditingId ? 'Produto atualizado!' : 'Produto anunciado!';
+            alert(msg);
+            window.currentEditingId = null;
             bootstrap.Modal.getInstance(document.getElementById('announceModal'))?.hide();
             loadPage('eletronicos');
         }
@@ -582,9 +679,8 @@ async function initializeJsonDatabase() {
             last_updated: new Date().toISOString(),
             products: products,
             users: [],
-            orders: [],
-            announcements: [],
-            notifications: [],
+            orders: orders,
+            chats: chats,
             site_config: { featured_products: [], banners: [], categories: [] }
         };
 
@@ -836,8 +932,16 @@ window.showProductDetail = function(productId) {
                 <p class="small mb-3">Estoque disponível: <b>${item.quantidade || 1} unidades</b></p>
 
                 <div class="d-grid gap-2 mb-3">
-                    <button class="btn-buy-now" onclick="window.finalizarCompraMock(0)">Solicitar Compra</button>
-                    <button class="btn-add-to-cart-ml" onclick="window.addToCart('${item.productKey}')">Adicionar ao carrinho</button>
+                    ${userInfo && item.vendedor_id === userInfo.id ? 
+                        `<button class="btn btn-primary btn-lg fw-bold" onclick="window.prepareEditProduct('${item.productKey}')">
+                            <i class="bi bi-pencil-square me-2"></i>Editar Publicação
+                         </button>
+                         <button class="btn btn-outline-danger btn-sm fw-bold" onclick="window.deleteProduct('${item.productKey}')">
+                            <i class="bi bi-trash me-2"></i>Excluir Anúncio Permanente
+                         </button>` : 
+                        `<button class="btn-buy-now" onclick="window.buyNow('${item.productKey}')">Solicitar Compra</button>
+                         <button class="btn-add-to-cart-ml" onclick="window.addToCart('${item.productKey}')">Adicionar ao carrinho</button>`
+                    }
                 </div>
                 <button class="btn btn-link text-decoration-none w-100 text-secondary fw-bold small mb-4" onclick="window.shareProduct('${item.productKey}')">
                     <i class="bi bi-share me-2"></i>Compartilhar produto
@@ -1427,7 +1531,22 @@ window.applyFilters = applyFilters;
 // SISTEMA DE CHAT E PEDIDOS (LÓGICA INTEGRADA)
 // ============================================
 
-window.finalizarCompraMock = function(itemIndex) {
+window.buyNow = function(productId) {
+    const product = allProductsCache.find(p => p.productKey === productId);
+    if (!product) return;
+
+    // Garante que o item está no carrinho antes de processar a compra direta
+    const existing = cart.find(item => item.productKey === productId);
+    if (!existing) {
+        cart.push({ ...product, qtd: 1 });
+        renderCart();
+    }
+
+    const index = cart.findIndex(item => item.productKey === productId);
+    window.finalizarCompraMock(index);
+};
+
+window.finalizarCompraMock = async function(itemIndex) {
     const item = cart[itemIndex];
     const info = getSavedCadastro();
     if (!info) {
@@ -1453,7 +1572,6 @@ window.finalizarCompraMock = function(itemIndex) {
     };
     
     orders.push(order);
-    localStorage.setItem('electro_orders', JSON.stringify(orders));
     
     const chatId = `chat_${order.id}`;
     chats.push({
@@ -1461,8 +1579,17 @@ window.finalizarCompraMock = function(itemIndex) {
         participants: [String(order.buyerId), String(order.sellerId)],
         messages: [{ senderId: 'system', text: `🛒 Solicitação de compra #${order.id.slice(-8)}`, timestamp: new Date().toISOString(), type: 'system' }]
     });
+
+    // 1. Salva localmente
+    localStorage.setItem('electro_orders', JSON.stringify(orders));
     localStorage.setItem('electro_chats', JSON.stringify(chats));
     
+    // 2. Força a sincronização com a nuvem (JSONBin)
+    if (!fullDatabase) await fetchFullDatabase();
+    if (fullDatabase) {
+        await updateFullDatabase(fullDatabase);
+    }
+
     addNotification("Nova Solicitação", `${info.nome} quer comprar: ${item.titulo}`, "bi-bag-plus", "warning", order.sellerId);
     window.removeFromCart(itemIndex);
     bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
@@ -1539,8 +1666,21 @@ window.renderOrderManagement = function(type = 'buyer') {
     if (!info) return;
     const grid = document.getElementById('productsGrid');
     const gridTitle = document.getElementById('gridTitle');
-    let filteredOrders = orders.filter(o => type === 'buyer' ? o.buyerId === info.id : (type === 'seller' ? o.sellerId === info.id : o.status === 'dispute'));
-    gridTitle.textContent = type === 'buyer' ? "Minhas Compras" : (type === 'seller' ? "Minhas Vendas" : "Painel de Disputas");
+    
+    let filteredOrders = [];
+    if (type === 'buyer') {
+        filteredOrders = orders.filter(o => o.buyerId === info.id);
+        gridTitle.textContent = "Minhas Compras";
+    } else if (type === 'seller_requests') {
+        filteredOrders = orders.filter(o => o.sellerId === info.id && o.status === 'pending');
+        gridTitle.textContent = "Solicitações Pendentes";
+    } else if (type === 'seller_sales') {
+        filteredOrders = orders.filter(o => o.sellerId === info.id && o.status !== 'pending');
+        gridTitle.textContent = "Histórico de Vendas";
+    } else if (type === 'admin') {
+        filteredOrders = orders.filter(o => o.status === 'dispute');
+        gridTitle.textContent = "Painel de Disputas";
+    }
 
     if (filteredOrders.length === 0) {
         grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Nenhum pedido encontrado.</h5></div>`;
@@ -1560,16 +1700,16 @@ window.renderOrderManagement = function(type = 'buyer') {
                             <div>
                                 <span class="badge ${statusInfo.class} mb-2">${statusInfo.label}</span>
                                 <h6 class="fw-bold mb-1">${order.productTitle}</h6>
-                                <p class="small text-muted mb-0">Pedido #${order.id.slice(-8)} • ${type === 'seller' ? 'Comprador: ' + order.buyerName : 'Vendedor: ' + order.sellerName}</p>
+                                <p class="small text-muted mb-0">Pedido #${order.id.slice(-8)} • ${type.includes('seller') ? 'Comprador: ' + order.buyerName : 'Vendedor: ' + order.sellerName}</p>
                             </div>
                             <h5 class="fw-bold text-success">R$ ${order.total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h5>
                         </div>
                         <div class="d-flex gap-2 mt-3 justify-content-end">
-                            ${order.status !== 'pending' ? `<button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')">Chat</button>` : ''}
-                            ${order.status === 'pending' && type === 'seller' ? `
-                                <button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>` : ''}
-                            ${order.status === 'shipping' && type === 'seller' ? `<button class="btn btn-sm btn-primary" onclick="window.updateOrderStatus('${order.id}', 'shipped')">Enviado</button>` : ''}
+                            ${order.status !== 'pending' && order.status !== 'cancelled' ? `<button class="btn btn-sm btn-outline-primary" onclick="window.showChat('chat_${order.id}')"><i class="bi bi-chat-dots me-1"></i> Abrir Chat</button>` : ''}
+                            ${order.status === 'pending' && type === 'seller_requests' ? `
+                                <button class="btn btn-sm btn-success fw-bold" onclick="window.updateOrderStatus('${order.id}', 'accepted')"><i class="bi bi-check-lg me-1"></i> Aceitar Venda</button>
+                                <button class="btn btn-sm btn-outline-danger fw-bold" onclick="window.updateOrderStatus('${order.id}', 'cancelled')"><i class="bi bi-x-lg me-1"></i> Recusar</button>` : ''}
+                            ${order.status === 'shipping' && type === 'seller_sales' ? `<button class="btn btn-sm btn-primary" onclick="window.updateOrderStatus('${order.id}', 'shipped')">Enviado</button>` : ''}
                             ${order.status === 'shipped' && type === 'buyer' ? `<button class="btn btn-sm btn-success" onclick="window.updateOrderStatus('${order.id}', 'finished')">Confirmar Recebimento</button>` : ''}
                         </div>
                     </div>
@@ -1683,6 +1823,13 @@ window.setLogistics = function(orderId, type) {
 function saveAndRefresh(chat) {
     localStorage.setItem('electro_orders', JSON.stringify(orders));
     localStorage.setItem('electro_chats', JSON.stringify(chats));
+    
+    if (fullDatabase) {
+        fullDatabase.orders = orders;
+        fullDatabase.chats = chats;
+        updateFullDatabase(fullDatabase);
+    }
+
     if (chat) renderMessages(chat);
 }
 
@@ -1698,8 +1845,13 @@ window.updateOrderStatus = function(orderId, newStatus) {
     if (newStatus === 'accepted') {
         addNotification("Pedido Aprovado!", "Combine a entrega no chat.", "bi-chat-dots-fill", "success", order.buyerId);
     }
+
     if (currentChat) selectChat(currentChat);
-    else renderOrderManagement(getSavedCadastro().tipo === 'VENDEDOR' ? 'seller' : 'buyer');
+    else {
+        const userInfo = getSavedCadastro();
+        const nextType = userInfo.tipo === 'VENDEDOR' ? (newStatus === 'accepted' ? 'seller_sales' : 'seller_requests') : 'buyer';
+        renderOrderManagement(nextType);
+    }
 };
 
 function updateOrderStatusBar(orderId) {
