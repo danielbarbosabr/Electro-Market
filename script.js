@@ -9,6 +9,8 @@ let cart = JSON.parse(localStorage.getItem('electroCart')) || [];
 let likedProducts = JSON.parse(localStorage.getItem('electroLiked')) || [];
 let accessHistory = JSON.parse(localStorage.getItem('electroHistory')) || [];
 let currentChat = null;
+let currentReplyIndex = null; // Para responder mensagens
+let editingMessageIndex = null; // Para editar mensagens
 let ordersCache = []; // Cache de pedidos para acesso rápido
 let chatsCache = []; // Cache de chats para acesso rápido
 
@@ -485,6 +487,74 @@ window.buyItem = async function(i) {
     renderCart();
     bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
     alert('✅ Compra solicitada!');
+    if (!user) return alert('Faça login para comprar!');
+    
+    const btn = document.querySelector(`button[onclick="buyItem(${i})"]`);
+    const originalText = btn?.textContent || 'Comprar';
+    if (btn) { btn.disabled = true; btn.textContent = 'Processando...'; }
+
+    try {
+        const orderId = `ord_${Date.now()}`;
+        const order = {
+            id: orderId,
+            seller_id: item.vendedor_id || 'system',
+            seller_name: item.loja || 'Vendedor',
+            buyer_id: user.id,
+            buyer_name: user.nome,
+            product_id: item.id,
+            product_title: item.titulo,
+            product_img: item.img || '',
+            total: (item.preco || 0) * (item.qtd || 1),
+            quantity: item.qtd || 1,
+            status: 'pending',
+            realiza_entrega: item.realizaentrega ?? item.realizaEntrega ?? true,
+            agree_buyer: false,
+            agree_seller: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        // 1. Salvar pedido no Supabase
+        await supabaseFetch('orders', {
+            method: 'POST',
+            body: JSON.stringify(order)
+        });
+
+        // 2. Criar chat inicial
+        await supabaseFetch('chats', {
+            method: 'POST',
+            body: JSON.stringify({
+                id: `chat_${Date.now()}`,
+                order_id: orderId,
+                seller_id: order.seller_id,
+                seller_name: order.seller_name,
+                buyer_id: order.buyer_id,
+                buyer_name: order.buyer_name,
+                participants: [order.seller_id, order.buyer_id],
+                logistics_agreed: false,
+                messages: [{
+                    senderId: 'system',
+                    text: `🛒 Pedido #${orderId.slice(-8).toUpperCase()} criado!\n📦 ${item.titulo}\n💰 R$ ${order.total.toLocaleString('pt-BR')}\n⏳ Aguardando aprovação do vendedor...`,
+                    timestamp: new Date().toISOString()
+                }]
+            })
+        });
+
+        // 3. Remover do carrinho e atualizar UI
+        cart.splice(i, 1);
+        renderCart();
+        ordersCache.push(order);
+        bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
+        
+        alert('✅ Pedido realizado com sucesso!\n\nAcompanhe em "Minhas Compras".');
+        window.renderOrderManagement('buyer');
+        
+    } catch (err) {
+        console.error('Erro ao finalizar compra:', err);
+        alert('❌ Erro ao processar pedido: ' + (err.message || 'Tente novamente.'));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalText; }
+    }
 };
 
 // Inicialização
@@ -616,6 +686,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Iniciar
+    // Configurar formulário do chat (quando o modal abrir)
+    document.getElementById('chatModal')?.addEventListener('shown.bs.modal', () => {
+        const form = document.getElementById('chatMessageForm');
+        if (form) {
+            window.cancelReplyOrEdit();
+            form.onsubmit = window.sendChatMessage;
+        }
+    });
+
     updateUI();
     renderCart();
     loadPage();
@@ -723,21 +802,24 @@ window.renderOrderManagement = async function(type = 'buyer') {
                                 <span class="text-muted fw-normal" style="font-size: 0.8rem;">(${order.quantity} un.)</span><br>
                             </p>
 
-                            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end align-items-center">
                                 ${isPending && type === 'seller_requests' ? `
-                                    <button class="btn btn-sm btn-success px-4 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
-                                    <button class="btn btn-sm btn-outline-danger px-4" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
+                                    <button class="btn btn-sm btn-success px-4 fw-bold shadow-sm" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
+                                    <button class="btn btn-sm btn-danger px-4 fw-bold shadow-sm" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
                                 ` : ''}
 
-                                ${isPending && type === 'buyer' ? `
-                                    <button class="btn btn-sm btn-outline-danger px-3" onclick="window.cancelOrderBuyer('${order.id}')">Cancelar Pedido</button>
-                                ` : ''}
-                                
-                                ${!isPending && !isCancelled && !isBuyer ? `
+                                ${!isPending && !isCancelled ? `
                                     <button class="btn btn-sm btn-primary px-4 fw-bold shadow-sm" onclick="window.showChat('${order.id}')">
                                         <i class="bi bi-chat-dots me-1"></i> Abrir Chat
                                     </button>
-                                ` : (isBuyer && isPending ? '<small class="text-muted italic">Aguardando vendedor liberar o chat...</small>' : '')}
+                                ` : ''}
+
+                                ${isPending ? `
+                                    <span class="badge bg-warning text-dark py-2 px-3 rounded-pill">⏳ Aguardando aprovação</span>
+                                    ${type === 'buyer' ? `
+                                        <button class="btn btn-sm btn-danger px-3 fw-bold shadow-sm rounded-pill" onclick="window.cancelOrderBuyer('${order.id}')">Cancelar</button>
+                                    ` : ''}
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -797,206 +879,563 @@ window.resetAnnounceModal = function() {
     }
 };
 
-// Lógica do Chat
+// ============================================
+// CHAT COMPLETO - COM IMAGENS, LINKS E ARQUIVOS
+// ============================================
+
 window.showChat = async function(orderId) {
-    currentChat = orderId; // O currentChat agora é o orderId
     const user = getSavedUser();
-    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
+    if (!user) return alert('Faça login!');
+
+    // Buscar pedido
+    let order = ordersCache.find(o => o.id === orderId);
+    if (!order) {
+        const result = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        order = result[0];
+    }
     if (!order) return alert('Pedido não encontrado.');
 
-    document.getElementById('chatPartnerNameHeader').textContent = user?.tipo === 'VENDEDOR' ? order.buyer_name : order.seller_name;
-    document.getElementById('chatPartnerAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(document.getElementById('chatPartnerNameHeader').textContent)}&background=random`;
-    document.getElementById('chatOrderIdDisplay').textContent = `#${orderId.slice(-6).toUpperCase()}`;
+    currentChat = orderId;
+
+    // 1. Atualiza o resumo do topo (Onde aparecia Produto R$ 0,00)
+    const titleEl = document.getElementById('chatProdTitle');
+    const priceEl = document.getElementById('chatProdPrice');
+    const imgEl = document.getElementById('chatProdImg');
+    const orderIdEl = document.getElementById('chatOrderIdDisplay');
+
+    if (titleEl) titleEl.textContent = order.product_title;
+    if (priceEl) priceEl.textContent = `R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    if (imgEl) imgEl.src = order.product_img || 'https://placehold.co/45?text=📦';
+    if (orderIdEl) orderIdEl.textContent = `#${order.id.slice(-8).toUpperCase()}`;
+
+    // Garante que a área de ações comece fechada ao abrir o chat
+    const actionsArea = document.getElementById('chatActionsArea');
+    if (actionsArea) actionsArea.classList.add('d-none');
+
+    // Nome do outro participante
+    const otherName = user.id === order.buyer_id ? order.seller_name : order.buyer_name;
+    document.getElementById('chatPartnerNameHeader').textContent = otherName || 'Chat';
+    document.getElementById('chatPartnerAvatar').src = 
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`;
+
+    // Mostrar modal
     new bootstrap.Modal(document.getElementById('chatModal')).show();
     
-    loadMessages(orderId);
+    // Carregar mensagens
+    await loadChatMessages(orderId);
 };
 
-async function loadMessages(orderId) {
+async function loadChatMessages(orderId) {
     const container = document.getElementById('chatMessagesContainer');
     container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>';
-    const user = getSavedUser();
-    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
-    if (!order) return;
-    
+
     try {
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
+        const user = getSavedUser();
         
-        container.innerHTML = chat.messages.map(msg => {
-            const isMe = msg.senderId === getSavedUser()?.id;
-            return `
-                <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-2">
-                    <div class="p-2 rounded shadow-sm ${isMe ? 'bg-primary text-white' : 'bg-light'}" style="max-width: 80%;">
-                        ${msg.text}
-                        <div style="font-size: 0.6rem;" class="text-end opacity-75">${new Date(msg.timestamp).toLocaleTimeString()}</div>
+        // Buscar pedido atualizado
+        const orderResult = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        const order = orderResult?.[0];
+        
+        if (!order) {
+            container.innerHTML = '<div class="text-center py-4 text-danger">Pedido não encontrado</div>';
+            return;
+        }
+
+        // Atualizar cache
+        const idx = ordersCache.findIndex(o => o.id === orderId);
+        if (idx >= 0) ordersCache[idx] = order;
+        else ordersCache.push(order);
+
+        // Buscar ou criar chat
+        let chatResult = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatResult?.[0];
+
+        // Se não existe chat, cria um
+        if (!chat) {
+            const newChat = {
+                id: `chat_${Date.now()}`,
+                order_id: orderId,
+                seller_id: order.seller_id,
+                seller_name: order.seller_name,
+                buyer_id: order.buyer_id,
+                buyer_name: order.buyer_name,
+                participants: [order.seller_id, order.buyer_id],
+                messages: [],
+                logistics_agreed: false
+            };
+            await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
+            chat = newChat;
+        }
+
+        // ============================================
+        // MONTAR HTML DO CHAT
+        // ============================================
+        let html = '';
+
+        // Criar ou atualizar container de preview do input (barra de responder/editar)
+        if (!document.getElementById('chatInputPreview')) {
+            const form = document.getElementById('chatMessageForm');
+            const preview = document.createElement('div');
+            preview.id = 'chatInputPreview';
+            preview.className = 'p-2 bg-light border-bottom d-flex justify-content-between align-items-center d-none';
+            form?.parentNode.insertBefore(preview, form);
+        }
+
+        // 💬 MENSAGENS
+        if (chat.messages && chat.messages.length > 0) {
+            html += chat.messages.map((msg, index) => {
+                // Mensagem do sistema
+                if (msg.type === 'system' || msg.senderId === 'system') {
+                    return `<div class="text-center my-3">
+                        <span class="badge bg-light text-dark px-3 py-2">${msg.text}</span>
+                    </div>`;
+                }
+
+                const isMe = msg.senderId === user.id || msg.senderId === String(user.id);
+                
+                const replyHtml = msg.replyTo ? `
+                    <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-25'} small border-start border-4 border-info">
+                        <div class="fw-bold" style="font-size: 0.7rem;">${msg.replyTo.senderName}</div>
+                        <div class="text-truncate" style="max-height: 20px;">${msg.replyTo.text}</div>
                     </div>
-                </div>
-            `;
-        }).join('');
+                ` : '';
+
+                return `
+                <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-3">
+                    <div class="p-3 rounded shadow-sm ${isMe ? 'bg-primary text-white' : 'bg-light'}" 
+                         style="max-width: 75%; word-break: break-word;">
+                        <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+                            <small class="fw-bold" style="font-size: 0.7rem;">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</small>
+                            <div class="dropdown">
+                                <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                    <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startReply(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>
+                                    ${isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startEdit(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
+                                </ul>
+                            </div>
+                        </div>
+
+                        ${replyHtml}
+
+                        ${msg.image ? `
+                            <img src="${msg.image}" class="img-fluid rounded mb-2" 
+                                 style="max-width: 250px; cursor: pointer;" 
+                                 onclick="window.openImageFull('${msg.image}')">
+                        ` : ''}
+                        
+                        ${msg.file ? `
+                            <div class="d-flex align-items-center gap-2 p-2 bg-white rounded mb-2">
+                                <i class="bi bi-file-earmark fs-4"></i>
+                                <a href="${msg.file.url}" target="_blank" class="small text-primary">
+                                    📎 ${msg.file.name || 'Arquivo anexado'}
+                                </a>
+                            </div>
+                        ` : ''}
+                        
+                        <div style="white-space: pre-wrap;">${formatLinks(msg.text)}</div>
+                        
+                        <div style="font-size: 0.65rem;" class="text-end mt-1 ${isMe ? 'text-white-50' : 'text-muted'} d-flex justify-content-end gap-1">
+                            ${msg.edited ? '<span>(editada)</span>' : ''}
+                            <span>${new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            html += '<div class="text-center py-4 text-muted">📝 Nenhuma mensagem ainda. Envie a primeira!</div>';
+        }
+
+        container.innerHTML = html;
         container.scrollTop = container.scrollHeight;
 
-        // Lógica para exibir botões de ação no chat
-        const logisticsArea = document.getElementById('logisticsAgreementArea');
-        const logisticsButtons = document.getElementById('logisticsButtons');
-        const chatActionsArea = document.getElementById('chatActionsArea');
-        chatActionsArea.innerHTML = ''; // Limpa ações anteriores
+        // Atualizar área de logística e status
+        updateChatLogistics(order, user);
 
-        if (order.status === 'pending' && user.tipo === 'VENDEDOR') {
-            chatActionsArea.innerHTML = `
-                <p class="fw-bold mb-2"><i class="bi bi-question-circle me-1"></i> Ações do Pedido:</p>
-                <div class="d-flex gap-2 flex-wrap">
-                    <button class="btn btn-success px-4 fw-bold" onclick="window.updateOrderStatusFromChat('${order.id}', 'accepted')">Aceitar Pedido</button>
-                    <button class="btn btn-outline-danger px-4" onclick="window.updateOrderStatusFromChat('${order.id}', 'cancelled')">Recusar Pedido</button>
-                </div>
-            `;
-            logisticsArea.classList.add('d-none');
-        } else if (order.status === 'accepted' || order.status === 'agreement') {
-            logisticsArea.classList.remove('d-none');
-            logisticsArea.classList.add('d-flex'); // Garante que o flexbox seja aplicado
-            
-            const buyerAgreed = order.agree_buyer;
-            const sellerAgreed = order.agree_seller;
-
-            if (user.tipo === 'VENDEDOR' && !sellerAgreed) {
-                logisticsButtons.innerHTML = `
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">Retirada</button>
-                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">Entrega</button>
-                    <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">App Entrega</button>
-                `;
-            } else if (user.tipo === 'CLIENTE' && !buyerAgreed) {
-                logisticsButtons.innerHTML = `
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">Retirada</button>
-                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">Entrega</button>
-                    <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">App Entrega</button>
-                `;
-            } else {
-                logisticsButtons.innerHTML = `<div class="alert alert-info mb-0 small w-100">Aguardando a outra parte definir a logística...</div>`;
-            }
-            chatActionsArea.innerHTML = ''; // Limpa ações de pending
-        } else if (['shipping', 'awaiting_pickup'].includes(order.status) && user.tipo === 'CLIENTE') {
-            chatActionsArea.innerHTML = `
-                <p class="fw-bold mb-2"><i class="bi bi-check-circle me-1"></i> Recebeu o produto?</p>
-                <div class="d-flex gap-2 flex-wrap">
-                    <button class="btn btn-success px-4 fw-bold" onclick="window.confirmReceipt('${order.id}')">Confirmar Recebimento</button>
-                    <button class="btn btn-outline-warning px-4" onclick="window.reportProblem('${order.id}')">Reportar Problema</button>
-                </div>
-            `;
-            logisticsArea.classList.add('d-none');
-        } else {
-            logisticsArea.classList.add('d-none');
-            chatActionsArea.innerHTML = '';
-        }
-
-        // Atualiza a barra de status do pedido no chat
-        updateOrderStatusBar(order);
-
-        // Adiciona um listener para o formulário de mensagem
-        document.getElementById('chatMessageForm')?.addEventListener('submit', window.sendChatMessage);
-
-    } catch (e) { container.innerHTML = 'Erro ao carregar mensagens.'; }
+    } catch (e) {
+        console.error('❌ Erro ao carregar chat:', e);
+        container.innerHTML = `
+            <div class="text-center py-4 text-danger">
+                <i class="bi bi-exclamation-triangle fs-1"></i>
+                <p>Erro ao carregar mensagens</p>
+                <small>${e.message}</small>
+                <br>
+                <button class="btn btn-primary btn-sm mt-2" onclick="loadChatMessages('${orderId}')">Tentar Novamente</button>
+            </div>`;
+    }
 }
 
-window.sendChatMessage = async function(event) {
-    event.preventDefault();
-    const input = document.getElementById('chatMessageInput');
-    const text = input.value.trim();
-    const user = getSavedUser(); // currentChat já é o orderId
-    const orderId = currentChat;
+function formatLinks(text) {
+    if (!text) return '';
+    // Detecta URLs e transforma em links clicáveis
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.replace(urlRegex, (url) => {
+        return `<a href="${url}" target="_blank" style="color: inherit; text-decoration: underline;">🔗 ${url}</a>`;
+    });
+}
 
-    if (!text || !user) return;
+function updateChatLogistics(order, user) {
+    // Atualizar a barra de status visual
+    const statusBar = document.getElementById('orderStatusBar');
+    if (statusBar) {
+        const st = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
+        statusBar.innerHTML = `<div class="badge ${st.class} w-100 py-2 shadow-sm">${st.text}</div>`;
+    }
 
-    try {
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
-        const newMessage = { senderId: user.id, text, timestamp: new Date().toISOString() };
-        
-        if (chat) {
-            chat.messages.push(newMessage);
-            await supabaseFetch(`chats?id=eq.${chat.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ messages: chat.messages })
-            });
+    const actionsArea = document.getElementById('chatActionsArea');
+    if (!actionsArea) return;
+    actionsArea.innerHTML = '';
+
+    const isBuyer = user.id === order.buyer_id;
+
+    // Combinar logística
+    if (['accepted', 'agreement'].includes(order.status)) {
+        const buyerAgreed = order.agree_buyer;
+        const sellerAgreed = order.agree_seller;
+        const userAgreed = isBuyer ? buyerAgreed : sellerAgreed;
+
+        if (!userAgreed) {
+            actionsArea.innerHTML = `
+                <p class="small fw-bold mb-2"><i class="bi bi-truck me-1"></i> Combine a entrega:</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">🏪 Retirada</button>
+                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">🚚 Entrega</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">📱 App</button>
+                </div>`;
         } else {
-            // Se o chat não existe, cria um novo
-            const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
-            if (!order) throw new Error('Pedido não encontrado para criar chat.');
-
-            await supabaseFetch('chats', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id: `chat_${Date.now()}`,
-                    order_id: orderId,
-                    seller_id: order.seller_id,
-                    seller_name: order.seller_name,
-                    buyer_id: order.buyer_id,
-                    buyer_name: order.buyer_name,
-                    participants: [order.seller_id, order.buyer_id],
-                    logistics_agreed: false,
-                    messages: [newMessage]
-                })
-            });
+            actionsArea.innerHTML = `<div class="alert alert-info mb-0 small py-2">⏳ Aguardando a outra parte confirmar...</div>`;
         }
-        input.value = '';
-        loadMessages(orderId);
-    } catch (e) { alert('Erro ao enviar mensagem.'); }
-};
+    }
 
-// Função para atualizar status do pedido a partir do chat
-window.updateOrderStatusFromChat = async function(orderId, newStatus) {
-    const user = getSavedUser();
-    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
-    if (!order) return alert('Pedido não encontrado.');
+    // Confirmar recebimento (comprador)
+    if (['shipping', 'awaiting_pickup'].includes(order.status) && isBuyer) {
+        actionsArea.innerHTML = `
+            <p class="small fw-bold mb-2">📦 O produto chegou?</p>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-success flex-grow-1 fw-bold" onclick="window.confirmReceipt('${order.id}')">
+                    <i class="bi bi-check-circle me-1"></i> Sim, recebi!
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onclick="window.reportProblem('${order.id}')">
+                    ⚠️ Reportar
+                </button>
+            </div>`;
+    }
 
-    if (newStatus === 'cancelled' && !confirm('Tem certeza que deseja recusar este pedido?')) return;
-    if (newStatus === 'accepted' && !confirm('Tem certeza que deseja aceitar este pedido?')) return;
+    // Pedido finalizado
+    if (order.status === 'finished') {
+        actionsArea.innerHTML = `<div class="alert alert-success mb-0 py-2 text-center small fw-bold">🎉 Negociação finalizada com sucesso!</div>`;
+    }
 
+    // Pedido cancelado
+    if (order.status === 'cancelled') {
+        actionsArea.innerHTML = `<div class="alert alert-danger mb-0 py-2 text-center small fw-bold">❌ Este pedido foi cancelado.</div>`;
+    }
+
+    // Botão cancelar (sempre visível enquanto ativo)
+    if (!['finished', 'cancelled', 'dispute'].includes(order.status)) {
+        actionsArea.innerHTML += `
+            <button class="btn btn-link btn-sm text-danger text-decoration-none mt-2 p-0 fw-bold" 
+                    onclick="window.cancelOrderFromChat('${order.id}')">
+                <i class="bi bi-x-circle me-1"></i> Cancelar Pedido
+            </button>`;
+    }
+}
+
+// --- Novas Funções de Status ---
+
+window.confirmReceipt = async function(orderId) {
+    if (!confirm('Você confirma que recebeu o produto conforme anunciado? Isso liberará o pagamento.')) return;
     try {
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
+            body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
         });
-
-        // Adiciona mensagem do sistema no chat
+        
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
         let chat = chatData[0];
-        const systemMessage = {
-            senderId: 'system',
-            text: `Status do pedido alterado para: ${ORDER_STATUS_MAP[newStatus]?.text || newStatus}`,
-            timestamp: new Date().toISOString()
-        };
-
         if (chat) {
-            chat.messages.push(systemMessage);
-            await supabaseFetch(`chats?id=eq.${chat.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ messages: chat.messages })
-            });
-        } else {
-            // Se o chat não existe, cria um novo com a mensagem do sistema
-            await supabaseFetch('chats', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id: `chat_${Date.now()}`,
-                    order_id: orderId,
-                    seller_id: order.seller_id,
-                    seller_name: order.seller_name,
-                    buyer_id: order.buyer_id,
-                    buyer_name: order.buyer_name,
-                    participants: [order.seller_id, order.buyer_id],
-                    logistics_agreed: false,
-                    messages: [systemMessage]
-                })
-            });
+            chat.messages.push({ senderId: 'system', text: `✅ Comprador confirmou o recebimento. Pedido finalizado!`, timestamp: new Date().toISOString(), type: 'system' });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        alert('Parabéns! Compra finalizada.');
+        loadChatMessages(orderId);
+    } catch (e) { alert('Erro ao finalizar pedido.'); }
+};
+
+window.reportProblem = async function(orderId) {
+    const motivo = prompt('Descreva brevemente o problema encontrado:');
+    if (!motivo) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'dispute', updated_at: new Date().toISOString() })
+        });
+        
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatData[0];
+        if (chat) {
+            chat.messages.push({ senderId: 'system', text: `⚠️ O comprador reportou um problema: "${motivo}". Negociação em disputa.`, timestamp: new Date().toISOString(), type: 'system' });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        loadChatMessages(orderId);
+    } catch (e) { alert('Erro ao reportar problema.'); }
+};
+
+window.sendChatMessage = async function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const input = document.getElementById('chatMessageInput');
+    const text = input?.value?.trim();
+    const user = getSavedUser();
+    
+    console.log('📤 Enviando mensagem:', text, '| Chat:', currentChat, '| User:', user?.id);
+    
+    if (!text || !user || !currentChat) {
+        console.warn('⚠️ Dados faltando:', { text: !!text, user: !!user, chat: !!currentChat });
+        return false;
+    }
+
+    try {
+        // Buscar chat
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        let chat = chatResult?.[0];
+
+        if (!chat) {
+            alert('Chat não encontrado.');
+            return false;
         }
 
-        alert(`Pedido atualizado para: ${ORDER_STATUS_MAP[newStatus]?.text || newStatus}`);
-        loadMessages(orderId); // Recarrega as mensagens para atualizar a UI
-        window.renderOrderManagement(user.tipo === 'VENDEDOR' ? 'seller_requests' : 'buyer'); // Atualiza a lista de pedidos
+        if (editingMessageIndex !== null) {
+            // Lógica de Edição
+            chat.messages[editingMessageIndex].text = text;
+            chat.messages[editingMessageIndex].edited = true;
+        } else {
+            // Lógica de Nova Mensagem
+            const newMessage = {
+                senderId: String(user.id),
+                senderName: user.nome || 'Usuário',
+                text: text,
+                timestamp: new Date().toISOString(),
+                type: 'message'
+            };
+
+            if (currentReplyIndex !== null) {
+                const repliedMsg = chat.messages[currentReplyIndex];
+                newMessage.replyTo = {
+                    text: repliedMsg.text,
+                    senderName: repliedMsg.senderName
+                };
+            }
+
+            chat.messages.push(newMessage);
+        }
+
+        // Salvar no Supabase
+        const result = await supabaseFetch(`chats?id=eq.${chat.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ messages: chat.messages })
+        });
+
+        console.log('✅ Mensagem salva!', result);
+
+        // Limpar input e estados de UI
+        window.cancelReplyOrEdit();
+        input.value = '';
+        
+        // Recarregar mensagens
+        await loadChatMessages(currentChat);
+
     } catch (e) {
-        console.error('Erro ao atualizar status do pedido no chat:', e);
-        alert('Erro ao atualizar pedido. Tente novamente.');
+        console.error('❌ Erro ao enviar mensagem:', e);
+        alert('Erro ao enviar mensagem: ' + e.message);
     }
+    
+    return false;
+};
+
+// Alterna a visibilidade da área de opções do pedido
+window.toggleChatActions = function() {
+    const area = document.getElementById('chatActionsArea');
+    if (area) {
+        area.classList.toggle('d-none');
+    }
+};
+
+// ============================================
+// LÓGICA DE RESPOSTA E EDIÇÃO
+// ============================================
+
+window.startReply = async function(index) {
+    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+    const msg = chatResult?.[0]?.messages[index];
+    if (!msg) return;
+
+    currentReplyIndex = index;
+    editingMessageIndex = null;
+    
+    window.updateChatInputUI(`Respondendo a ${msg.senderName}`, msg.text);
+    document.getElementById('chatMessageInput')?.focus();
+};
+
+window.startEdit = async function(index) {
+    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+    const msg = chatResult?.[0]?.messages[index];
+    if (!msg) return;
+
+    editingMessageIndex = index;
+    currentReplyIndex = null;
+
+    const input = document.getElementById('chatMessageInput');
+    if (input) input.value = msg.text;
+    
+    window.updateChatInputUI(`Editando sua mensagem`, msg.text);
+    input?.focus();
+};
+
+window.cancelReplyOrEdit = function() {
+    currentReplyIndex = null;
+    editingMessageIndex = null;
+    const preview = document.getElementById('chatInputPreview');
+    if (preview) {
+        preview.classList.add('d-none');
+        preview.innerHTML = '';
+    }
+};
+
+window.updateChatInputUI = function(title, text) {
+    const preview = document.getElementById('chatInputPreview');
+    if (!preview) return;
+
+    preview.innerHTML = `
+        <div class="small text-truncate" style="max-width: 80%;">
+            <strong class="text-primary d-block" style="font-size: 0.7rem;">${title}</strong>
+            <span class="text-muted" style="font-size: 0.8rem;">${text}</span>
+        </div>
+        <button type="button" class="btn-close" style="font-size: 0.6rem;" onclick="window.cancelReplyOrEdit()"></button>
+    `;
+    preview.classList.remove('d-none');
+};
+
+// Enviar imagem
+window.sendChatImage = async function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const user = getSavedUser();
+        if (!user || !currentChat) return;
+
+        // Converter para base64
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            try {
+                const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+                let chat = chatResult?.[0];
+                if (!chat) return;
+
+                chat.messages.push({
+                    senderId: user.id,
+                    senderName: user.nome,
+                    text: '📷 Imagem',
+                    image: ev.target.result,
+                    timestamp: new Date().toISOString(),
+                    type: 'image'
+                });
+
+                await supabaseFetch(`chats?id=eq.${chat.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ messages: chat.messages })
+                });
+
+                await loadChatMessages(currentChat);
+            } catch (err) {
+                console.error(err);
+                alert('Erro ao enviar imagem.');
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+};
+
+// Função para cancelar o pedido diretamente pelo chat
+window.cancelOrderFromChat = async function(orderId) {
+    if (!confirm('Deseja realmente cancelar este pedido? Esta ação não pode ser desfeita.')) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
+        });
+
+        // Adiciona aviso do sistema no chat
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatData[0];
+        if (chat) {
+            chat.messages.push({ senderId: 'system', text: `🚫 Pedido cancelado através do chat.`, timestamp: new Date().toISOString(), type: 'system' });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+
+        alert('Pedido cancelado!');
+        loadChatMessages(orderId);
+    } catch (e) { alert('Erro ao cancelar pedido.'); }
+};
+
+// Enviar arquivo
+window.sendChatFile = async function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const user = getSavedUser();
+        if (!user || !currentChat) return;
+
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            try {
+                const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+                let chat = chatResult?.[0];
+                if (!chat) return;
+
+                chat.messages.push({
+                    senderId: user.id,
+                    senderName: user.nome,
+                    text: `📎 ${file.name}`,
+                    file: {
+                        name: file.name,
+                        url: ev.target.result,
+                        size: file.size
+                    },
+                    timestamp: new Date().toISOString(),
+                    type: 'file'
+                });
+
+                await supabaseFetch(`chats?id=eq.${chat.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ messages: chat.messages })
+                });
+
+                await loadChatMessages(currentChat);
+            } catch (err) {
+                console.error(err);
+                alert('Erro ao enviar arquivo.');
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+};
+
+window.openImageFull = function(src) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    modal.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;">`;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
 };
 
 // Função para definir logística (chamada do chat)
@@ -1030,137 +1469,19 @@ window.setLogistics = async function(orderId, type) {
         // Adiciona mensagem do sistema no chat
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
         let chat = chatData[0];
-        const systemMessage = {
-            senderId: 'system',
-            text: `${user.nome} propôs a logística: ${type === 'pickup' ? 'Retirada' : (type === 'seller_delivery' ? 'Entrega pelo Vendedor' : 'App de Entrega')}.`,
-            timestamp: new Date().toISOString()
-        };
-        chat.messages.push(systemMessage);
-        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        if (chat) {
+            const systemMessage = {
+                senderId: 'system',
+                text: `${user.nome} propôs a logística: ${type === 'pickup' ? 'Retirada' : (type === 'seller_delivery' ? 'Entrega pelo Vendedor' : 'App de Entrega')}.`,
+                timestamp: new Date().toISOString(),
+                type: 'system'
+            };
+            chat.messages.push(systemMessage);
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
         
-        loadMessages(orderId); // Recarrega as mensagens para atualizar a UI
+        loadChatMessages(orderId);
     } catch (e) { console.error('Erro ao definir logística:', e); alert('Erro ao definir logística.'); }
 };
 
-// Função para o comprador confirmar recebimento
-window.confirmReceipt = async function(orderId) {
-    if (!confirm('Confirma o recebimento do produto?')) return;
-    try {
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
-        });
-        // Adiciona mensagem do sistema no chat
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
-        const systemMessage = { senderId: 'system', text: '✅ Comprador confirmou o recebimento do produto!', timestamp: new Date().toISOString() };
-        chat.messages.push(systemMessage);
-        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-
-        alert('Recebimento confirmado! Pedido finalizado.');
-        loadMessages(orderId);
-        window.renderOrderManagement('buyer');
-    } catch (e) { alert('Erro ao confirmar recebimento.'); }
-};
-
-// Função para o comprador reportar problema
-window.reportProblem = async function(orderId) {
-    const reason = prompt('Por favor, descreva o problema com o pedido:');
-    if (!reason) return;
-    try {
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'dispute', dispute_reason: reason, updated_at: new Date().toISOString() })
-        });
-        // Adiciona mensagem do sistema no chat
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
-        const systemMessage = { senderId: 'system', text: `⚠️ Comprador reportou um problema: ${reason}`, timestamp: new Date().toISOString() };
-        chat.messages.push(systemMessage);
-        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-
-        alert('Problema reportado. Nossa equipe analisará.');
-        loadMessages(orderId);
-        window.renderOrderManagement('buyer');
-    } catch (e) { alert('Erro ao reportar problema.'); }
-};
-
-// Função para atualizar a barra de status do pedido no chat
-function updateOrderStatusBar(order) {
-    const container = document.getElementById('orderStatusBar');
-    if (!order || !container) return;
-
-    const steps = ['pending', 'accepted', 'agreement', 'shipping', 'finished'];
-    const currentStatusIndex = steps.indexOf(order.status);
-
-    container.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center p-2 small">
-            ${steps.map((s, i) => {
-                const isActive = i <= currentStatusIndex;
-                const statusInfo = ORDER_STATUS_MAP[s] || { text: s, class: 'bg-secondary' };
-                return `
-                    <div class="text-center flex-grow-1 ${isActive ? 'text-primary' : 'text-muted'}">
-                        <i class="bi ${isActive ? 'bi-check-circle-fill' : 'bi-circle'}" style="font-size: 1.2rem;"></i><br>
-                        ${statusInfo.text}
-                    </div>
-                `;
-            }).join('')}
-        </div>
-    `;
-}
-
 // Painel do Vendedor
-window.renderSellerPanel = async function() { // Tornar a função assíncrona
-    const user = getSavedUser();
-    if (!user) {
-        alert('Faça login para acessar o painel do vendedor!');
-        return;
-    }
-    if (user.tipo !== 'VENDEDOR' && user.tipo !== 'ADMIN') {
-        return alert('Acesso restrito a vendedores!');
-    }
-    
-    document.getElementById('gridTitle').textContent = 'Meus Produtos';
-    const hero = document.getElementById('heroSection');
-    if (hero) hero.classList.add('d-none');
-
-    const grid = document.getElementById('productsGrid');
-    // Garante que o grid de produtos volte ao normal (3 ou 4 por linha)
-    grid.style.display = 'grid';
-    grid.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border" style="color:#131673;"></div><h5>Carregando seus produtos...</h5></div>`;
-
-    try {
-        // Busca APENAS os produtos do vendedor logado diretamente do Supabase
-        const sellerProducts = await supabaseFetch(`products?select=*&vendedor_id=eq.${user.id}`);
-        
-        if (!sellerProducts.length) {
-            grid.innerHTML = `
-            <div class="col-12 text-center py-5">
-                <i class="bi bi-box-seam" style="font-size:4rem;color:#ccc;"></i>
-                <h5 class="mt-3">Você ainda não tem produtos</h5>
-                <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#announceModal">
-                    <i class="bi bi-plus-circle me-2"></i>Anunciar Produto
-                </button>
-            </div>`;
-        } else {
-            renderGrid(sellerProducts); // Renderiza apenas os produtos do vendedor
-        }
-        console.log('✅', sellerProducts.length, 'produtos do vendedor carregados');
-        window.closeMobileMenu(); // Fecha o menu mobile após carregar
-    } catch (e) {
-        console.error('Erro ao carregar produtos do vendedor:', e);
-        grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Erro ao carregar seus produtos</h5><button class="btn btn-primary mt-3" onclick="window.renderSellerPanel()">Tentar Novamente</button></div>`;
-    }
-};
-
-window.shareProduct = function (pid) {
-    const item = allProductsCache.find(x => x.id === pid || x.id == pid);
-    if (!item) return;
-    const url = window.location.href;
-    const text = `Confira este produto no ElectroMarket: ${item.titulo}`;
-    if (navigator.share) {
-        navigator.share({ title: 'ElectroMarket', text: text, url: url }).catch(console.error);
-    } else {
-        navigator.clipboard.writeText(url).then(() => alert('Link do produto copiado!'));
-    }
-};
