@@ -46,9 +46,6 @@ async function loadPage(query = 'eletronicos') {
     const grid = document.getElementById('productsGrid');
     grid.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border" style="color:#131673;"></div><h5>Carregando...</h5></div>`;
 
-    // Garante que o layout volte ao modo grade (3 ou 4 por linha)
-    grid.style.display = 'grid';
-
     try {
         const user = getSavedUser();
         const role = user?.tipo || 'CLIENTE';
@@ -360,6 +357,23 @@ function updateUI() {
         if (navName) navName.textContent = user.nome.split(' ')[0];
         const mobileName = document.getElementById('mobileWelcomeName');
         if (mobileName) mobileName.textContent = `Olá, ${user.nome.split(' ')[0]}`;
+
+        // Atualiza a foto/ícone no botão do menu mobile (antigos 3 pontos)
+        const mobileTrigger = document.getElementById('mobileUserTrigger');
+        if (mobileTrigger) {
+            if (user.avatar && user.avatar.startsWith('http')) {
+                mobileTrigger.innerHTML = `<img src="${user.avatar}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            } else {
+                mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-3 text-white"></i>`;
+            }
+        }
+    }
+    else {
+        // Se deslogado, volta para o ícone padrão
+        const mobileTrigger = document.getElementById('mobileUserTrigger');
+        if (mobileTrigger) {
+            mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-3 text-white"></i>`;
+        }
     }
 
     updateCartBadge();
@@ -719,11 +733,11 @@ window.renderOrderManagement = async function(type = 'buyer') {
                                     <button class="btn btn-sm btn-outline-danger px-3" onclick="window.cancelOrderBuyer('${order.id}')">Cancelar Pedido</button>
                                 ` : ''}
                                 
-                                ${!isPending && !isCancelled ? `
+                                ${!isPending && !isCancelled && !isBuyer ? `
                                     <button class="btn btn-sm btn-primary px-4 fw-bold shadow-sm" onclick="window.showChat('${order.id}')">
                                         <i class="bi bi-chat-dots me-1"></i> Abrir Chat
                                     </button>
-                                ` : (isBuyer && isPending ? '<small class="text-muted italic border rounded p-1">Aguardando aprovação para liberar chat...</small>' : '')}
+                                ` : (isBuyer && isPending ? '<small class="text-muted italic">Aguardando vendedor liberar o chat...</small>' : '')}
                             </div>
                         </div>
                     </div>
@@ -732,7 +746,6 @@ window.renderOrderManagement = async function(type = 'buyer') {
         }).join('');
         window.closeMobileMenu();
     } catch (e) {
-        console.error("Erro renderOrderManagement:", e);
         grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Erro ao carregar pedidos.</h5></div>';
     }
 };
@@ -808,7 +821,7 @@ async function loadMessages(orderId) {
     
     try {
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0] || { messages: [] };
+        let chat = chatData[0];
         
         container.innerHTML = chat.messages.map(msg => {
             const isMe = msg.senderId === getSavedUser()?.id;
