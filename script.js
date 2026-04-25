@@ -9,7 +9,20 @@ let cart = JSON.parse(localStorage.getItem('electroCart')) || [];
 let likedProducts = JSON.parse(localStorage.getItem('electroLiked')) || [];
 let accessHistory = JSON.parse(localStorage.getItem('electroHistory')) || [];
 let currentChat = null;
-let ordersCache = [];
+let ordersCache = []; // Cache de pedidos para acesso rápido
+let chatsCache = []; // Cache de chats para acesso rápido
+
+// Mapeamento de status de pedidos para exibição
+const ORDER_STATUS_MAP = {
+    'pending':         { text: 'Em Aprovação',             class: 'bg-warning text-dark' },
+    'accepted':        { text: 'Aprovado (Chat Liberado)', class: 'bg-success' },
+    'agreement':       { text: 'Aguardando Logística',     class: 'bg-info' },
+    'shipping':        { text: 'Em Rota de Entrega',       class: 'bg-primary' },
+    'awaiting_pickup': { text: 'Aguardando Retirada',      class: 'bg-primary' },
+    'finished':        { text: 'Finalizado',               class: 'bg-dark' },
+    'cancelled':       { text: 'Cancelado',                class: 'bg-danger' },
+    'dispute':         { text: 'Em Disputa',               class: 'bg-danger' }
+};
 
 // Função fetch direta
 async function supabaseFetch(path, options = {}) {
@@ -23,7 +36,7 @@ async function supabaseFetch(path, options = {}) {
         }
     });
     if (!res.ok) throw await res.json().catch(() => ({ message: 'Erro' }));
-    if (options.method === 'DELETE') return true;
+    if (options.method === 'DELETE' || res.status === 204) return true; // 204 No Content para DELETE/PATCH sem retorno
     const text = await res.text();
     return text ? JSON.parse(text) : [];
 }
@@ -32,6 +45,9 @@ async function supabaseFetch(path, options = {}) {
 async function loadPage(query = 'eletronicos') {
     const grid = document.getElementById('productsGrid');
     grid.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border" style="color:#131673;"></div><h5>Carregando...</h5></div>`;
+
+    // Garante que o layout volte ao modo grade (3 ou 4 por linha)
+    grid.style.display = 'grid';
 
     try {
         const user = getSavedUser();
@@ -206,6 +222,12 @@ window.showDetail = async function(pid) {
         if (submitBtn) submitBtn.textContent = 'Salvar Alterações';
     }
 
+    // Garante que o modal de detalhes do produto seja fechado antes de abrir o de anúncio
+    const productDetailModal = bootstrap.Modal.getInstance(document.getElementById('productDetailModal'));
+    if (productDetailModal) {
+        productDetailModal.hide();
+    }
+
     // Busca o endereço do vendedor no banco de dados para mostrar na retirada
     let sellerAddress = 'A combinar com o vendedor';
     try {
@@ -282,7 +304,7 @@ window.showDetail = async function(pid) {
                 <p><strong>Estoque:</strong> ${item.quantidade || 1} unidades</p>
                 
                 ${isOwner ? `
-                    <button class="btn btn-primary btn-lg w-100 mb-2" data-bs-toggle="modal" data-bs-target="#announceModal">
+                    <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
                         <i class="bi bi-pencil me-2"></i>Editar Anúncio
                     </button>
                     <button class="btn btn-danger w-100" onclick="window.deleteProduct('${item.id}')">
@@ -305,6 +327,11 @@ window.showDetail = async function(pid) {
     new bootstrap.Modal(document.getElementById('productDetailModal')).show();
 };
 
+// Função para preparar o modal de edição
+window.prepareEditProduct = function(pid) {
+    // A lógica de preenchimento já está em showDetail, só precisamos abrir o modal
+    new bootstrap.Modal(document.getElementById('announceModal')).show();
+};
 // Login/Cadastro
 function getSavedUser() {
     try { return JSON.parse(localStorage.getItem('electroUser')) || null; }
@@ -626,13 +653,9 @@ window.renderOrderManagement = async function(type = 'buyer') {
     const title = document.getElementById('gridTitle');
     grid.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>';
 
-    const statusLabels = {
-        'pending':   { text: 'Em Aprovação', class: 'bg-warning text-dark' },
-        'accepted':  { text: 'Aprovado',     class: 'bg-success' },
-        'cancelled': { text: 'Cancelado',    class: 'bg-danger' },
-        'shipped':   { text: 'Em Envio',     class: 'bg-info' },
-        'finished':  { text: 'Finalizado',   class: 'bg-dark' }
-    };
+    // Reset do layout de grid para modo lista
+    grid.style.display = 'block'; 
+    grid.classList.add('order-view-active');
 
     try {
         let path = 'orders?select=*';
@@ -644,7 +667,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
             title.textContent = type === 'seller_requests' ? 'Solicitações Pendentes' : 'Minhas Vendas';
         }
 
-        let orders = await supabaseFetch(path);
+        let orders = await supabaseFetch(path); // Busca os pedidos
         ordersCache = orders;
 
         if (type === 'seller_requests') orders = orders.filter(o => o.status === 'pending');
@@ -656,15 +679,15 @@ window.renderOrderManagement = async function(type = 'buyer') {
         }
 
         grid.innerHTML = orders.map(order => {
-            const st = statusLabels[order.status] || { text: order.status, class: 'bg-secondary' };
+            const st = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
             const isPending = order.status === 'pending';
             const isCancelled = order.status === 'cancelled';
+            const isBuyer = type === 'buyer';
 
             return `
             <div class="col-12 col-xl-10 mx-auto mb-3">
                 <div class="card p-3 shadow-sm border-0" style="border-radius: 15px;">
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-center align-items-md-start">
-                        <!-- Imagem um pouco maior e com borda -->
                         <img src="${order.product_img || ''}" class="rounded border" 
                              style="width:100px;height:100px;object-fit:cover;" 
                              onerror="this.src='https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=100'">
@@ -672,15 +695,18 @@ window.renderOrderManagement = async function(type = 'buyer') {
                         <div class="flex-grow-1 w-100">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
-                                    <h6 class="fw-bold mb-1" style="font-size: 1.05rem;">${order.product_title}</h6>
-                                    <p class="text-muted mb-0" style="font-size: 0.8rem;">ID: #${order.id.slice(-6).toUpperCase()}</p>
+                                    <h6 class="fw-bold mb-1" style="font-size: 1.05rem;">${order.product_title}</h6>                                    
+                                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                                        ${isBuyer ? `Vendedor: ${order.seller_name}` : `Comprador: ${order.buyer_name}`}<br>
+                                        ID: #${order.id.slice(-6).toUpperCase()}
+                                    </p>
                                 </div>
                                 <span class="badge ${st.class} py-2 px-3 rounded-pill" style="font-size: 0.75rem;">${st.text}</span>
                             </div>
                             
                             <p class="text-dark fw-bold mb-3" style="font-size: 0.95rem;">
                                 Total: R$ ${parseFloat(order.total).toLocaleString('pt-BR')} 
-                                <span class="text-muted fw-normal" style="font-size: 0.8rem;">(${order.quantity} un.)</span>
+                                <span class="text-muted fw-normal" style="font-size: 0.8rem;">(${order.quantity} un.)</span><br>
                             </p>
 
                             <div class="d-flex flex-wrap gap-2 justify-content-end">
@@ -694,10 +720,10 @@ window.renderOrderManagement = async function(type = 'buyer') {
                                 ` : ''}
                                 
                                 ${!isPending && !isCancelled ? `
-                                    <button class="btn btn-sm btn-primary px-4 fw-bold shadow-sm" onclick="window.showChat('chat_${order.id}')">
+                                    <button class="btn btn-sm btn-primary px-4 fw-bold shadow-sm" onclick="window.showChat('${order.id}')">
                                         <i class="bi bi-chat-dots me-1"></i> Abrir Chat
                                     </button>
-                                ` : (type === 'buyer' && isPending ? '<small class="text-muted italic">Aguardando aprovação para chat...</small>' : '')}
+                                ` : (isBuyer && isPending ? '<small class="text-muted italic border rounded p-1">Aguardando aprovação para liberar chat...</small>' : '')}
                             </div>
                         </div>
                     </div>
@@ -706,6 +732,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
         }).join('');
         window.closeMobileMenu();
     } catch (e) {
+        console.error("Erro renderOrderManagement:", e);
         grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Erro ao carregar pedidos.</h5></div>';
     }
 };
@@ -714,7 +741,7 @@ window.updateOrderStatus = async function(orderId, newStatus) {
     try {
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ status: newStatus })
+            body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
         });
         alert(`Pedido atualizado para: ${newStatus}`);
         window.renderOrderManagement(newStatus === 'accepted' ? 'seller_sales' : 'seller_requests');
@@ -726,7 +753,7 @@ window.cancelOrderBuyer = async function(orderId) {
     try {
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ status: 'cancelled' })
+            body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
         });
         alert('Pedido cancelado!');
         window.renderOrderManagement('buyer');
@@ -758,12 +785,15 @@ window.resetAnnounceModal = function() {
 };
 
 // Lógica do Chat
-window.showChat = async function(chatId) {
-    const orderId = chatId.replace('chat_', '');
-    currentChat = chatId;
-    const order = ordersCache.find(o => o.id === orderId);
-    
-    document.getElementById('chatPartnerNameHeader').textContent = getSavedUser()?.tipo === 'VENDEDOR' ? order.buyer_name : order.seller_name;
+window.showChat = async function(orderId) {
+    currentChat = orderId; // O currentChat agora é o orderId
+    const user = getSavedUser();
+    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
+    if (!order) return alert('Pedido não encontrado.');
+
+    document.getElementById('chatPartnerNameHeader').textContent = user?.tipo === 'VENDEDOR' ? order.buyer_name : order.seller_name;
+    document.getElementById('chatPartnerAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(document.getElementById('chatPartnerNameHeader').textContent)}&background=random`;
+    document.getElementById('chatOrderIdDisplay').textContent = `#${orderId.slice(-6).toUpperCase()}`;
     new bootstrap.Modal(document.getElementById('chatModal')).show();
     
     loadMessages(orderId);
@@ -772,10 +802,13 @@ window.showChat = async function(chatId) {
 async function loadMessages(orderId) {
     const container = document.getElementById('chatMessagesContainer');
     container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>';
+    const user = getSavedUser();
+    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
+    if (!order) return;
     
     try {
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        const chat = chatData[0] || { messages: [] };
+        let chat = chatData[0] || { messages: [] };
         
         container.innerHTML = chat.messages.map(msg => {
             const isMe = msg.senderId === getSavedUser()?.id;
@@ -789,6 +822,65 @@ async function loadMessages(orderId) {
             `;
         }).join('');
         container.scrollTop = container.scrollHeight;
+
+        // Lógica para exibir botões de ação no chat
+        const logisticsArea = document.getElementById('logisticsAgreementArea');
+        const logisticsButtons = document.getElementById('logisticsButtons');
+        const chatActionsArea = document.getElementById('chatActionsArea');
+        chatActionsArea.innerHTML = ''; // Limpa ações anteriores
+
+        if (order.status === 'pending' && user.tipo === 'VENDEDOR') {
+            chatActionsArea.innerHTML = `
+                <p class="fw-bold mb-2"><i class="bi bi-question-circle me-1"></i> Ações do Pedido:</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-success px-4 fw-bold" onclick="window.updateOrderStatusFromChat('${order.id}', 'accepted')">Aceitar Pedido</button>
+                    <button class="btn btn-outline-danger px-4" onclick="window.updateOrderStatusFromChat('${order.id}', 'cancelled')">Recusar Pedido</button>
+                </div>
+            `;
+            logisticsArea.classList.add('d-none');
+        } else if (order.status === 'accepted' || order.status === 'agreement') {
+            logisticsArea.classList.remove('d-none');
+            logisticsArea.classList.add('d-flex'); // Garante que o flexbox seja aplicado
+            
+            const buyerAgreed = order.agree_buyer;
+            const sellerAgreed = order.agree_seller;
+
+            if (user.tipo === 'VENDEDOR' && !sellerAgreed) {
+                logisticsButtons.innerHTML = `
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">Retirada</button>
+                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">Entrega</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">App Entrega</button>
+                `;
+            } else if (user.tipo === 'CLIENTE' && !buyerAgreed) {
+                logisticsButtons.innerHTML = `
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">Retirada</button>
+                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">Entrega</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">App Entrega</button>
+                `;
+            } else {
+                logisticsButtons.innerHTML = `<div class="alert alert-info mb-0 small w-100">Aguardando a outra parte definir a logística...</div>`;
+            }
+            chatActionsArea.innerHTML = ''; // Limpa ações de pending
+        } else if (['shipping', 'awaiting_pickup'].includes(order.status) && user.tipo === 'CLIENTE') {
+            chatActionsArea.innerHTML = `
+                <p class="fw-bold mb-2"><i class="bi bi-check-circle me-1"></i> Recebeu o produto?</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-success px-4 fw-bold" onclick="window.confirmReceipt('${order.id}')">Confirmar Recebimento</button>
+                    <button class="btn btn-outline-warning px-4" onclick="window.reportProblem('${order.id}')">Reportar Problema</button>
+                </div>
+            `;
+            logisticsArea.classList.add('d-none');
+        } else {
+            logisticsArea.classList.add('d-none');
+            chatActionsArea.innerHTML = '';
+        }
+
+        // Atualiza a barra de status do pedido no chat
+        updateOrderStatusBar(order);
+
+        // Adiciona um listener para o formulário de mensagem
+        document.getElementById('chatMessageForm')?.addEventListener('submit', window.sendChatMessage);
+
     } catch (e) { container.innerHTML = 'Erro ao carregar mensagens.'; }
 }
 
@@ -796,8 +888,8 @@ window.sendChatMessage = async function(event) {
     event.preventDefault();
     const input = document.getElementById('chatMessageInput');
     const text = input.value.trim();
-    const user = getSavedUser();
-    const orderId = currentChat.replace('chat_', '');
+    const user = getSavedUser(); // currentChat já é o orderId
+    const orderId = currentChat;
 
     if (!text || !user) return;
 
@@ -805,7 +897,7 @@ window.sendChatMessage = async function(event) {
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
         let chat = chatData[0];
         const newMessage = { senderId: user.id, text, timestamp: new Date().toISOString() };
-
+        
         if (chat) {
             chat.messages.push(newMessage);
             await supabaseFetch(`chats?id=eq.${chat.id}`, {
@@ -813,14 +905,21 @@ window.sendChatMessage = async function(event) {
                 body: JSON.stringify({ messages: chat.messages })
             });
         } else {
-            const order = ordersCache.find(o => o.id === orderId);
+            // Se o chat não existe, cria um novo
+            const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
+            if (!order) throw new Error('Pedido não encontrado para criar chat.');
+
             await supabaseFetch('chats', {
                 method: 'POST',
                 body: JSON.stringify({
                     id: `chat_${Date.now()}`,
                     order_id: orderId,
                     seller_id: order.seller_id,
+                    seller_name: order.seller_name,
                     buyer_id: order.buyer_id,
+                    buyer_name: order.buyer_name,
+                    participants: [order.seller_id, order.buyer_id],
+                    logistics_agreed: false,
                     messages: [newMessage]
                 })
             });
@@ -829,6 +928,173 @@ window.sendChatMessage = async function(event) {
         loadMessages(orderId);
     } catch (e) { alert('Erro ao enviar mensagem.'); }
 };
+
+// Função para atualizar status do pedido a partir do chat
+window.updateOrderStatusFromChat = async function(orderId, newStatus) {
+    const user = getSavedUser();
+    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
+    if (!order) return alert('Pedido não encontrado.');
+
+    if (newStatus === 'cancelled' && !confirm('Tem certeza que deseja recusar este pedido?')) return;
+    if (newStatus === 'accepted' && !confirm('Tem certeza que deseja aceitar este pedido?')) return;
+
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
+        });
+
+        // Adiciona mensagem do sistema no chat
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatData[0];
+        const systemMessage = {
+            senderId: 'system',
+            text: `Status do pedido alterado para: ${ORDER_STATUS_MAP[newStatus]?.text || newStatus}`,
+            timestamp: new Date().toISOString()
+        };
+
+        if (chat) {
+            chat.messages.push(systemMessage);
+            await supabaseFetch(`chats?id=eq.${chat.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ messages: chat.messages })
+            });
+        } else {
+            // Se o chat não existe, cria um novo com a mensagem do sistema
+            await supabaseFetch('chats', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: `chat_${Date.now()}`,
+                    order_id: orderId,
+                    seller_id: order.seller_id,
+                    seller_name: order.seller_name,
+                    buyer_id: order.buyer_id,
+                    buyer_name: order.buyer_name,
+                    participants: [order.seller_id, order.buyer_id],
+                    logistics_agreed: false,
+                    messages: [systemMessage]
+                })
+            });
+        }
+
+        alert(`Pedido atualizado para: ${ORDER_STATUS_MAP[newStatus]?.text || newStatus}`);
+        loadMessages(orderId); // Recarrega as mensagens para atualizar a UI
+        window.renderOrderManagement(user.tipo === 'VENDEDOR' ? 'seller_requests' : 'buyer'); // Atualiza a lista de pedidos
+    } catch (e) {
+        console.error('Erro ao atualizar status do pedido no chat:', e);
+        alert('Erro ao atualizar pedido. Tente novamente.');
+    }
+};
+
+// Função para definir logística (chamada do chat)
+window.setLogistics = async function(orderId, type) {
+    const user = getSavedUser();
+    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
+    if (!order) return alert('Pedido não encontrado.');
+
+    const isBuyer = user.id === order.buyer_id;
+    const updateBody = {
+        logistics_type: type,
+        updated_at: new Date().toISOString()
+    };
+
+    if (isBuyer) updateBody.agree_buyer = true;
+    else updateBody.agree_seller = true;
+
+    // Se ambos concordaram, muda o status do pedido
+    if ((isBuyer && order.agree_seller) || (!isBuyer && order.agree_buyer)) {
+        updateBody.status = (type === 'pickup' ? 'awaiting_pickup' : 'shipping');
+    } else {
+        updateBody.status = 'agreement'; // Aguardando a outra parte
+    }
+
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updateBody)
+        });
+
+        // Adiciona mensagem do sistema no chat
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatData[0];
+        const systemMessage = {
+            senderId: 'system',
+            text: `${user.nome} propôs a logística: ${type === 'pickup' ? 'Retirada' : (type === 'seller_delivery' ? 'Entrega pelo Vendedor' : 'App de Entrega')}.`,
+            timestamp: new Date().toISOString()
+        };
+        chat.messages.push(systemMessage);
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        
+        loadMessages(orderId); // Recarrega as mensagens para atualizar a UI
+    } catch (e) { console.error('Erro ao definir logística:', e); alert('Erro ao definir logística.'); }
+};
+
+// Função para o comprador confirmar recebimento
+window.confirmReceipt = async function(orderId) {
+    if (!confirm('Confirma o recebimento do produto?')) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
+        });
+        // Adiciona mensagem do sistema no chat
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatData[0];
+        const systemMessage = { senderId: 'system', text: '✅ Comprador confirmou o recebimento do produto!', timestamp: new Date().toISOString() };
+        chat.messages.push(systemMessage);
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+
+        alert('Recebimento confirmado! Pedido finalizado.');
+        loadMessages(orderId);
+        window.renderOrderManagement('buyer');
+    } catch (e) { alert('Erro ao confirmar recebimento.'); }
+};
+
+// Função para o comprador reportar problema
+window.reportProblem = async function(orderId) {
+    const reason = prompt('Por favor, descreva o problema com o pedido:');
+    if (!reason) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'dispute', dispute_reason: reason, updated_at: new Date().toISOString() })
+        });
+        // Adiciona mensagem do sistema no chat
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat = chatData[0];
+        const systemMessage = { senderId: 'system', text: `⚠️ Comprador reportou um problema: ${reason}`, timestamp: new Date().toISOString() };
+        chat.messages.push(systemMessage);
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+
+        alert('Problema reportado. Nossa equipe analisará.');
+        loadMessages(orderId);
+        window.renderOrderManagement('buyer');
+    } catch (e) { alert('Erro ao reportar problema.'); }
+};
+
+// Função para atualizar a barra de status do pedido no chat
+function updateOrderStatusBar(order) {
+    const container = document.getElementById('orderStatusBar');
+    if (!order || !container) return;
+
+    const steps = ['pending', 'accepted', 'agreement', 'shipping', 'finished'];
+    const currentStatusIndex = steps.indexOf(order.status);
+
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center p-2 small">
+            ${steps.map((s, i) => {
+                const isActive = i <= currentStatusIndex;
+                const statusInfo = ORDER_STATUS_MAP[s] || { text: s, class: 'bg-secondary' };
+                return `
+                    <div class="text-center flex-grow-1 ${isActive ? 'text-primary' : 'text-muted'}">
+                        <i class="bi ${isActive ? 'bi-check-circle-fill' : 'bi-circle'}" style="font-size: 1.2rem;"></i><br>
+                        ${statusInfo.text}
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
 
 // Painel do Vendedor
 window.renderSellerPanel = async function() { // Tornar a função assíncrona
@@ -846,6 +1112,8 @@ window.renderSellerPanel = async function() { // Tornar a função assíncrona
     if (hero) hero.classList.add('d-none');
 
     const grid = document.getElementById('productsGrid');
+    // Garante que o grid de produtos volte ao normal (3 ou 4 por linha)
+    grid.style.display = 'grid';
     grid.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border" style="color:#131673;"></div><h5>Carregando seus produtos...</h5></div>`;
 
     try {
