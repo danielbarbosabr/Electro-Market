@@ -22,7 +22,9 @@
                 <div class="col-md-2 d-flex align-items-center">
                     <button class="btn d-md-none border-0 p-0 me-2 text-white hamburger-btn" type="button" data-bs-toggle="offcanvas" 
                             data-bs-target="#mobileMenu" aria-controls="mobileMenu">
-                        <i class="bi bi-list fs-1"></i>
+                        <div id="mobileUserTrigger" class="d-flex align-items-center justify-content-center bg-white bg-opacity-25 rounded-circle shadow-sm" style="width: 40px; height: 40px; overflow: hidden; border: 1px solid rgba(255,255,255,0.3);">
+                            <i class="bi bi-person-circle fs-3"></i>
+                        </div>
                     </button>
                     <a href="index.html" class="logo mb-0 d-flex align-items-center text-decoration-none">
                         <img src="https://cdn-icons-png.flaticon.com/512/8596/8596449.png" alt="ElectroMarket Logo" width="30" class="me-1 me-md-2">
@@ -387,9 +389,50 @@
         </div>
         <div class="offcanvas-body p-0">
             <div class="list-group list-group-flush">
+                <!-- Seção de Login (Apenas visitantes) -->
+                <div class="role-guest">
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-3" data-bs-toggle="modal" data-bs-target="#loginModal" onclick="window.closeMobileMenu();">
+                        <i class="bi bi-box-arrow-in-right me-3 fs-5 text-success"></i> <strong>Entre na sua conta</strong>
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-3" data-bs-toggle="modal" data-bs-target="#cadastroModal" onclick="window.closeMobileMenu();">
+                        <i class="bi bi-person-plus-fill me-3 fs-5 text-primary"></i> Cadastre-se
+                    </a>
+                    <hr class="my-0 opacity-10">
+                </div>
+
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('eletronicos'); window.closeMobileMenu();">
                     <i class="bi bi-house-door-fill me-3 fs-5" style="color: var(--primary-blue);"></i> Início
                 </a>
+
+                <!-- Menu de Categorias Mobile -->
+                <a href="#collapseCategoriesMobile" class="list-group-item list-group-item-action border-0 py-3 d-flex justify-content-between align-items-center" data-bs-toggle="collapse">
+                    <span><i class="bi bi-grid-fill me-3 fs-5 text-warning"></i> Categorias</span>
+                    <i class="bi bi-chevron-down small"></i>
+                </a>
+                <div class="collapse bg-light" id="collapseCategoriesMobile">
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Smartphone'); window.closeMobileMenu();">Celulares</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Notebook'); window.closeMobileMenu();">Notebooks</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Smart TV'); window.closeMobileMenu();">TV e Vídeo</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Console Video Game'); window.closeMobileMenu();">Games</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Placa de Vídeo'); window.closeMobileMenu();">Hardware</a>
+                </div>
+
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="loadPage('Ofertas'); window.closeMobileMenu();">
+                    <i class="bi bi-tag-fill me-3 fs-5 text-danger"></i> <span class="fw-semibold">Ofertas do Dia</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.renderLikedProducts(); window.closeMobileMenu();">
+                    <i class="bi bi-heart-fill me-3 fs-5 text-danger"></i> <span class="fw-semibold">Meus Favoritos</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.renderAccessHistory(); window.closeMobileMenu();">
+                    <i class="bi bi-clock-history me-3 fs-5 text-primary"></i> <span class="fw-semibold">Histórico de Navegação</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.renderOrderManagement('buyer'); window.closeMobileMenu();">
+                    <i class="bi bi-bag-check-fill me-3 fs-5 text-success"></i> <span class="fw-semibold">Minhas Compras</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas" onclick="window.closeMobileMenu();">
+                    <i class="bi bi-filter-square-fill me-3 fs-5 text-info"></i> <span class="fw-semibold">Filtros de Busca</span>
+                </a>
+
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-admin d-none" data-bs-toggle="modal" data-bs-target="#adminDbModal" onclick="window.closeMobileMenu();">
                     <i class="bi bi-database-fill-gear me-3 fs-5"></i> Gerenciar Banco de Dados
                 </a>
@@ -399,8 +442,10 @@
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); window.closeMobileMenu();">
                     <i class="bi bi-plus-circle me-3 fs-5"></i> Vender
                 </a>
+                
+                <hr class="my-0 opacity-10">
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3" id="themeToggleMobile" onclick="toggleTheme();">
-                    <i class="bi bi-moon-stars-fill me-3 fs-5"></i> Modo Escuro
+                    <i class="bi bi-palette-fill me-3 fs-5 text-info"></i> Cor do Site (Escuro/Claro)
                 </a>
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-logged-in d-none" onclick="logout(); window.closeMobileMenu();">
                     <i class="bi bi-box-arrow-right me-3 fs-5 text-danger"></i> Sair
@@ -413,46 +458,34 @@
     <div class="modal fade" id="chatModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
-                    <h5 class="modal-title"><i class="bi bi-chat-dots-fill me-2"></i><span id="chatPartnerName">Chat</span></h5>
+                <div class="modal-header text-white d-flex align-items-center" style="background-color: var(--primary-blue);">
+                    <img id="chatPartnerAvatar" src="" class="rounded-circle me-2" width="40" height="40" onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                    <h5 class="modal-title mb-0">
+                        <span id="chatPartnerNameHeader">Carregando...</span>
+                        <small class="text-white-50 d-block" id="chatOrderIdDisplay" style="font-size: 0.7rem;"></small>
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
                     <div class="row g-0" style="height: 70vh;">
-                        <div class="col-md-4 border-end bg-light">
-                            <div id="chatContactsList" class="p-2" style="overflow-y: auto; max-height: 70vh;"></div>
-                        </div>
-                        <div class="col-md-8 d-flex flex-column">
-                            <div id="chatEmptyState" class="d-flex flex-column align-items-center justify-content-center h-100 text-muted bg-white">
-                                <i class="bi bi-chat-dots fs-1 mb-3"></i>
-                                <h5>Suas Mensagens</h5>
-                                <p class="small">Selecione uma conversa para começar</p>
-                            </div>
-                            <div id="chatActiveContent" class="d-flex flex-column h-100 d-none bg-white">
-                                <div class="d-flex align-items-center p-3 border-bottom bg-light">
-                                    <img id="chatPartnerAvatar" src="" class="rounded-circle me-2" width="40" height="40">
-                                    <div>
-                                        <h6 class="mb-0 fw-bold" id="chatPartnerNameHeader"></h6>
-                                        <small class="text-muted"><i class="bi bi-circle-fill text-success" style="font-size: 8px;"></i> Online</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="window.viewOrderDetails()">
-                                        <i class="bi bi-info-circle"></i> Detalhes
+                        <div class="col-12 d-flex flex-column h-100 bg-white">
+                            <!-- Barra de Status do Pedido -->
+                            <div id="orderStatusBar" class="bg-light border-bottom p-2"></div>
+
+                            <!-- Área de Mensagens -->
+                            <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: var(--bg-color);"></div>
+                            
+                            <!-- Área de Ações (Botões Aceitar/Logística/Confirmar) -->
+                            <div id="chatActionsArea" class="p-3 border-top bg-light"></div>
+
+                            <!-- Input de Mensagem -->
+                            <div class="p-3 border-top bg-white">
+                                <form id="chatMessageForm" class="d-flex gap-2">
+                                    <input type="text" id="chatMessageInput" class="form-control rounded-pill" placeholder="Digite sua mensagem..." autocomplete="off">
+                                    <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px; flex-shrink: 0;">
+                                        <i class="bi bi-send"></i>
                                     </button>
-                                </div>
-                                <div id="orderStatusBar" class="p-2 border-bottom bg-white"></div>
-                                <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: #f0f2f5;"></div>
-                                <div id="logisticsAgreementArea" class="p-3 border-top bg-warning bg-opacity-10 d-none">
-                                    <p class="fw-bold mb-2"><i class="bi bi-truck"></i> Combine a entrega:</p>
-                                    <div id="logisticsButtons" class="d-flex gap-2 flex-wrap"></div>
-                                </div>
-                                <div class="p-3 border-top bg-white">
-                                    <form onsubmit="window.sendChatMessage(event)" class="d-flex gap-2">
-                                        <input type="text" id="chatMessageInput" class="form-control rounded-pill" placeholder="Digite sua mensagem..." autocomplete="off">
-                                        <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px;">
-                                            <i class="bi bi-send"></i>
-                                        </button>
-                                    </form>
-                                </div>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -562,19 +595,41 @@
         </div>
     </div>
 
-    <!-- Footer Fixo (Dock Style) - Garantido no final da página -->
+    <!-- Dock Unificado Mobile (Navegação + Ferramentas) -->
     <footer class="footer py-2 border-top fixed-bottom main-footer-dock">
-        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-            <span class="footer-copyright text-white">© 2026 Electro<span class="market-text">Market</span>. Todos os direitos reservados.</span>
+        <div class="container">
+            <!-- Navegação do App (Apenas Mobile) -->
+            <div class="mobile-nav-row d-flex d-md-none justify-content-around mb-2">
+                <a href="#" class="nav-item active" onclick="loadPage('eletronicos'); updateMobileNavActive('eletronicos')">
+                    <i class="bi bi-house"></i><span>Início</span>
+                </a>
+                <a href="#" class="nav-item" onclick="window.renderLikedProducts(); updateMobileNavActive('renderLikedProducts')">
+                    <i class="bi bi-heart"></i><span>Favoritos</span>
+                </a>
+                <a href="#" class="nav-item" onclick="window.renderOrderManagement('buyer'); updateMobileNavActive('renderOrderManagement')">
+                    <i class="bi bi-bag"></i><span>Compras</span>
+                </a>
+                <a href="#" class="nav-item" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" onclick="updateMobileNavActive('cartOffcanvas')">
+                    <i class="bi bi-cart"></i><span>Carrinho</span>
+                </a>
+                <a href="#" class="nav-item" onclick="window.showProfileEdit(); updateMobileNavActive('showProfileEdit')">
+                    <i class="bi bi-person"></i><span>Perfil</span>
+                </a>
+            </div>
+
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+                <span class="footer-copyright text-white d-none d-md-block">© 2026 Electro<span class="market-text">Market</span>.</span>
             
-            <!-- Ferramentas Usadas -->
-            <div class="footer-tools d-flex gap-4 align-items-center justify-content-center">
-                <span class="small text-white opacity-75">Stack:</span>
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg" width="22" title="VS Code">
-                <a href="https://github.com/danielbarbosabr" target="_blank" class="text-white"><i class="bi bi-github fs-4"></i></a>
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="22" title="Vercel" style="filter: invert(1) brightness(2);">
-                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="22" title="Supabase">
-                <img src="https://www.deepseek.com/favicon.ico" width="22" title="DeepSeek AI" style="border-radius: 4px; filter: brightness(1.2);">
+                <div class="footer-tools d-flex gap-4 align-items-center justify-content-center">
+                    <span class="small text-white opacity-50 d-none d-md-block">Stack:</span>
+                    <a href="https://code.visualstudio.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg" width="20" title="VS Code"></a>
+                    <a href="https://github.com/danielbarbosabr" target="_blank" class="text-white"><i class="bi bi-github fs-5"></i></a>
+                    <a href="https://vercel.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="20" title="Vercel" style="filter: invert(1) brightness(2);"></a>
+                    <a href="https://supabase.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="20" title="Supabase"></a>
+                    <a href="https://www.deepseek.com/" target="_blank"><img src="https://www.deepseek.com/favicon.ico" width="20" title="DeepSeek AI" style="border-radius: 4px; filter: brightness(1.2);"></a>
+                </div>
+
+                <span class="text-white-50 d-md-none" style="font-size: 0.6rem;">© 2026 ElectroMarket</span>
             </div>
         </div>
     </footer>
