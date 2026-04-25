@@ -20,7 +20,6 @@
             <!-- Linha Superior: Logo e Busca -->
             <div class="row align-items-center g-2 g-md-4">
                 <div class="col-md-2 d-flex align-items-center">
-                    <!-- Botão Hambúrguer Mobile -->
                     <button class="btn d-md-none border-0 p-0 me-2 text-white hamburger-btn" type="button" data-bs-toggle="offcanvas" 
                             data-bs-target="#mobileMenu" aria-controls="mobileMenu">
                         <i class="bi bi-list fs-1"></i>
@@ -32,27 +31,21 @@
                 </div>
                 <div class="col-12 col-md-6">
                     <div class="input-group search-bar">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Buscar produtos, marcas e muito mais..." aria-label="Buscar produtos">
-                        <button class="btn btn-search" type="button" id="btnSearch" aria-label="Buscar"><i class="bi bi-search"></i></button>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Buscar produtos, marcas e muito mais...">
+                        <button class="btn btn-search" type="button" id="btnSearch"><i class="bi bi-search"></i></button>
                     </div>
                 </div>
-                <!-- Links de Usuário Estilo ML -->
                 <div class="col-md-4 text-end d-none d-md-flex align-items-center justify-content-end">
                     <div class="user-nav d-flex align-items-center gap-2">
-                        <!-- Login/Cadastro (Visitante) -->
                         <div class="role-guest d-flex gap-2">
                             <button class="btn btn-simple" data-bs-toggle="modal" data-bs-target="#cadastroModal">Cadastre-se</button>
                             <button class="btn btn-simple btn-solid" data-bs-toggle="modal" data-bs-target="#loginModal">Entre</button>
                         </div>
-
-                        <!-- Perfil (Logado) -->
                         <div class="role-logged-in d-none d-flex align-items-center gap-2 cursor-pointer me-2" onclick="window.showProfileEdit()" title="Meu Perfil">
                             <img id="navUserAvatar" src="" class="rounded-circle border" width="28" height="28" style="object-fit: cover; display: none;">
                             <i id="navUserIcon" class="bi bi-person-circle fs-5 text-white"></i>
                             <span id="navUserName" class="text-white fw-bold small">Usuário</span>
                         </div>
-
-                        <!-- Ícones de Ação (Tema, Carrinho, Notificações) -->
                         <div class="d-flex align-items-center gap-3">
                             <button class="btn btn-theme p-0 border-0 text-white" id="themeToggle" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
                             <a href="#" class="text-white text-decoration-none position-relative role-client" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -61,14 +54,13 @@
                             </a>
                             <a href="#" class="text-white text-decoration-none position-relative" title="Notificações" data-bs-toggle="modal" data-bs-target="#notificacoesModal">
                                 <i class="bi bi-bell fs-5"></i>
-                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBadgeDesktop" style="font-size: 0.6rem;">2</span>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBadgeDesktop" style="font-size: 0.6rem;">0</span>
                             </a>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Linha Inferior: Endereço e Categorias -->
             <div class="row mt-2 d-none d-md-flex">
                 <div class="col-md-2">
                     <div class="shipping-info d-flex align-items-center text-white">
@@ -90,19 +82,16 @@
                                 <li><a class="dropdown-item" href="#" onclick="loadPage('Console Video Game')"><i class="bi bi-controller me-2"></i> Games</a></li>
                                 <li><a class="dropdown-item" href="#" onclick="loadPage('Placa de Vídeo')"><i class="bi bi-cpu me-2"></i> Hardware</a></li>
                                 <li><a class="dropdown-item" href="#" onclick="loadPage('Smartwatch')"><i class="bi bi-watch me-2"></i> Smartwatches</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="loadPage('Tablet')"><i class="bi bi-tablet me-2"></i> Tablets</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="loadPage('Câmera')"><i class="bi bi-camera me-2"></i> Câmeras</a></li>
                                 <li><a class="dropdown-item" href="#" onclick="loadPage('Eletrodomesticos')"><i class="bi bi-lightning-charge me-2"></i> Eletro</a></li>
                             </ul>
                         </div>
                         <a href="#" class="text-white text-decoration-none role-client" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas"><i class="bi bi-filter-left me-1"></i> Filtros</a>
-                        <a href="#" class="text-white text-decoration-none role-client" onclick="loadPage('Smartphone')"><i class="bi bi-tag me-1"></i> Ofertas</a>
+                        <a href="#" class="text-white text-decoration-none role-client" onclick="loadPage('Ofertas')"><i class="bi bi-tag me-1"></i> Ofertas</a>
                         <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderLikedProducts()"><i class="bi bi-heart me-1"></i> Curtidos</a>
                         <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderAccessHistory()"><i class="bi bi-clock-history me-1"></i> Histórico</a>
                         <a href="#" class="text-white text-decoration-none role-client" onclick="window.renderOrderManagement('buyer')"><i class="bi bi-bag-check me-1"></i> Minhas Compras</a>
                         
-                        <!-- Itens do Vendedor integrados na barra principal -->
-                        <a href="#" class="text-white text-decoration-none role-seller d-none" onclick="loadPage('eletronicos')">
+                        <a href="#" class="text-white text-decoration-none role-seller d-none" onclick="window.renderSellerPanel()">
                             <i class="bi bi-box-seam me-1"></i> <strong>Meus Produtos</strong>
                         </a>
                         <a href="#" class="text-white text-decoration-none role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal()">
@@ -115,7 +104,6 @@
                         <a href="#" class="text-white text-decoration-none role-seller d-none" onclick="window.renderOrderManagement('seller_sales')">
                             <i class="bi bi-shop me-1"></i> <strong>Minhas Vendas</strong>
                         </a>
-
                         <a href="#" class="text-white text-decoration-none role-admin d-none" onclick="window.renderOrderManagement('admin')"><i class="bi bi-shield-lock me-1"></i> Painel Admin</a>
                     </nav>
                 </div>
@@ -123,13 +111,12 @@
         </div>
     </header>
 
-    <!-- Banner principal com categorias integradas -->
-    <section class="hero-banner py-4 py-md-5 text-white text-center">
+    <!-- Banner principal -->
+    <section id="heroSection" class="hero-banner py-4 py-md-5 text-white text-center">
         <div class="container hero-inner">
             <h2 class="hero-title mb-2" id="heroTitle">Encontre o melhor preço em eletrônicos</h2>
             <p class="hero-subtitle mb-4 opacity-75" id="heroSubtitle">Navegue por ofertas, compare preços e descubra produtos com frete rápido.</p>
             
-            <!-- Categorias com Ícones (Unificadas e com Eletrodomésticos) -->
             <div id="heroCategories" class="hero-categories d-flex justify-content-start justify-content-md-center text-center overflow-auto pb-2 gap-4 mt-2">
                 <div class="hero-cat-item" onclick="loadPage('Smartphone')"><i class="bi bi-phone"></i><p>Celulares</p></div>
                 <div class="hero-cat-item" onclick="loadPage('Notebook')"><i class="bi bi-laptop"></i><p>Notebooks</p></div>
@@ -142,106 +129,69 @@
         </div>
     </section>
 
-    <!-- Offcanvas de Filtros Estilo Shopee -->
-    <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="filterOffcanvas" aria-labelledby="filterOffcanvasLabel">
-        <div class="offcanvas-header text-white">
-            <h5 class="offcanvas-title fw-bold" id="filterOffcanvasLabel" style="color: var(--primary-blue);"><i class="bi bi-filter-left me-1"></i> Filtros de Busca</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
-        <div class="offcanvas-body">
-            <div class="filter-sidebar">
-                <!-- Ordenação -->
-                <div class="filter-group mb-4">
-                    <h6 class="fw-bold small text-uppercase">Ordenar por</h6>
-                    <select id="sortOrder" class="form-select form-select-sm mt-2" onchange="applyFilters()">
-                        <option value="default">Destaques</option>
-                        <option value="recent">Mais recentes</option>
-                        <option value="rating">Mais avaliados</option>
-                        <option value="priceAsc">Menor Preço</option>
-                        <option value="priceDesc">Maior Preço</option>
-                    </select>
-                </div>
-
-                <!-- Faixa de Preço -->
-                <div class="filter-group mb-4">
-                    <h6 class="fw-bold small text-uppercase">Faixa de Preço</h6>
-                    <div class="d-flex align-items-center gap-2 mt-2">
-                        <input type="number" id="minPrice" class="form-control form-control-sm" placeholder="Mín">
-                        <span>-</span>
-                        <input type="number" id="maxPrice" class="form-control form-control-sm" placeholder="Máx">
-                    </div>
-                    <button class="btn btn-primary btn-sm w-100 mt-2 fw-bold" onclick="applyFilters()">Aplicar</button>
-                </div>
-
-                <!-- Lojas -->
-                <div class="filter-group mb-4">
-                    <h6 class="fw-bold small text-uppercase">Lojas</h6>
-                    <div id="storeFilters" class="mt-2">
-                        <!-- Gerado via JS -->
-                    </div>
-                </div>
-
-                <!-- Condição -->
-                <div class="filter-group mb-4">
-                    <h6 class="fw-bold small text-uppercase">Condição</h6>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" value="new" id="condNovo" onchange="applyFilters()">
-                        <label class="form-check-label small" for="condNovo">Novo</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="used" id="condUsado" onchange="applyFilters()">
-                        <label class="form-check-label small" for="condUsado">Usado</label>
-                    </div>
-                </div>
-
-                <button class="btn btn-outline-secondary btn-sm w-100 fw-bold mt-2" onclick="clearFilters()">Limpar Filtros</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Grid de Produtos -->
     <main class="container my-4">
         <div class="row">
             <div class="col-12">
                 <h2 class="section-title mb-4 fs-4" id="gridTitle">Recomendados para você</h2>
-                <div id="productsGrid" style="min-height: 50vh;">
-                    <!-- Barra de Carregamento Injetada via JS -->
-                    <div class="col-12 d-flex align-items-center justify-content-center py-5">
-                        <div class="card border-0 shadow-sm p-5 text-center" style="max-width: 600px; width: 100%; background: #fff; border-radius: 12px;">
-                            <div class="spinner-border mb-3" style="width: 3rem; height: 3rem; color: #131673;"></div>
-                            <h5 style="color: #131673; font-family: 'Sora', sans-serif; font-weight: 600;">Sincronizando ofertas em tempo real...</h5>
-                            <div class="progress mb-3" style="height: 8px;">
-                                <div id="loadingBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background-color: #131673;"></div>
-                            </div>
-                            <div id="statusLogs" class="d-flex flex-wrap justify-content-center gap-2"></div>
-                        </div>
-                    </div>
-                </div>
+                <div id="productsGrid" class="row g-3" style="min-height: 50vh;"></div>
             </div>
         </div>
     </main>
 
-    <!-- Aba Lateral do Carrinho (Esquerda) -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartOffcanvasLabel">
+    <!-- Offcanvas Filtros -->
+    <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="filterOffcanvas">
+        <div class="offcanvas-header text-white">
+            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-filter-left me-1"></i> Filtros de Busca</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div class="filter-group mb-4">
+                <h6 class="fw-bold small text-uppercase">Ordenar por</h6>
+                <select id="sortOrder" class="form-select form-select-sm mt-2" onchange="applyFilters()">
+                    <option value="default">Destaques</option>
+                    <option value="recent">Mais recentes</option>
+                    <option value="rating">Mais avaliados</option>
+                    <option value="priceAsc">Menor Preço</option>
+                    <option value="priceDesc">Maior Preço</option>
+                </select>
+            </div>
+            <div class="filter-group mb-4">
+                <h6 class="fw-bold small text-uppercase">Faixa de Preço</h6>
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <input type="number" id="minPrice" class="form-control form-control-sm" placeholder="Mín">
+                    <span>-</span>
+                    <input type="number" id="maxPrice" class="form-control form-control-sm" placeholder="Máx">
+                </div>
+                <button class="btn btn-primary btn-sm w-100 mt-2 fw-bold" onclick="applyFilters()">Aplicar</button>
+            </div>
+            <div class="filter-group mb-4">
+                <h6 class="fw-bold small text-uppercase">Lojas</h6>
+                <div id="storeFilters" class="mt-2"></div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm w-100 fw-bold mt-2" onclick="clearFilters()">Limpar Filtros</button>
+        </div>
+    </div>
+
+    <!-- Offcanvas Carrinho -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="cartOffcanvas">
         <div class="offcanvas-header border-bottom">
-            <h5 class="offcanvas-title fw-bold" id="cartOffcanvasLabel"><i class="bi bi-cart-check me-2 text-success"></i>Meu Carrinho</h5>
-            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <h5 class="offcanvas-title fw-bold"><i class="bi bi-cart-check me-2 text-success"></i>Meu Carrinho</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column">
-            <div id="cartItemsList" class="flex-grow-1 overflow-auto pe-2">
-                <!-- Itens injetados via JS -->
-            </div>
+            <div id="cartItemsList" class="flex-grow-1 overflow-auto pe-2"></div>
             <div id="cartFooter" class="border-top pt-3 mt-3">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0 fw-bold">Total:</h5>
                     <h5 class="mb-0 fw-bold text-success" id="cartTotalValue">R$ 0,00</h5>
                 </div>
-                <button class="btn btn-success w-100 py-3 fw-bold rounded-3 shadow-sm" onclick="alert('Finalizando compra total...')">FINALIZAR TUDO</button>
+                <button class="btn btn-success w-100 py-3 fw-bold rounded-3 shadow-sm" onclick="alert('Finalizando compra...')">FINALIZAR TUDO</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Detalhes do Produto (Estilo Amazon/ML) -->
+    <!-- Modal Detalhes do Produto -->
     <div class="modal fade" id="productDetailModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0">
@@ -250,26 +200,18 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <div class="row" id="productDetailContent">
-                        <!-- Conteúdo injetado via JS -->
-                    </div>
-                </div>
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Fechar</button>
+                    <div class="row" id="productDetailContent"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Login -->
+    <!-- Modal Login -->
     <div class="modal fade" id="loginModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0">
                 <div class="modal-header text-white">
-                    <h5 class="modal-title fw-bold d-flex align-items-center">
-                        <img src="https://cdn-icons-png.flaticon.com/512/8596/8596449.png" alt="Logo" width="25" class="me-2" style="filter: brightness(0) invert(1);">
-                        Bem-vindo ao ElectroMarket
-                    </h5>
+                    <h5 class="modal-title fw-bold">Bem-vindo ao ElectroMarket</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -291,7 +233,7 @@
         </div>
     </div>
 
-    <!-- Modal de Cadastro Completo -->
+    <!-- Modal Cadastro -->
     <div class="modal fade" id="cadastroModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0">
@@ -304,7 +246,7 @@
                         <div class="row mb-3">
                             <div class="col-12">
                                 <label class="form-label small fw-bold">Tipo de Conta</label>
-                                <div class="d-flex gap-4 align-items-center">
+                                <div class="d-flex gap-4">
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="cadastroTipo" id="cadastroTipoCliente" value="CLIENTE" checked required>
                                         <label class="form-check-label small" for="cadastroTipoCliente">Cliente</label>
@@ -319,39 +261,33 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label small fw-bold">Nome Completo</label>
-                                <input type="text" class="form-control" id="cadastroNome" placeholder="Ex: João Silva" required>
+                                <input type="text" class="form-control" id="cadastroNome" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label small fw-bold">CPF</label>
-                                <input type="text" class="form-control" id="cadastroCPF" placeholder="00000000000" required>
+                                <input type="text" class="form-control" id="cadastroCPF" required>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label small fw-bold">E-mail</label>
-                                <input type="email" class="form-control" id="cadastroEmail" placeholder="joao@email.com" required>
+                                <input type="email" class="form-control" id="cadastroEmail" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label small fw-bold">Senha</label>
                                 <input type="password" class="form-control" id="cadastroSenha" required>
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label small fw-bold">URL do Avatar (Opcional)</label>
-                                <input type="url" class="form-control" id="cadastroAvatar" placeholder="https://link-da-foto.com">
-                            </div>
-                        </div>
                         <hr>
                         <h6 class="fw-bold mb-3"><i class="bi bi-geo-alt me-1"></i> Dados de Entrega</h6>
                         <div class="row">
                             <div class="col-md-8 mb-3">
-                                <label class="form-label small fw-bold">Endereço (Rua e Número)</label>
-                                <input type="text" class="form-control" id="cadastroEndereco" placeholder="Ex: Av. Paulista, 1000" required>
+                                <label class="form-label small fw-bold">Endereço</label>
+                                <input type="text" class="form-control" id="cadastroEndereco" required>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label small fw-bold">CEP</label>
-                                <input type="text" class="form-control" id="cadastroCEP" placeholder="00000-000" required>
+                                <input type="text" class="form-control" id="cadastroCEP" required>
                             </div>
                         </div>
                         <div class="row">
@@ -368,11 +304,11 @@
                                 </select>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="form-label small fw-bold">Pagamento Preferido</label>
+                                <label class="form-label small fw-bold">Pagamento</label>
                                 <select class="form-select" id="cadastroPagamento" required>
                                     <option value="pix">PIX</option>
-                                    <option value="cartao">Cartão de Crédito</option>
-                                    <option value="boleto">Boleto Bancário</option>
+                                    <option value="cartao">Cartão</option>
+                                    <option value="boleto">Boleto</option>
                                 </select>
                             </div>
                         </div>
@@ -383,11 +319,11 @@
         </div>
     </div>
 
-    <!-- Modal de Anúncio -->
+    <!-- Modal Anúncio -->
     <div class="modal fade" id="announceModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0">
-                <div class="modal-header text-white">
+                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
                     <h5 class="modal-title fw-bold">O que você quer vender?</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -397,14 +333,14 @@
                             <input type="text" class="form-control" id="prodTitle" placeholder="Título do anúncio" required>
                         </div>
                         <div class="mb-3">
-                            <textarea class="form-control" id="prodDescription" placeholder="Descrição detalhada do produto" rows="3" required></textarea>
+                            <textarea class="form-control" id="prodDescription" placeholder="Descrição detalhada" rows="3" required></textarea>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <input type="number" class="form-control" id="prodPrice" placeholder="Preço (R$)" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <input type="number" class="form-control" id="prodQuantity" placeholder="Quantidade em estoque" required>
+                                <input type="number" class="form-control" id="prodQuantity" placeholder="Quantidade" required>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -422,13 +358,13 @@
                         <div class="mb-3">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="prodDelivery" checked>
-                                <label class="form-check-label small" for="prodDelivery">Eu realizo a entrega deste produto</label>
+                                <label class="form-check-label small" for="prodDelivery">Eu realizo a entrega</label>
                             </div>
                         </div>
                         <div class="mb-3">
                             <input type="url" class="form-control" id="prodImage" placeholder="URL da imagem do produto">
                         </div>
-                        <button type="submit" class="btn btn-warning w-100 fw-bold">Publicar Anúncio</button>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Publicar Anúncio</button>
                     </form>
                 </div>
             </div>
@@ -447,273 +383,71 @@
                     <small class="text-white-50">Bem-vindo ao Electro<span class="market-text">Market</span></small>
                 </div>
             </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
         </div>
-
         <div class="offcanvas-body p-0">
-            <!-- Menu Principal -->
             <div class="list-group list-group-flush">
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('eletronicos'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-house-door-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
-                        <span class="fw-semibold">Início</span>
-                    </div>
+                    <i class="bi bi-house-door-fill me-3 fs-5" style="color: var(--primary-blue);"></i> Início
                 </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" data-bs-toggle="offcanvas" data-bs-target="#filterOffcanvas" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-filter-left me-3 fs-5"></i>
-                        <span>Filtros de Busca</span>
-                    </div>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-admin d-none" data-bs-toggle="modal" data-bs-target="#adminDbModal" onclick="window.closeMobileMenu();">
+                    <i class="bi bi-database-fill-gear me-3 fs-5"></i> Gerenciar Banco de Dados
                 </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="loadPage('Ofertas'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-tag-fill me-3 fs-5" style="color: #ff6b00;"></i>
-                        <span class="fw-semibold">Ofertas</span>
-                        <span class="badge bg-danger ms-2">NOVO</span>
-                    </div>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-seller d-none" onclick="window.renderSellerPanel(); window.closeMobileMenu();">
+                    <i class="bi bi-box-seam me-3 fs-5"></i> Meus Produtos
                 </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-heart-fill me-3 fs-5" style="color: #e63946;"></i>
-                        <span>Curtidos</span>
-                    </div>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); window.closeMobileMenu();">
+                    <i class="bi bi-plus-circle me-3 fs-5"></i> Vender
                 </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-cart-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
-                        <span>Carrinho</span>
-                        <span class="badge rounded-pill bg-danger ms-auto d-none" id="cartBadgeMobile">0</span>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Divisor -->
-            <div class="px-3 py-2">
-                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Categorias</small>
-            </div>
-
-            <!-- Menu do Vendedor (Mobile) -->
-            <div class="list-group list-group-flush role-seller d-none">
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('eletronicos'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-box-seam-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
-                        <span>Meus Produtos (Estoque)</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="window.renderOrderManagement('seller_requests'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-bell-fill me-3 fs-5" style="color: var(--primary-blue);"></i>
-                        <span>Solicitações de Compra</span>
-                        <span class="badge rounded-pill bg-danger ms-auto d-none" id="pendingBadgeMobile">0</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="window.renderOrderManagement('seller_sales'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-shop me-3 fs-5" style="color: var(--primary-blue);"></i>
-                        <span>Minhas Vendas</span>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Categorias (Cliente) -->
-            <div class="list-group list-group-flush role-client">
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Smartphone'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-phone-fill me-3 fs-5"></i>
-                        <span>Celulares e Smartphones</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Notebook'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-laptop-fill me-3 fs-5"></i>
-                        <span>Notebooks</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Smart TV'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-tv-fill me-3 fs-5"></i>
-                        <span>TV e Vídeo</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Console Video Game'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-controller me-3 fs-5"></i>
-                        <span>Games e Consoles</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Placa de Vídeo'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-cpu me-3 fs-5"></i>
-                        <span>Hardware</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Smartwatch'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-watch me-3 fs-5"></i>
-                        <span>Smartwatches</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="loadPage('Eletrodomesticos'); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-lightning-charge me-3 fs-5"></i>
-                        <span>Eletro</span>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Divisor -->
-            <div class="px-3 py-2 mt-2">
-                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Sua Conta</small>
-            </div>
-
-            <!-- Conta e Configurações -->
-            <div class="list-group list-group-flush">
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-seller" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-plus-circle me-3 fs-5"></i>
-                        <span>Vender</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-client" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-clock-history me-3 fs-5"></i>
-                        <span>Histórico</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-guest" data-bs-toggle="modal" data-bs-target="#loginModal" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-box-arrow-in-right me-3 fs-5"></i>
-                        <span>Entre</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-guest" data-bs-toggle="modal" data-bs-target="#cadastroModal" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-person-plus-fill me-3 fs-5"></i>
-                        <span>Cadastre-se</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-logged-in d-none" onclick="window.showProfileEdit(); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-person-gear me-3 fs-5"></i>
-                        <span>Editar Perfil</span>
-                    </div>
+                <a href="#" class="list-group-item list-group-item-action border-0 py-3" id="themeToggleMobile" onclick="toggleTheme();">
+                    <i class="bi bi-moon-stars-fill me-3 fs-5"></i> Modo Escuro
                 </a>
                 <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-logged-in d-none" onclick="logout(); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center text-danger">
-                        <i class="bi bi-box-arrow-right me-3 fs-5"></i>
-                        <span class="fw-bold">Sair</span>
-                    </div>
+                    <i class="bi bi-box-arrow-right me-3 fs-5 text-danger"></i> Sair
                 </a>
             </div>
+        </div>
+    </div>
 
-            <!-- Divisor -->
-            <div class="px-3 py-2 mt-2">
-                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Ajuda e Configurações</small>
-            </div>
-
-            <div class="list-group list-group-flush">
-                <!-- Opção exclusiva para ADMIN -->
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3 role-admin d-none" 
-                   data-bs-toggle="modal" data-bs-target="#adminDbModal" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-database-fill-gear me-3 fs-5" style="color: var(--primary-blue);"></i>
-                        <span class="fw-bold">Gerenciar Banco de Dados</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" id="themeToggleMobileWrapper" onclick="toggleTheme(); syncThemeSwitch();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-moon-stars-fill me-3 fs-5"></i>
-                        <span>Modo Escuro</span>
-                        <div class="form-check form-switch ms-auto">
-                            <input class="form-check-input" type="checkbox" id="themeSwitchMobile">
-                        </div>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" data-bs-toggle="modal" data-bs-target="#notificacoesModal" onclick="window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-bell-fill me-3 fs-5"></i>
-                        <span>Notificações</span>
-                        <span class="badge rounded-pill bg-danger ms-auto" id="notifBadgeMobile">2</span>
-                    </div>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action border-0 py-3" onclick="window.showChat(); window.closeMobileMenu();">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-chat-dots me-3 fs-5"></i>
-                        <span>Mensagens</span>
-                    </div>
-                </a>
-            </div>
-
-    <!-- Modal de Chat -->
-    <div class="modal fade" id="chatModal" tabindex="-1" aria-labelledby="chatModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="chatModalLabel">
-                        <i class="bi bi-chat-dots-fill me-2"></i>
-                        <span id="chatPartnerName">Chat</span>
-                    </h5>
+    <!-- Modal Chat -->
+    <div class="modal fade" id="chatModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
+                    <h5 class="modal-title"><i class="bi bi-chat-dots-fill me-2"></i><span id="chatPartnerName">Chat</span></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
                     <div class="row g-0" style="height: 70vh;">
-                        <!-- Sidebar de Contatos -->
-                        <div class="col-md-4 border-end bg-light" id="chatSidebar">
-                            <div class="p-3 border-bottom">
-                                <h6 class="mb-0 fw-bold">Conversas</h6>
-                            </div>
-                            <div id="chatContactsList" class="p-2" style="overflow-y: auto; max-height: calc(70vh - 60px);">
-                                <!-- Contatos serão carregados aqui -->
-                            </div>
+                        <div class="col-md-4 border-end bg-light">
+                            <div id="chatContactsList" class="p-2" style="overflow-y: auto; max-height: 70vh;"></div>
                         </div>
-                        
-                        <!-- Área do Chat -->
                         <div class="col-md-8 d-flex flex-column">
-                            <!-- Estado Vazio -->
-                            <div id="chatEmptyState" class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+                            <div id="chatEmptyState" class="d-flex flex-column align-items-center justify-content-center h-100 text-muted bg-white">
                                 <i class="bi bi-chat-dots fs-1 mb-3"></i>
-                                <p>Selecione uma conversa para começar</p>
+                                <h5>Suas Mensagens</h5>
+                                <p class="small">Selecione uma conversa para começar</p>
                             </div>
-                            
-                            <!-- Chat Ativo -->
-                            <div id="chatActiveContent" class="d-flex flex-column h-100 d-none">
-                                <!-- Cabeçalho do Chat -->
-                                <div class="d-flex align-items-center p-3 border-bottom">
+                            <div id="chatActiveContent" class="d-flex flex-column h-100 d-none bg-white">
+                                <div class="d-flex align-items-center p-3 border-bottom bg-light">
                                     <img id="chatPartnerAvatar" src="" class="rounded-circle me-2" width="40" height="40">
                                     <div>
                                         <h6 class="mb-0 fw-bold" id="chatPartnerNameHeader"></h6>
-                                        <small class="text-muted">
-                                            <i class="bi bi-circle-fill text-success" style="font-size: 8px;"></i> Online
-                                        </small>
+                                        <small class="text-muted"><i class="bi bi-circle-fill text-success" style="font-size: 8px;"></i> Online</small>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-primary ms-auto" onclick="window.viewOrderDetails()">
+                                    <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="window.viewOrderDetails()">
                                         <i class="bi bi-info-circle"></i> Detalhes
                                     </button>
                                 </div>
-                                
-                                <!-- Barra de Status do Pedido -->
-                                <div id="orderStatusBar" class="p-3 border-bottom bg-light">
-                                    <!-- Status será carregado aqui -->
-                                </div>
-                                
-                                <!-- Mensagens -->
-                                <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto;"></div>
-                                
-                                <!-- Área de Acordo de Entrega -->
+                                <div id="orderStatusBar" class="p-2 border-bottom bg-white"></div>
+                                <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: #f0f2f5;"></div>
                                 <div id="logisticsAgreementArea" class="p-3 border-top bg-warning bg-opacity-10 d-none">
-                                    <p class="fw-bold mb-2">
-                                        <i class="bi bi-truck"></i> Combine a entrega:
-                                    </p>
-                                    <div id="logisticsButtons" class="d-flex gap-2 flex-wrap">
-                                        <!-- Botões de logística -->
-                                    </div>
+                                    <p class="fw-bold mb-2"><i class="bi bi-truck"></i> Combine a entrega:</p>
+                                    <div id="logisticsButtons" class="d-flex gap-2 flex-wrap"></div>
                                 </div>
-                                
-                                <!-- Input de Mensagem -->
-                                <div class="p-3 border-top">
+                                <div class="p-3 border-top bg-white">
                                     <form onsubmit="window.sendChatMessage(event)" class="d-flex gap-2">
-                                        <input type="text" id="chatMessageInput" class="form-control rounded-pill" 
-                                               placeholder="Digite sua mensagem..." autocomplete="off">
+                                        <input type="text" id="chatMessageInput" class="form-control rounded-pill" placeholder="Digite sua mensagem..." autocomplete="off">
                                         <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px;">
                                             <i class="bi bi-send"></i>
                                         </button>
@@ -727,7 +461,7 @@
         </div>
     </div>
 
-    <!-- Modal de Detalhes do Pedido -->
+    <!-- Modal Detalhes do Pedido -->
     <div class="modal fade" id="orderDetailsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -740,16 +474,7 @@
         </div>
     </div>
 
-            <!-- Footer do Menu -->
-            <div class="p-4 mt-3 text-center border-top">
-                <img src="https://cdn-icons-png.flaticon.com/512/8596/8596449.png" alt="Logo" width="30" class="mb-2">
-                <p class="text-muted small mb-0">© 2026 Electro<span class="market-text">Market</span></p>
-                <p class="text-muted small">Versão 2.0.0</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Gerenciamento de Banco (ADMIN) -->
+    <!-- Modal Admin -->
     <div class="modal fade" id="adminDbModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
@@ -760,19 +485,14 @@
                 <div class="modal-body text-center p-4">
                     <i class="bi bi-cloud-arrow-up-fill text-primary" style="font-size: 3rem;"></i>
                     <h5 class="mt-3 fw-bold">Sincronizar Banco de Dados</h5>
-                    <p class="text-muted small">Esta ação enviará os produtos padrão para o JSONBin.io, criando a estrutura inicial do marketplace.</p>
-                    
-                    <div class="alert alert-warning small">
-                        <i class="bi bi-exclamation-triangle me-1"></i> <strong>Atenção:</strong> Isso substituirá os dados atuais no servidor.
-                    </div>
-                    
+                    <p class="text-muted small">Esta ação enviará os produtos padrão para o Supabase.</p>
                     <button class="btn btn-primary w-100 py-2 fw-bold" id="btnInitDb">CRIAR / ATUALIZAR BANCO</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Notificações -->
+    <!-- Modal Notificações -->
     <div class="modal fade" id="notificacoesModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
@@ -781,37 +501,24 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
-                    <div class="list-group list-group-flush" id="notificacoesList">
-                        <!-- Conteúdo injetado via JS -->
-                    </div>
+                    <div class="list-group list-group-flush" id="notificacoesList"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer bg-white py-4 mt-4 border-top">
-        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-            <span class="text-muted">© 2026 Electro<span class="market-text">Market</span>. Todos os direitos reservados.</span>
-            <div class="footer-links d-flex gap-3">
-                <a href="#" class="text-decoration-none text-muted">Sobre</a>
-                <a href="#" class="text-decoration-none text-muted">Ajuda</a>
-                <a href="https://github.com/danielbarbosabr" target="_blank" class="text-decoration-none text-muted">Contato</a>
-            </div>
     <!-- Offcanvas Editar Perfil -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="profileEditOffcanvas" aria-labelledby="profileEditOffcanvasLabel" style="width: 400px; max-width: 90%;">
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="profileEditOffcanvas" style="width: 400px; max-width: 90%;">
         <div class="offcanvas-header text-white" style="background-color: var(--primary-blue);">
-            <h5 class="offcanvas-title fw-bold" id="profileEditOffcanvasLabel"><i class="bi bi-person-gear me-2"></i> Meu Perfil</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <h5 class="offcanvas-title fw-bold"><i class="bi bi-person-gear me-2"></i> Meu Perfil</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body">
             <form id="profileEditForm">
                 <div class="text-center mb-4">
                     <img id="profilePreview" src="https://via.placeholder.com/100" class="rounded-circle border shadow-sm mb-2" width="100" height="100" style="object-fit: cover;">
-                    <div class="small text-muted">Alterar foto (URL)</div>
                     <input type="url" class="form-control form-control-sm mt-1" id="editAvatar" placeholder="https://link-da-foto.com">
                 </div>
-                
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Nome Completo</label>
                     <input type="text" class="form-control" id="editNome" required>
@@ -819,14 +526,13 @@
                 <div class="mb-3">
                     <label class="form-label small fw-bold">E-mail</label>
                     <input type="email" class="form-control" id="editEmail" required readonly style="background-color: #f8f9fa;">
-                    <div class="form-text" style="font-size: 0.7rem;">O e-mail não pode ser alterado.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">CPF</label>
                     <input type="text" class="form-control" id="editCPF" readonly style="background-color: #f8f9fa;">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small fw-bold">Endereço (Rua e Número)</label>
+                    <label class="form-label small fw-bold">Endereço</label>
                     <input type="text" class="form-control" id="editEndereco" required>
                 </div>
                 <div class="row">
@@ -850,17 +556,35 @@
                         <option value="boleto">Boleto Bancário</option>
                     </select>
                 </div>
-                
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="background-color: #3a81f8; border: none;">SALVAR ALTERAÇÕES</button>
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">SALVAR ALTERAÇÕES</button>
                 <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="logout()">SAIR DA CONTA</button>
             </form>
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="footer py-3 border-top fixed-bottom">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            <span class="footer-copyright">© 2026 Electro<span class="market-text">Market</span>. Todos os direitos reservados.</span>
+            
+            <div class="footer-tools d-flex gap-3 align-items-center">
+                <span class="small opacity-75">Stack:</span>
+                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg" width="18" title="VS Code">
+                <a href="https://github.com" target="_blank" class="footer-link"><i class="bi bi-github fs-5"></i></a>
+                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="18" title="Vercel" class="theme-invert">
+                <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="18" title="Supabase">
+                <img src="https://chat.deepseek.com/favicon.ico" width="18" title="DeepSeek" style="border-radius: 3px;">
+            </div>
+
+            <div class="footer-links d-flex gap-3">
+                <a href="https://github.com/danielbarbosabr?tab=repositories" target="_blank" class="text-decoration-none footer-link small">Sobre</a>
+                <a href="https://github.com/danielbarbosabr" target="_blank" class="text-decoration-none footer-link small">Contato</a>
+            </div>
         </div>
     </footer>
 
-    <!-- Scripts: Bootstrap e Lógica Local -->
+    <!-- Scripts na ordem correta -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js"></script>
 </body>
