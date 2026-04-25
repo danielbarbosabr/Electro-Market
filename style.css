@@ -41,6 +41,7 @@ body {
     color: var(--text-main);
     font-family: 'Sora', sans-serif;
     margin: 0;
+    padding-bottom: 70px; /* Espaço para o rodapé fixo não cobrir o conteúdo */
 }
 
 /* ============================================ */
@@ -1260,18 +1261,42 @@ a:hover {
 /* ============================================ */
 
 footer {
-    background-color: var(--header-bg);
-    color: #ffffff;
+    background-color: #001529 !important; /* Azul escuro fixo mesmo no tema claro */
+    color: #ffffff !important;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+    backdrop-filter: blur(10px); /* Efeito de transparência suave se preferir */
 }
 
-footer a {
-    color: rgba(255, 255, 255, 0.7);
+.footer-copyright {
+    color: #ffffff !important;
+    font-weight: 500;
+    font-size: 0.85rem;
 }
 
-footer a:hover {
+.footer-link {
+    color: #ffffff !important;
+    opacity: 0.8;
+    font-weight: 600;
+}
+
+footer .footer-link:hover {
     color: var(--market-color);
+    opacity: 1;
 }
 
-footer .text-muted {
-    color: rgba(255, 255, 255, 0.5) !important;
+.footer-tools img {
+    transition: transform 0.3s ease;
+}
+
+.footer-tools img:hover {
+    transform: scale(1.2);
+}
+
+.theme-invert {
+    filter: invert(1) brightness(2); /* Ajusta ícones pretos (Vercel) para ficarem brancos */
+}
+
+footer.fixed-bottom {
+    z-index: 1030;
+    border-top: 1px solid rgba(255,255,255,0.1) !important;
 }
