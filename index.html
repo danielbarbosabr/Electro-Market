@@ -461,7 +461,7 @@
                 <div class="modal-header text-white d-flex align-items-center" style="background-color: var(--primary-blue);">
                     <img id="chatPartnerAvatar" src="" class="rounded-circle me-2" width="40" height="40" onerror="this.src='https://ui-avatars.com/api/?name=User'">
                     <h5 class="modal-title mb-0">
-                        <span id="chatPartnerNameHeader">Carregando...</span>
+                        <span id="chatPartnerNameHeader">Conversa</span>
                         <small class="text-white-50 d-block" id="chatOrderIdDisplay" style="font-size: 0.7rem;"></small>
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -469,20 +469,43 @@
                 <div class="modal-body p-0">
                     <div class="row g-0" style="height: 70vh;">
                         <div class="col-12 d-flex flex-column h-100 bg-white">
+                            <!-- Resumo do Produto (fixo no topo) -->
+                            <div id="chatProductSummary" class="p-2 bg-light border-bottom d-flex align-items-center gap-2">
+                                <img id="chatProdImg" src="" style="width:45px;height:45px;object-fit:cover;border-radius:8px;" 
+                                     onerror="this.src='https://placehold.co/45?text=📦'">
+                                <div class="flex-grow-1" style="line-height: 1.2;">
+                                    <div id="chatProdTitle" class="fw-bold small text-truncate" style="max-width: 200px;">Produto</div>
+                                    <div id="chatProdPrice" class="text-success small fw-bold">R$ 0,00</div>
+                                </div>
+                                <small id="chatOrderIdDisplay" class="text-muted">#000000</small>
+                            </div>
                             <!-- Barra de Status do Pedido -->
-                            <div id="orderStatusBar" class="bg-light border-bottom p-2"></div>
+                            <div id="orderStatusBar" class="bg-white border-bottom p-2 shadow-sm"></div>
 
                             <!-- Área de Mensagens -->
                             <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: var(--bg-color);"></div>
                             
-                            <!-- Área de Ações (Botões Aceitar/Logística/Confirmar) -->
-                            <div id="chatActionsArea" class="p-3 border-top bg-light"></div>
+                            <!-- Área de Ações (Logística, Confirmar, Cancelar) -->
+                            <div id="chatActionsArea" class="p-3 border-top bg-light d-none"></div>
+
+                            <!-- Barra de Preview (Responder/Editar) -->
+                            <div id="chatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
 
                             <!-- Input de Mensagem -->
                             <div class="p-3 border-top bg-white">
-                                <form id="chatMessageForm" class="d-flex gap-2">
-                                    <input type="text" id="chatMessageInput" class="form-control rounded-pill" placeholder="Digite sua mensagem..." autocomplete="off">
-                                    <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <form id="chatMessageForm" onsubmit="return window.sendChatMessage(event)" class="d-flex gap-2 align-items-center">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle" 
+                                            onclick="window.sendChatFile()" title="Enviar arquivo">
+                                        <i class="bi bi-paperclip"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-circle" 
+                                            onclick="window.toggleChatActions()" title="Opções do pedido">
+                                        <i class="bi bi-plus-circle"></i>
+                                    </button>
+                                    <input type="text" id="chatMessageInput" class="form-control rounded-pill" 
+                                           placeholder="Digite sua mensagem..." autocomplete="off">
+                                    <button type="submit" class="btn btn-primary rounded-circle" 
+                                            style="width: 40px; height: 40px;">
                                         <i class="bi bi-send"></i>
                                     </button>
                                 </form>
@@ -626,7 +649,7 @@
                     <a href="https://github.com/danielbarbosabr" target="_blank" class="text-white"><i class="bi bi-github fs-5"></i></a>
                     <a href="https://vercel.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="20" title="Vercel" style="filter: invert(1) brightness(2);"></a>
                     <a href="https://supabase.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="20" title="Supabase"></a>
-                    <a href="https://www.deepseek.com/" target="_blank"><img src="https://www.deepseek.com/favicon.ico" width="20" title="DeepSeek AI" style="border-radius: 4px; filter: brightness(1.2);"></a>
+                    <a href="https://www.deepseek.com/" target="_blank"><img src="https://chat.deepseek.com/favicon.ico" width="20" title="DeepSeek AI" style="border-radius: 4px;"></a>
                 </div>
 
                 <span class="text-white-50 d-md-none" style="font-size: 0.6rem;">© 2026 ElectroMarket</span>
