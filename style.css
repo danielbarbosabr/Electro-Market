@@ -41,7 +41,7 @@ body {
     color: var(--text-main);
     font-family: 'Sora', sans-serif;
     margin: 0;
-    padding-bottom: 70px; /* Espaço para o rodapé fixo não cobrir o conteúdo */
+    padding-bottom: 90px; /* Espaço para o rodapé não sobrepor o conteúdo */
 }
 
 /* ============================================ */
@@ -1260,11 +1260,15 @@ a:hover {
 /* FOOTER                                       */
 /* ============================================ */
 
-footer {
+footer.main-footer-dock {
     background-color: #001529 !important; /* Azul escuro fixo mesmo no tema claro */
     color: #ffffff !important;
-    box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
-    backdrop-filter: blur(10px); /* Efeito de transparência suave se preferir */
+    box-shadow: 0 -5px 25px rgba(0,0,0,0.3);
+    backdrop-filter: blur(12px);
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 2000; /* Garante que fique acima de tudo */
 }
 
 .footer-copyright {
@@ -1279,17 +1283,20 @@ footer {
     font-weight: 600;
 }
 
-footer .footer-link:hover {
-    color: var(--market-color);
+.footer-hover-link:hover {
+    color: var(--market-color) !important;
     opacity: 1;
+    text-decoration: underline !important;
 }
 
 .footer-tools img {
-    transition: transform 0.3s ease;
+    transition: transform 0.2s ease, filter 0.2s ease;
+    cursor: help;
 }
 
 .footer-tools img:hover {
     transform: scale(1.2);
+    filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
 }
 
 .theme-invert {
