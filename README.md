@@ -195,7 +195,7 @@ cd electromarket
 
 🌐 Demonstração Online
 
-O projeto está disponível em: https://electromarket.vercel.app (substitua pelo seu link)
+O projeto está disponível em: https://eletromarket-pi.vercel.app/ (substitua pelo seu link)
 
 ---
 
