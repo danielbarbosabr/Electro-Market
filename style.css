@@ -1592,16 +1592,6 @@ footer.main-footer-dock {
 .theme-invert {
     filter: invert(1) brightness(2); /* Ajusta ícones pretos (Vercel) para ficarem brancos */
 }
-.auth-wrapper {
-    position: relative;
-    overflow: hidden;
-    background: #fff;
-    width: 100vw;
-    height: 100vh;
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 0;
-}
 
 .auth-wrapper::before {
     content: "";
@@ -1868,4 +1858,79 @@ body.sign-up-js .second-content .second-column {
     transform: translateY(-1px);
     filter: brightness(1.1);
     letter-spacing: 0.02rem;
+}
+
+/* Ajustes para Mobile (Android) na tela de Auth */
+@media (max-width: 768px) {
+    .auth-wrapper {
+        width: 100vw !important;
+        height: 100dvh !important; /* dVH é melhor para mobile Android/Chrome */
+        max-width: 100% !important;
+        max-height: 100% !important;
+        border-radius: 0 !important;
+        background: var(--card-bg) !important;
+    }
+    .auth-wrapper::before {
+        display: none !important;
+    }
+    .auth-column-side {
+        display: none !important;
+    }
+    .auth-column-form {
+        width: 100% !important;
+        padding: 50px 20px 20px !important; /* Aumentado padding superior para dar espaço ao botão de fechar */
+        background: var(--card-bg) !important;
+        justify-content: flex-start !important; /* Alinha ao topo para evitar que o conteúdo suma em telas pequenas */
+        height: 100% !important;
+        overflow-y: auto !important; /* Habilita scroll para formulários longos como o de Cadastro */
+        -webkit-overflow-scrolling: touch;
+    }
+    .auth-content {
+        position: absolute !important; /* Volta para absolute para as telas não empilharem */
+        inset: 0 !important;
+        flex-direction: column !important;
+    }
+    .auth-close-btn {
+        position: fixed !important; /* Muda de absolute para fixed para ignorar o scroll do formulário */
+        top: 20px !important; 
+        right: 15px !important;
+        background: transparent !important; /* Remove o fundo circular (a bolota) */
+        width: 44px !important; /* Mantém área de clique boa para o polegar */
+        height: 44px !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 999999 !important; /* Z-index máximo para garantir que fique no topo de tudo */
+        box-shadow: none !important; /* Remove a sombra da bolota */
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important; /* Garante que o botão seja clicável */
+    }
+
+    .auth-close-btn i, 
+    .auth-close-btn img {
+        display: block !important; /* Mostra o ícone original novamente */
+        filter: none !important; 
+        color: #ff0000 !important; /* Define a cor do X como vermelho */
+        font-size: 2rem !important; /* Ajusta o tamanho do ícone */
+    }
+    .login-icon-v3 {
+        width: 100px; /* Reduzido levemente para economizar espaço vertical */
+        height: 100px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }
+    .auth-form-v2 {
+        max-width: 100%;
+    }
+    .auth-form-v2 input, .auth-form-v2 select {
+        margin-bottom: 10px !important;
+        padding: 8px 12px !important; /* Inputs um pouco mais compactos no mobile */
+    }
+    /* Remove animações de deslocamento horizontal que causam "pulos" na visualização mobile */
+    body.sign-in-js .first-content .second-column,
+    body.sign-up-js .second-content .second-column {
+        animation: none !important;
+    }
 }
