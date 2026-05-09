@@ -208,12 +208,12 @@
                     <h2 class="title-second">Criar uma Conta</h2>
                     <form id="cadFormAnim" class="auth-form-v2" autocomplete="off">
                         <div class="row g-2">
-                            <div class="col-6"><input type="text" id="v2CadNome" placeholder="Nome completo" required></div>
-                            <div class="col-6"><input type="text" id="v2CadCPF" placeholder="CPF" maxlength="14" required></div>
+                            <div class="col-12 col-sm-6"><input type="text" id="v2CadNome" placeholder="Nome completo" required></div>
+                            <div class="col-12 col-sm-6"><input type="text" id="v2CadCPF" placeholder="CPF" maxlength="14" required></div>
                         </div>
                         <div class="row g-2 mt-2">
-                            <div class="col-6"><input type="text" id="v2CadCEP" placeholder="CEP" maxlength="9" required></div>
-                            <div class="col-6">
+                            <div class="col-12 col-sm-6"><input type="text" id="v2CadCEP" placeholder="CEP" maxlength="9" required></div>
+                            <div class="col-12 col-sm-6">
                                 <select class="auth-v2-select" id="v2CadTipo" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
                                     <option value="CLIENTE">Cliente</option>
                                     <option value="VENDEDOR">Vendedor</option>
@@ -224,12 +224,12 @@
                             <div class="col-12"><input type="text" id="v2CadEnd" placeholder="Rua / Logradouro" required></div>
                         </div>
                         <div class="row g-2 mt-2">
-                            <div class="col-4"><input type="text" id="v2CadNum" placeholder="Nº" required></div>
-                            <div class="col-8"><input type="text" id="v2CadBairro" placeholder="Bairro"></div>
+                            <div class="col-4 col-sm-3"><input type="text" id="v2CadNum" placeholder="Nº" required></div>
+                            <div class="col-8 col-sm-9"><input type="text" id="v2CadBairro" placeholder="Bairro"></div>
                         </div>
                         <div class="row g-2 mt-2">
-                            <div class="col-8"><input type="text" id="v2CadCid" placeholder="Cidade" required></div>
-                            <div class="col-4">
+                            <div class="col-8 col-sm-9"><input type="text" id="v2CadCid" placeholder="Cidade" required></div>
+                            <div class="col-4 col-sm-3">
                                 <select class="auth-v2-select" id="v2CadUF" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
                                     <option value="SP">SP</option><option value="RJ">RJ</option><option value="MG">MG</option>
                                     <option value="ES">ES</option><option value="PR">PR</option><option value="SC">SC</option>
@@ -238,10 +238,10 @@
                             </div>
                         </div>
                         <div class="row g-2 mt-2">
-                            <div class="col-6">
+                            <div class="col-12 col-sm-6">
                                 <input type="file" id="v2CadAvatar" accept="image/*" style="width:100%;padding:8px;border:1.5px solid #ddd;border-radius:8px;font-size:.8rem;background:#f9f9f9;" title="Foto de perfil">
                             </div>
-                            <div class="col-6">
+                            <div class="col-12 col-sm-6">
                                 <select class="auth-v2-select" id="v2CadPagamento" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
                                     <option value="pix">PIX</option>
                                     <option value="cartao">Cartão</option>
@@ -257,6 +257,9 @@
                                onclick="window.toggleAuthPass('v2CadPass', this)"></i>
                         </div>
                         <button type="submit" class="btn-market-solid mt-3">CRIAR CONTA</button>
+                        <div class="text-center mt-3 d-md-none">
+                            <p class="mb-0 small text-muted">Já tem uma conta? <a href="#" class="text-primary fw-bold" onclick="window.toggleAuthMode('login')">Entrar agora</a></p>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -285,6 +288,9 @@
                         </div>
                         <a href="https://github.com/danielbarbosabr" target="_blank" style="display:block;text-align:right;font-size:.78rem;color:#34495e;margin-top:6px;">Esqueceu a senha?</a>
                         <button type="submit" class="btn-market-solid mt-3">ENTRAR</button>
+                        <div class="text-center mt-3 d-md-none">
+                            <p class="mb-0 small text-muted">Ainda não tem conta? <a href="#" class="text-primary fw-bold" onclick="window.toggleAuthMode('cadastro')">Cadastre-se aqui</a></p>
+                        </div>
                     </form>
                 </div>
             </div>
