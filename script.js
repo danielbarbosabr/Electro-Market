@@ -1,24 +1,24 @@
 // ============================================
-// ELECTROMARKET - VERSÃO QUE FUNCIONA
+// ELECTROMARKET - SCRIPT PRINCIPAL
+// Melhorias: Toast system, Yeti corrigido,
+//            debounce na busca, skeleton loading,
+//            toggle tema global, melhor gestão de estado
 // ============================================
-const SUPABASE_URL = 'https://pjisiqvaulgoikaitmaj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqaXNpcXZhdWxnb2lrYWl0bWFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNjI5ODAsImV4cCI6MjA5MjYzODk4MH0.vq69kmmYdr2aBePlxwVcO3QhUtbp5dtx-pZxRXgEkV8';
 
 let allProductsCache = [];
-let cart = JSON.parse(localStorage.getItem('electroCart')) || [];
-let likedProducts = JSON.parse(localStorage.getItem('electroLiked')) || [];
-let accessHistory = JSON.parse(localStorage.getItem('electroHistory')) || [];
-let currentChat = null;
-let currentReplyIndex = null; // Para responder mensagens
-let editingMessageIndex = null; // Para editar mensagens
-let ordersCache = []; // Cache de pedidos para acesso rápido
-let chatsCache = []; // Cache de chats para acesso rápido
+let cart              = JSON.parse(localStorage.getItem('electroCart'))    || [];
+let likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || [];
+let accessHistory     = JSON.parse(localStorage.getItem('electroHistory')) || [];
+let currentChat       = null;
+let ordersCache       = [];
+let riveInstance      = null;
+let chatsCache        = [];
+let notificationsCache = JSON.parse(localStorage.getItem('electroNotifs')) || [];
 
-// Mapeamento de status de pedidos para exibição
 const ORDER_STATUS_MAP = {
     'pending':         { text: 'Em Aprovação',             class: 'bg-warning text-dark' },
     'accepted':        { text: 'Aprovado (Chat Liberado)', class: 'bg-success' },
-    'agreement':       { text: 'Aguardando Logística',     class: 'bg-info' },
+    'agreement':       { text: '🤝 Combinando Entrega',     class: 'bg-info' },
     'shipping':        { text: 'Em Rota de Entrega',       class: 'bg-primary' },
     'awaiting_pickup': { text: 'Aguardando Retirada',      class: 'bg-primary' },
     'finished':        { text: 'Finalizado',               class: 'bg-dark' },
@@ -26,27 +26,103 @@ const ORDER_STATUS_MAP = {
     'dispute':         { text: 'Em Disputa',               class: 'bg-danger' }
 };
 
-// Função fetch direta
+// ============================================
+// SISTEMA DE TOAST (substitui alerts)
+// ============================================
+
+/**
+ * Cria uma notificação persistente no Banco de Dados e mostra o Toast na tela
+ */
+async function createPersistentNotification(message, type = 'info', userId = null) {
+    const targetId = userId || getSavedUser()?.id;
+    const newNotif = { 
+        id: Date.now(), 
+        message, 
+        type, 
+        read: false, 
+        created_at: new Date().toISOString() 
+    };
+    
+    // 1. Mostra o feedback visual (Toast) imediatamente
+    showToast(message, type);
+
+    // 2. Salva localmente (Log de no máximo 10 itens)
+    notificationsCache.unshift(newNotif);
+    if (notificationsCache.length > 10) notificationsCache.pop();
+    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+
+    // 3. Se houver um usuário e banco, tenta salvar remotamente
+    if (targetId) {
+        try {
+            await supabaseFetch('notifications', { method: 'POST', body: JSON.stringify({ user_id: targetId, ...newNotif, id: undefined }) });
+        } catch (e) { console.error("Erro ao salvar log:", e); }
+    }
+    loadNotifications();
+}
+
+function showToast(message, type = 'info', duration = 3500) {
+    let container = document.getElementById('toastContainerCustom');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainerCustom';
+        container.className = 'toast-container-custom';
+        document.body.appendChild(container);
+    }
+
+    const icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', info: 'bi-info-circle-fill', warning: 'bi-exclamation-triangle-fill' };
+    const toast = document.createElement('div');
+    toast.className = `toast-custom ${type}`;
+    toast.innerHTML = `
+        <i class="bi ${icons[type] || icons.info} fs-4"></i>
+        <div class="flex-grow-1">${message}</div>
+        <i class="bi bi-x fs-4 cursor-pointer opacity-50" onclick="this.parentElement.classList.add('fade-out'); setTimeout(()=>this.parentElement.remove(), 300)"></i>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 320);
+    }, duration);
+}
+
+// ============================================
+// FETCH SUPABASE
+// ============================================
+
 async function supabaseFetch(path, options = {}) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${path}`, {
         ...options,
         headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'apikey': CONFIG.SUPABASE_KEY,
+            'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`,
             'Content-Type': 'application/json',
             ...options.headers
         }
     });
-    if (!res.ok) throw await res.json().catch(() => ({ message: 'Erro' }));
-    if (options.method === 'DELETE' || res.status === 204) return true; // 204 No Content para DELETE/PATCH sem retorno
+    if (!res.ok) throw await res.json().catch(() => ({ message: 'Erro na requisição' }));
+    if (options.method === 'DELETE' || res.status === 204) return true;
     const text = await res.text();
     return text ? JSON.parse(text) : [];
 }
 
-// Carregar produtos
+// ============================================
+// CARREGAR PRODUTOS (com skeleton)
+// ============================================
+
 async function loadPage(query = 'eletronicos') {
     const grid = document.getElementById('productsGrid');
-    grid.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border" style="color:#131673;"></div><h5>Carregando...</h5></div>`;
+    // Skeleton loading - muito mais suave que um spinner central
+    grid.style.display = 'grid';
+    grid.classList.remove('order-view-active');
+    grid.innerHTML = Array(12).fill(0).map(() => `
+        <div class="card border-0" style="border-radius: 10px; overflow: hidden;">
+            <div class="skeleton" style="height: 160px;"></div>
+            <div style="padding: 12px;">
+                <div class="skeleton mb-2" style="height: 14px; width: 80%;"></div>
+                <div class="skeleton mb-1" style="height: 14px; width: 60%;"></div>
+                <div class="skeleton" style="height: 22px; width: 50%;"></div>
+            </div>
+        </div>`).join('');
 
     try {
         const user = getSavedUser();
@@ -54,29 +130,27 @@ async function loadPage(query = 'eletronicos') {
         const hero = document.getElementById('heroSection');
         let path = 'products?select=*';
 
-        // Exibe o banner apenas se for a página inicial ('eletronicos') e o usuário não for Vendedor
         if (hero) {
             hero.classList.toggle('d-none', role === 'VENDEDOR' || query !== 'eletronicos');
         }
-        
-        // REGRA CRÍTICA: Se for vendedor, filtra apenas os produtos dele em qualquer navegação
+
         if (user && user.tipo === 'VENDEDOR') {
             path += `&vendedor_id=eq.${user.id}`;
         }
 
         const data = await supabaseFetch(path);
+        console.log(`Fetched ${data.length} products from Supabase.`);
         allProductsCache = data || [];
-        
+
         let products = allProductsCache;
         if (query !== 'eletronicos' && query !== '') {
             const term = query.toLowerCase();
             if (term === 'ofertas') {
-                // Filtra produtos que tenham preço original maior que o preço atual
                 products = products.filter(p => (p.preco_original || 0) > p.preco);
                 document.getElementById('gridTitle').textContent = 'Ofertas Imperdíveis';
             } else {
-                products = products.filter(p => 
-                    (p.titulo || '').toLowerCase().includes(term) ||
+                products = products.filter(p =>
+                    (p.titulo    || '').toLowerCase().includes(term) ||
                     (p.categoria || '').toLowerCase().includes(term)
                 );
                 document.getElementById('gridTitle').textContent = `Resultados para "${query}"`;
@@ -84,25 +158,40 @@ async function loadPage(query = 'eletronicos') {
         } else {
             document.getElementById('gridTitle').textContent = 'Recomendados para você';
         }
-        
+
+        console.log(`loadPage called with query: "${query}"`);
+        console.log(`Filtered products count: ${products.length}`);
+        console.log(`Filtered products:`, products);
         renderGrid(products);
         updateStoreFilterUI();
-        console.log('✅', products.length, 'produtos carregados');
     } catch (e) {
         console.error(e);
-        grid.innerHTML = `<div class="col-12 text-center py-5"><h5>Erro ao carregar</h5><button class="btn btn-primary mt-3" onclick="loadPage()">Tentar</button></div>`;
+        grid.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-wifi-off fs-1 text-muted d-block mb-3"></i>
+                <h5>Erro ao carregar produtos</h5>
+                <button class="btn btn-primary mt-3" onclick="loadPage()">Tentar novamente</button>
+            </div>`;
     }
 }
 
+// ============================================
+// RENDER CARD
+// ============================================
+
 function renderCard(item) {
     if (!item?.titulo) return '';
-    const preco = item.preco || 0;
-    const pid = item.id;
-    const isLiked = likedProducts.includes(pid);
-    
-    // Puxa a informação de entrega do banco de dados
-    const realizaEntrega = !!(item.realizaentrega ?? item.realizaEntrega ?? true);
-    
+    const preco    = item.preco || 0;
+    const pid      = item.id;
+    const isLiked  = likedProducts.includes(pid);
+    const realizaEntrega = !!(item.realizaentrega);
+    const cidade   = item.cidade || 'Não informada';
+    const thumb    = Array.isArray(item.img) ? item.img[0] : item.img;
+
+    const precoFormatado = preco === 0
+        ? '<span class="text-success fw-bold">GRÁTIS</span>'
+        : `R$ ${Math.floor(preco).toLocaleString('pt-BR')}<small style="font-size:0.6em">,${((preco % 1).toFixed(2)).slice(1)}</small>`;
+
     return `
         <div class="card product-card-ml" onclick="window.showDetail('${pid}')">
             <div class="overlay">
@@ -113,41 +202,50 @@ function renderCard(item) {
                     <i class="bi ${isLiked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
                 </button>
             </div>
-            <div class="product-card-img-container d-flex align-items-center justify-content-center bg-light" style="height:200px;">
-                ${item.img 
-                    ? `<img src="${item.img}" alt="${item.titulo}" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size: 3rem;\\'></i>'">`
-                    : `<i class="bi bi-box-seam text-secondary" style="font-size: 3rem;"></i>`
+            <div class="product-card-img-container">
+                ${thumb
+                    ? `<img src="${thumb}" alt="${item.titulo}" loading="lazy"
+                           onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:2.5rem;\\'></i>'">`
+                    : `<i class="bi bi-box-seam text-secondary" style="font-size:2.5rem;"></i>`
                 }
             </div>
             <div class="card-body product-card-body">
                 <h6 class="product-title-grid">${item.titulo}</h6>
-                <h3 class="current-price">
-                    ${item.preco_original && item.preco_original > preco 
-                        ? `<small class="text-muted text-decoration-line-through d-block" style="font-size: 0.85rem; font-weight: normal;">
-                            R$ ${item.preco_original.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                           </small>` 
+                <div class="current-price">
+                    ${item.preco_original && item.preco_original > preco
+                        ? `<div class="text-muted text-decoration-line-through" style="font-size:0.75rem;font-weight:normal;">
+                               R$ ${item.preco_original.toLocaleString('pt-BR', {minimumFractionDigits:2})}
+                           </div>`
                         : ''
                     }
-                    ${preco === 0 
-                        ? '<span class="text-success">GRÁTIS</span>' 
-                        : `R$ ${Math.floor(preco).toLocaleString('pt-BR')}<small>${((preco % 1).toFixed(2)).substring(1)}</small>`
-                    }
-                </h3>
-                
-                <div class="shipping-info-grid ${realizaEntrega ? 'text-success' : 'text-muted'} small fw-bold mb-2">
+                    ${precoFormatado}
+                </div>
+                <div class="${realizaEntrega ? 'text-success' : 'text-muted'} small fw-bold mt-2">
                     <i class="bi ${realizaEntrega ? 'bi-truck' : 'bi-geo-alt'}"></i>
                     ${realizaEntrega ? 'Entrega disponível' : 'Retirada no local'}
                 </div>
-
-                <small class="text-muted">${item.loja || 'Vendedor'}</small>
+                <div class="text-muted mt-1" style="font-size:0.7rem;">
+                    <i class="bi bi-geo-alt"></i> ${cidade}
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
+                    <small class="text-muted text-truncate" style="max-width:60%">${item.loja || 'Vendedor'}</small>
+                    <span class="badge bg-light text-dark border" style="font-size:0.58rem;">${(item.categoria || 'Geral').split(' > ').pop()}</span>
+                </div>
             </div>
         </div>`;
 }
 
 function renderGrid(products) {
     const grid = document.getElementById('productsGrid');
+    grid.classList.remove('order-view-active');
+    grid.style.display = 'grid';
+
     if (!products?.length) {
-        grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Nenhum produto encontrado</h5></div>';
+        grid.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-search fs-1 text-muted d-block mb-3"></i>
+                <h5>Nenhum produto encontrado</h5>
+            </div>`;
         return;
     }
     grid.innerHTML = products.map(renderCard).join('');
@@ -160,225 +258,353 @@ function updateStoreFilterUI() {
     container.innerHTML = stores.map(store => `
         <div class="form-check mb-2">
             <input class="form-check-input store-checkbox" type="checkbox" value="${store}" checked onchange="applyFilters()">
-            <label class="form-check-label">${store}</label>
+            <label class="form-check-label small">${store}</label>
         </div>`).join('');
 }
 
 function applyFilters() {
-    const min = parseFloat(document.getElementById('minPrice')?.value) || 0;
-    const max = parseFloat(document.getElementById('maxPrice')?.value) || Infinity;
-    const sort = document.getElementById('sortOrder')?.value;
+    const min    = parseFloat(document.getElementById('minPrice')?.value)  || 0;
+    const max    = parseFloat(document.getElementById('maxPrice')?.value)  || Infinity;
+    const sort   = document.getElementById('sortOrder')?.value;
     const stores = Array.from(document.querySelectorAll('.store-checkbox:checked')).map(cb => cb.value);
-    
-    let filtered = allProductsCache.filter(p => 
-        p.preco >= min && p.preco <= max && 
-        (!stores.length || stores.includes(p.loja))
+    const city   = (document.getElementById('filterCity')?.value || '').toLowerCase();
+
+    let filtered = allProductsCache.filter(p =>
+        p.preco >= min && p.preco <= max &&
+        (!stores.length || stores.includes(p.loja)) &&
+        (p.cidade || '').toLowerCase().includes(city)
     );
-    
-    if (sort === 'priceAsc') filtered.sort((a, b) => a.preco - b.preco);
+
+    if (sort === 'priceAsc')  filtered.sort((a, b) => a.preco - b.preco);
     if (sort === 'priceDesc') filtered.sort((a, b) => b.preco - a.preco);
-    
+
     renderGrid(filtered);
 }
 
 function clearFilters() {
-    ['minPrice', 'maxPrice'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    const s = document.getElementById('sortOrder'); if (s) s.value = 'default';
+    ['minPrice', 'maxPrice', 'filterCity'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const s = document.getElementById('sortOrder');
+    if (s) s.value = 'default';
     document.querySelectorAll('.store-checkbox').forEach(cb => cb.checked = true);
     renderGrid(allProductsCache);
 }
 
-// Detalhe do produto
+// ============================================
+// DETALHE DO PRODUTO
+// ============================================
+
 window.showDetail = async function(pid) {
     const item = allProductsCache.find(x => x.id == pid || x.id === pid);
     if (!item) return;
-    
-    const user = getSavedUser();
+
+    const user    = getSavedUser();
     const isOwner = user && item.vendedor_id === user.id;
 
-    // Registrar no histórico de acessos
-    accessHistory = accessHistory.filter(id => id != pid); // Remove duplicata antiga
-    accessHistory.unshift(pid); // Adiciona no topo
-    if (accessHistory.length > 20) accessHistory.pop(); // Mantém os últimos 20
+    // Histórico
+    accessHistory = accessHistory.filter(id => id != pid);
+    accessHistory.unshift(pid);
+    if (accessHistory.length > 20) accessHistory.pop();
     localStorage.setItem('electroHistory', JSON.stringify(accessHistory));
 
-    // Preenche o formulário de edição caso o dono queira editar
     if (isOwner) {
-        document.getElementById('prodTitle').value = item.titulo;
+        document.getElementById('prodTitle').value       = item.titulo;
         document.getElementById('prodDescription').value = item.descricao;
-        document.getElementById('prodPrice').value = item.preco;
-        document.getElementById('prodQuantity').value = item.quantidade;
-        document.getElementById('prodCategory').value = item.categoria;
-        document.getElementById('prodImage').value = item.img || '';
-        document.getElementById('prodDelivery').checked = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
-        // Armazena o ID no formulário para saber que é uma edição
+        document.getElementById('prodPrice').value       = item.preco;
+        document.getElementById('prodQuantity').value    = item.quantidade;
+        document.getElementById('prodCategory').value    = item.categoria;
+        document.getElementById('prodImage').value       = item.img || '';
+        document.getElementById('prodDelivery').checked  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
         document.getElementById('announceForm').dataset.editingId = item.id;
 
-        // Ajusta textos do Modal para o modo de edição
         const modalTitle = document.querySelector('#announceModal .modal-title');
-        const submitBtn = document.querySelector('#announceForm button[type="submit"]');
+        const submitBtn  = document.querySelector('#announceForm button[type="submit"]');
         if (modalTitle) modalTitle.textContent = 'Editar Anúncio';
-        if (submitBtn) submitBtn.textContent = 'Salvar Alterações';
+        if (submitBtn)  submitBtn.textContent  = 'Salvar Alterações';
     }
 
-    // Garante que o modal de detalhes do produto seja fechado antes de abrir o de anúncio
-    const productDetailModal = bootstrap.Modal.getInstance(document.getElementById('productDetailModal'));
-    if (productDetailModal) {
-        productDetailModal.hide();
-    }
-
-    // Busca o endereço do vendedor no banco de dados para mostrar na retirada
     let sellerAddress = 'A combinar com o vendedor';
     try {
         const sellerInfo = await supabaseFetch(`users?select=endereco,cidade,estado&id=eq.${item.vendedor_id}`);
         if (sellerInfo?.length > 0) {
             const s = sellerInfo[0];
-            sellerAddress = `${s.endereco || 'Endereço não informado'}, ${s.cidade || ''} - ${s.estado || ''}`;
+            sellerAddress = `${s.endereco || ''}, ${s.cidade || ''} - ${s.estado || ''}`.replace(/^, /, '');
         }
-    } catch (e) {
-        console.error('Erro ao buscar endereço do vendedor:', e);
-    }
+    } catch (e) {}
 
-    // Verifica se o vendedor realiza entrega (padrão é true caso o campo não exista)
-    const realizaEntrega = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
+    const realizaEntrega  = !!(item.realizaentrega);
+    const cidadeVendedor  = item.cidade || 'sua região';
+    const images          = Array.isArray(item.img) ? item.img : [item.img].filter(Boolean);
+    const mainImg         = images[0] || '';
 
-    // Cálculo de reputação do vendedor
+    const thumbnailsHtml = images.length > 1 ? `
+        <div class="d-flex gap-2 mt-2 justify-content-center overflow-auto pb-2">
+            ${images.map(src => `
+                <img src="${src}" class="rounded border" width="58" height="58"
+                     style="object-fit:cover;cursor:pointer;transition:transform 0.2s;"
+                     onmouseover="this.style.transform='scale(1.1)'"
+                     onmouseout="this.style.transform='scale(1)'"
+                     onclick="document.getElementById('mainDetailImg').src='${src}'">`
+            ).join('')}
+        </div>` : '';
+
     const sellerProducts = allProductsCache.filter(p => p.vendedor_id === item.vendedor_id);
-    const totalLikes = sellerProducts.reduce((acc, p) => acc + (p.likes || 0), 0);
-    
-    // Define o nível da barra (1 a 5) baseado nas curtidas totais
-    const level = totalLikes > 50 ? 5 : totalLikes > 20 ? 4 : totalLikes > 10 ? 3 : totalLikes > 2 ? 2 : 1;
-    
-    // Cores do Mercado Livre
-    const colors = ['#F23D35', '#FF8900', '#FFE600', '#ADE07E', '#00A650'];
-    
+    const totalLikes     = sellerProducts.reduce((acc, p) => acc + (parseInt(p.likes) || 0), 0) || 0;
+    const level          = totalLikes > 50 ? 5 : totalLikes > 20 ? 4 : totalLikes > 10 ? 3 : totalLikes > 2 ? 2 : 1;
+    const colors         = ['#F23D35', '#FF8900', '#FFE600', '#ADE07E', '#00A650'];
+
     document.getElementById('productDetailContent').innerHTML = `
         <div class="row g-0 g-md-4">
             <div class="col-md-7 border-end pe-md-4">
-                <div class="text-center mb-4 bg-light rounded p-3 d-flex align-items-center justify-content-center" style="min-height:300px;">
-                    ${item.img 
-                        ? `<img src="${item.img}" class="img-fluid" style="max-height:400px;object-fit:contain" onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size: 5rem;\\'></i>'">`
-                        : `<i class="bi bi-box-seam text-secondary" style="font-size: 5rem;"></i>`
+                <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center" style="min-height:260px;">
+                    ${mainImg
+                        ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:380px;object-fit:contain;transition:transform 0.3s;"
+                               onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'"
+                               onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
+                        : `<i class="bi bi-box-seam text-secondary" style="font-size:4rem;"></i>`
                     }
                 </div>
-                <div class="d-none d-md-block">
-                    <h4>Descrição</h4>
-                    <p class="text-muted">${item.descricao || 'Sem descrição detalhada.'}</p>
+                ${thumbnailsHtml}
+                <div class="d-none d-md-block mt-3">
+                    <h5 class="fw-bold">Descrição</h5>
+                    <p class="text-muted" style="line-height:1.7">${item.descricao || 'Sem descrição detalhada.'}</p>
                 </div>
             </div>
-            <div class="col-md-5">
-                <span class="badge bg-secondary mb-2">${item.categoria || 'Geral'}</span>
-                <h3 class="fw-bold">${item.titulo}</h3>
-                
-                <div class="my-4">
-                    ${item.preco === 0 
-                        ? `<span class="fs-1 fw-bold text-success">GRÁTIS</span>` 
+            <div class="col-md-5 pt-3 pt-md-0">
+                <span class="badge bg-secondary mb-2 small">${item.categoria || 'Geral'}</span>
+                <h4 class="fw-bold">${item.titulo}</h4>
+
+                <div class="my-3">
+                    ${item.preco === 0
+                        ? `<span class="fs-1 fw-bold text-success">GRÁTIS</span>`
                         : `<span class="fs-1 fw-bold">R$ ${Math.floor(item.preco || 0).toLocaleString('pt-BR')}</span>
-                           <span class="fs-5">${((item.preco % 1).toFixed(2)).substring(1)}</span>`
+                           <span class="fs-5">,${((item.preco % 1).toFixed(2)).slice(1)}</span>`
                     }
                 </div>
-                
-                <div class="card bg-light border-0 p-3 mb-3">
+
+                <div class="card bg-light border-0 p-3 mb-3" style="border-radius:10px;">
                     ${realizaEntrega ? `
                         <p class="mb-1 text-success fw-bold"><i class="bi bi-truck me-2"></i> Entrega disponível</p>
-                        <small class="text-muted">Frete calculado no carrinho</small>
+                        <small class="text-muted">Entrega em <strong>${cidadeVendedor}</strong></small>
                     ` : `
-                        <p class="mb-1 text-warning fw-bold"><i class="bi bi-geo-alt me-2"></i> Retirada no local</p>
-                        <small class="text-muted"><strong class="text-dark">Local de retirada:</strong> ${sellerAddress}</small>
+                        <p class="mb-1 fw-bold" style="color:#e67e22;"><i class="bi bi-geo-alt me-2"></i> Retirada no local</p>
+                        <small class="text-muted"><strong>Local:</strong> ${sellerAddress}</small>
                     `}
                 </div>
-                
-                <div class="seller-reputation-ml mb-4">
-                    <p class="small mb-1 fw-bold text-muted">Avaliação do vendedor</p>
-                    <div class="reputation-bar d-flex gap-1 mb-2" style="height: 8px;">
-                        <div class="flex-grow-1 rounded-start" style="background-color: ${level >= 1 ? colors[0] : '#eee'}"></div>
-                        <div class="flex-grow-1" style="background-color: ${level >= 2 ? colors[1] : '#eee'}"></div>
-                        <div class="flex-grow-1" style="background-color: ${level >= 3 ? colors[2] : '#eee'}"></div>
-                        <div class="flex-grow-1" style="background-color: ${level >= 4 ? colors[3] : '#eee'}"></div>
-                        <div class="flex-grow-1 rounded-end" style="background-color: ${level >= 5 ? colors[4] : '#eee'}"></div>
+
+                <div class="mb-3">
+                    <p class="small mb-1 fw-bold text-muted">Reputação do vendedor</p>
+                    <div class="d-flex gap-1 mb-1" style="height:8px;">
+                        ${[1,2,3,4,5].map(i => `
+                            <div class="flex-grow-1 rounded" style="background-color:${level>=i ? colors[i-1] : '#eee'}"></div>
+                        `).join('')}
                     </div>
+                    <small class="text-muted">${totalLikes} curtidas recebidas</small>
                 </div>
 
-                <p><strong>Vendido por:</strong> ${item.loja || 'Vendedor'}</p>
-                <p><strong>Estoque:</strong> ${item.quantidade || 1} unidades</p>
-                
+                <p class="mb-1"><strong>Vendedor:</strong> ${item.loja || 'Não informado'}</p>
+                <p class="mb-3"><strong>Estoque:</strong> ${item.quantidade || 1} ${item.quantidade === 1 ? 'unidade' : 'unidades'}</p>
+
                 ${isOwner ? `
                     <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
                         <i class="bi bi-pencil me-2"></i>Editar Anúncio
                     </button>
                     <button class="btn btn-danger w-100" onclick="window.deleteProduct('${item.id}')">
-                        <i class="bi bi-trash me-2"></i>Excluir
+                        <i class="bi bi-trash me-2"></i>Excluir Anúncio
                     </button>
                 ` : `
                     <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}');window.buyItem(cart.length-1);bootstrap.Modal.getInstance(document.getElementById('productDetailModal')).hide();">
-                        <i class="bi bi-lightning me-2"></i>Solicitar Compra
+                        <i class="bi bi-lightning me-2"></i>Comprar Agora
                     </button>
-                    <button class="btn btn-success w-100" onclick="window.addToCart('${pid}');bootstrap.Modal.getInstance(document.getElementById('productDetailModal')).hide();">
+                    <button class="btn btn-success w-100 mb-2" onclick="window.addToCart('${pid}');bootstrap.Modal.getInstance(document.getElementById('productDetailModal')).hide();">
                         <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
                     </button>
                 `}
-                <button class="btn btn-link text-decoration-none w-100 text-secondary fw-bold small mt-3" onclick="window.shareProduct('${pid}')">
+                <button class="btn btn-link text-decoration-none w-100 text-muted small" onclick="window.shareProduct('${pid}')">
                     <i class="bi bi-share me-2"></i>Compartilhar
                 </button>
             </div>
         </div>`;
-    
+
     new bootstrap.Modal(document.getElementById('productDetailModal')).show();
 };
 
-// Função para preparar o modal de edição
 window.prepareEditProduct = function(pid) {
-    // A lógica de preenchimento já está em showDetail, só precisamos abrir o modal
     new bootstrap.Modal(document.getElementById('announceModal')).show();
 };
-// Login/Cadastro
+
+// ============================================
+// AUTH / USUÁRIO
+// ============================================
+
 function getSavedUser() {
     try { return JSON.parse(localStorage.getItem('electroUser')) || null; }
     catch { return null; }
 }
 
 function updateUI() {
-    const user = getSavedUser();
+    const user   = getSavedUser();
     const logged = !!user;
-    const role = user?.tipo || 'CLIENTE';
+    const role   = user?.tipo || 'CLIENTE';
 
-    document.querySelectorAll('.role-guest').forEach(el => el.classList.toggle('d-none', logged));
+    document.querySelectorAll('.role-guest').forEach(el     => el.classList.toggle('d-none', logged));
     document.querySelectorAll('.role-logged-in').forEach(el => el.classList.toggle('d-none', !logged));
-    
-    // Visibilidade baseada em Cargo
-    document.querySelectorAll('.role-client').forEach(el => el.classList.toggle('d-none', role === 'VENDEDOR'));
-    document.querySelectorAll('.role-seller').forEach(el => el.classList.toggle('d-none', role !== 'VENDEDOR' && role !== 'ADMIN'));
-    document.querySelectorAll('.role-admin').forEach(el => el.classList.toggle('d-none', role !== 'ADMIN'));
+    document.querySelectorAll('.role-client').forEach(el    => el.classList.toggle('d-none', role === 'VENDEDOR'));
+    document.querySelectorAll('.role-seller').forEach(el    => el.classList.toggle('d-none', role !== 'VENDEDOR' && role !== 'ADMIN'));
+    document.querySelectorAll('.role-admin').forEach(el     => el.classList.toggle('d-none', role !== 'ADMIN'));
 
-    // Oculta o banner principal se for Vendedor (Regra: banner apenas no Início do Cliente)
     const heroSection = document.getElementById('heroSection');
     if (heroSection) heroSection.classList.toggle('d-none', role === 'VENDEDOR');
+
+    const shippingLabel = document.getElementById('shippingLabel');
+    if (shippingLabel) {
+        shippingLabel.textContent = logged
+            ? (user.endereco?.substring(0, 20) + '...') || user.cidade || 'Endereço'
+            : 'Faça login';
+    }
+
+    // Sync tema
+    const modoEscuro  = document.body.classList.contains('dark-theme');
+    const themeSwitch = document.getElementById('themeSwitchMobile');
+    if (themeSwitch) themeSwitch.checked = modoEscuro;
+
+    const desktopIcon = document.querySelector('#themeToggle i');
+    if (desktopIcon) {
+        desktopIcon.className = modoEscuro ? 'bi bi-sun' : 'bi bi-moon-stars';
+    }
 
     if (logged && user.nome) {
         const navName = document.getElementById('navUserName');
         if (navName) navName.textContent = user.nome.split(' ')[0];
+
+        const navAvatar = document.getElementById('navUserAvatar');
+        const navIcon   = document.getElementById('navUserIcon');
+        if (navAvatar && navIcon) {
+            if (user.avatar?.startsWith('http')) {
+                navAvatar.src = user.avatar;
+                navAvatar.style.display = 'block';
+                navIcon.style.display = 'none';
+            } else {
+                navAvatar.style.display = 'none';
+                navIcon.style.display = 'block';
+            }
+        }
+
         const mobileName = document.getElementById('mobileWelcomeName');
         if (mobileName) mobileName.textContent = `Olá, ${user.nome.split(' ')[0]}`;
 
-        // Atualiza a foto/ícone no botão do menu mobile (antigos 3 pontos)
+        const mobileUserName = document.getElementById('mobileUserName');
+        if (mobileUserName) mobileUserName.textContent = user.nome.split(' ')[0];
+
         const mobileTrigger = document.getElementById('mobileUserTrigger');
         if (mobileTrigger) {
-            if (user.avatar && user.avatar.startsWith('http')) {
-                mobileTrigger.innerHTML = `<img src="${user.avatar}" style="width: 100%; height: 100%; object-fit: cover;">`;
-            } else {
-                mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-3 text-white"></i>`;
-            }
+            mobileTrigger.innerHTML = user.avatar?.startsWith('http')
+                ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png'">`
+                : `<i class="bi bi-person-circle fs-5 text-white"></i>`;
         }
-    }
-    else {
-        // Se deslogado, volta para o ícone padrão
-        const mobileTrigger = document.getElementById('mobileUserTrigger');
-        if (mobileTrigger) {
-            mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-3 text-white"></i>`;
+
+        const mobileMenuAvatar = document.getElementById('mobileProfileHeader');
+        if (mobileMenuAvatar) {
+            const avatarContent = user.avatar?.startsWith('http')
+                ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png'">`
+                : user.nome ? `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; color: var(--primary-blue);">${user.nome.charAt(0).toUpperCase()}</div>`
+                : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>
+                   </div>`;
+            mobileMenuAvatar.innerHTML = avatarContent;
+        }
+    } else {
+        const navAvatar = document.getElementById('navUserAvatar');
+        const navIcon   = document.getElementById('navUserIcon');
+        if (navAvatar && navIcon) {
+            navAvatar.style.display = 'none';
+            navIcon.style.display = 'block';
+        }
+
+        const mobileTrigger = document.getElementById('mobileUserTrigger'); 
+        if (mobileTrigger) mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-3 text-white"></i>`;
+
+        const mobileMenuAvatar = document.getElementById('mobileProfileHeader');
+        if (mobileMenuAvatar) {
+            mobileMenuAvatar.innerHTML = `<i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>`;
         }
     }
 
+    if (logged) loadNotifications();
     updateCartBadge();
+}
+
+async function loadNotifications() {
+    const user = getSavedUser();
+    const container = document.getElementById('notificacoesList');
+    const badge = document.getElementById('notifBadgeDesktop');
+    
+    let displayNotifs = notificationsCache;
+
+    try {
+        if (user) {
+            const dbNotifs = await supabaseFetch(`notifications?user_id=eq.${user.id}&order=created_at.desc&limit=10`);
+            if (dbNotifs && dbNotifs.length > 0) {
+                displayNotifs = dbNotifs;
+                // Sincroniza cache local com o banco para manter atualizado
+                notificationsCache = dbNotifs;
+                localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+            }
+        }
+    } catch (e) { console.error("Erro ao carregar do banco, usando cache local:", e); }
+
+    if (container) {
+        const notifs = displayNotifs;
+            if (notifs.length === 0) {
+                container.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-bell-slash fs-1 d-block mb-2"></i>Nenhuma notificação</div>';
+            } else {
+                const icons = { 
+                    success: { icon: 'bi-check-circle-fill', color: 'text-success' }, 
+                    error:   { icon: 'bi-x-circle-fill', color: 'text-danger' }, 
+                    info:    { icon: 'bi-info-circle-fill', color: 'text-primary' }, 
+                    warning: { icon: 'bi-exclamation-triangle-fill', color: 'text-warning' } 
+                };
+
+                container.innerHTML = notifs.map(n => `
+                    <div class="list-group-item list-group-item-action border-start-0 border-end-0 py-3 ${n.read ? 'opacity-75' : 'bg-light fw-bold'}">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi ${(icons[n.type] || icons.info).icon} fs-4 ${(icons[n.type] || icons.info).color}"></i>
+                            <div class="flex-grow-1">
+                                <div class="small">${n.message}</div>
+                                <div class="text-muted" style="font-size: 0.65rem;">${new Date(n.created_at).toLocaleString('pt-BR')}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+    }
+    
+    if (badge) {
+        const unread = displayNotifs.filter(n => !n.read).length;
+        badge.textContent = unread;
+        badge.classList.toggle('d-none', unread === 0);
+    }
+    // Badge para o menu mobile "Mais"
+    const mobileBadge = document.getElementById('mobileNotifBadge');
+    if (mobileBadge) {
+        const unread = displayNotifs.filter(n => !n.read).length;
+        mobileBadge.textContent = unread;
+        mobileBadge.classList.toggle('d-none', unread === 0);
+    }
+}
+
+/**
+ * Abre o painel de notificações e marca como lidas
+ */
+window.showNotifications = async function() {
+    const modalEl = document.getElementById('notificacoesModal');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+        loadNotifications();
+    }
 }
 
 function updateCartBadge() {
@@ -388,44 +614,56 @@ function updateCartBadge() {
     });
 }
 
-// Carrinho
+// ============================================
+// CARRINHO
+// ============================================
+
 function renderCart() {
-    const list = document.getElementById('cartItemsList');
+    const list    = document.getElementById('cartItemsList');
     const totalEl = document.getElementById('cartTotalValue');
     if (!list) return;
-    
+
     if (!cart.length) {
-        list.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-cart-x fs-1 d-block mb-3"></i>Carrinho vazio</div>';
+        list.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-cart-x fs-1 d-block mb-3"></i>
+                Seu carrinho está vazio
+            </div>`;
         if (totalEl) totalEl.textContent = 'R$ 0,00';
         updateCartBadge();
         return;
     }
-    
+
     let total = 0;
     list.innerHTML = cart.map((item, i) => {
         total += (item.preco || 0) * (item.qtd || 1);
+        const thumb = Array.isArray(item.img) ? item.img[0] : item.img;
         return `
         <div class="cart-item border rounded p-2 mb-2">
             <div class="d-flex gap-2 align-items-center">
-                <img src="${item.img || 'https://placehold.co/60'}" style="width:50px;height:50px;object-fit:contain">
+                <img src="${thumb || 'https://placehold.co/60'}" style="width:50px;height:50px;object-fit:contain;border-radius:6px;" loading="lazy">
                 <div class="flex-grow-1">
-                    <div class="small fw-bold">${item.titulo}</div>
-                    <div class="text-success fw-bold">R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                    <div class="small fw-bold text-truncate">${item.titulo}</div>
+                    <div class="text-success fw-bold small">R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
                     <div class="d-flex align-items-center gap-2 mt-1">
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, -1)">-</button>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, -1)">−</button>
                         <span class="small fw-bold">${item.qtd || 1}</span>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, 1)">+</button>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, +1)">+</button>
                     </div>
                 </div>
             </div>
-            <div class="d-flex gap-1 mt-1">
-                <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="removeFromCart(${i})"><i class="bi bi-trash"></i></button>
-                <button class="btn btn-sm btn-success flex-grow-1" onclick="buyItem(${i})">Comprar</button>
+            <div class="d-flex gap-1 mt-2">
+                <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="removeFromCart(${i})">
+                    <i class="bi bi-trash"></i>
+                </button>
+                <button class="btn btn-sm btn-success flex-grow-1" onclick="buyItem(${i})">
+                    Comprar
+                </button>
             </div>
         </div>`;
     }).join('');
-    
-    if (totalEl) totalEl.textContent = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+
+    if (totalEl) totalEl.textContent = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
     updateCartBadge();
     localStorage.setItem('electroCart', JSON.stringify(cart));
 }
@@ -434,47 +672,55 @@ window.addToCart = function(productId) {
     const p = allProductsCache.find(x => x.id === productId);
     if (!p) return;
     const exist = cart.find(i => i.id === productId);
-    exist ? exist.qtd++ : cart.push({ ...p, qtd: 1 });
+    if (exist) {
+        if (exist.qtd >= 2) return showToast('Limite de 2 unidades por produto!', 'warning');
+        exist.qtd++;
+    } else {
+        cart.push({ ...p, qtd: 1 });
+    }
     renderCart();
+    showToast(`"${p.titulo.substring(0,30)}..." adicionado ao carrinho!`, 'success');
     bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
 };
 
-window.removeFromCart = function(i) { cart.splice(i, 1); renderCart(); };
+window.removeFromCart = function(i) {
+    cart.splice(i, 1);
+    renderCart();
+};
 
 window.updateCartQty = function(i, delta) {
     const item = cart[i];
     if (!item) return;
     const newQty = (item.qtd || 1) + delta;
-    if (newQty < 1) {
-        window.removeFromCart(i);
-    } else {
-        item.qtd = newQty;
-        renderCart();
+    if (newQty > 2) {
+        showToast('Máximo de 2 unidades permitido!', 'warning');
+        return;
     }
+    newQty < 1 ? window.removeFromCart(i) : (item.qtd = newQty, renderCart());
 };
 
 window.toggleLike = async function(pid) {
-    const idx = likedProducts.indexOf(pid);
+    const idx     = likedProducts.indexOf(pid);
     const product = allProductsCache.find(p => p.id == pid);
     if (!product) return;
 
     if (idx > -1) {
         likedProducts.splice(idx, 1);
         product.likes = Math.max(0, (product.likes || 0) - 1);
+        showToast('Removido dos favoritos', 'info', 2000);
     } else {
         likedProducts.push(pid);
         product.likes = (product.likes || 0) + 1;
+        showToast('Adicionado aos favoritos!', 'success', 2000);
     }
 
     localStorage.setItem('electroLiked', JSON.stringify(likedProducts));
-    
-    // Atualiza o Supabase (requer coluna 'likes' na tabela 'products')
     try {
         await supabaseFetch(`products?id=eq.${pid}`, {
             method: 'PATCH',
             body: JSON.stringify({ likes: product.likes })
         });
-    } catch (e) { console.warn('Erro ao sincronizar curtida:', e); }
+    } catch (e) {}
 
     renderGrid(allProductsCache);
 };
@@ -482,180 +728,160 @@ window.toggleLike = async function(pid) {
 window.buyItem = async function(i) {
     const item = cart[i];
     const user = getSavedUser();
-    if (!user) return alert('Faça login!');
-    cart.splice(i, 1);
-    renderCart();
-    bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
-    alert('✅ Compra solicitada!');
-    if (!user) return alert('Faça login para comprar!');
-    
-    const btn = document.querySelector(`button[onclick="buyItem(${i})"]`);
+    if (!user) { showToast('Faça login para comprar!', 'warning'); return; }
+
+    const btn          = document.querySelector(`button[onclick="buyItem(${i})"]`);
     const originalText = btn?.textContent || 'Comprar';
     if (btn) { btn.disabled = true; btn.textContent = 'Processando...'; }
 
     try {
         const orderId = `ord_${Date.now()}`;
-        const order = {
-            id: orderId,
-            seller_id: item.vendedor_id || 'system',
-            seller_name: item.loja || 'Vendedor',
-            buyer_id: user.id,
-            buyer_name: user.nome,
-            product_id: item.id,
-            product_title: item.titulo,
-            product_img: item.img || '',
-            total: (item.preco || 0) * (item.qtd || 1),
-            quantity: item.qtd || 1,
-            status: 'pending',
-            realiza_entrega: item.realizaentrega ?? item.realizaEntrega ?? true,
-            agree_buyer: false,
-            agree_seller: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+        const order   = {
+            id:             orderId,
+            seller_id:      item.vendedor_id || 'system',
+            seller_name:    item.loja || 'Vendedor',
+            buyer_id:       user.id,
+            buyer_name:     user.nome,
+            product_id:     item.id,
+            product_title:  item.titulo,
+            product_img:    (Array.isArray(item.img) ? item.img[0] : item.img) || '',
+            total:          (item.preco || 0) * (item.qtd || 1),
+            quantity:       item.qtd || 1,
+            status:         'pending',
+            realiza_entrega: item.realizaentrega ?? true,
+            agree_buyer:    false,
+            agree_seller:   false,
+            created_at:     new Date().toISOString(),
+            updated_at:     new Date().toISOString()
         };
 
-        // 1. Salvar pedido no Supabase
-        await supabaseFetch('orders', {
-            method: 'POST',
-            body: JSON.stringify(order)
-        });
+        await supabaseFetch('orders', { method: 'POST', body: JSON.stringify(order) });
 
-        // 2. Criar chat inicial
         await supabaseFetch('chats', {
             method: 'POST',
             body: JSON.stringify({
-                id: `chat_${Date.now()}`,
-                order_id: orderId,
-                seller_id: order.seller_id,
-                seller_name: order.seller_name,
-                buyer_id: order.buyer_id,
-                buyer_name: order.buyer_name,
+                id:           `chat_${Date.now()}`,
+                order_id:     orderId,
+                seller_id:    order.seller_id,
+                seller_name:  order.seller_name,
+                buyer_id:     order.buyer_id,
+                buyer_name:   order.buyer_name,
                 participants: [order.seller_id, order.buyer_id],
                 logistics_agreed: false,
                 messages: [{
-                    senderId: 'system',
-                    text: `🛒 Pedido #${orderId.slice(-8).toUpperCase()} criado!\n📦 ${item.titulo}\n💰 R$ ${order.total.toLocaleString('pt-BR')}\n⏳ Aguardando aprovação do vendedor...`,
+                    senderId:  'system',
+                    text:      `🛒 Pedido #${orderId.slice(-8).toUpperCase()} criado!\n📦 ${item.titulo}\n💰 R$ ${order.total.toLocaleString('pt-BR')}\n⏳ Aguardando aprovação do vendedor...`,
                     timestamp: new Date().toISOString()
                 }]
             })
         });
 
-        // 3. Remover do carrinho e atualizar UI
         cart.splice(i, 1);
         renderCart();
         ordersCache.push(order);
         bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
-        
-        alert('✅ Pedido realizado com sucesso!\n\nAcompanhe em "Minhas Compras".');
+
+        createPersistentNotification(`Pedido #${orderId.slice(-6).toUpperCase()} realizado com sucesso!`, 'success');
         window.renderOrderManagement('buyer');
-        
+
     } catch (err) {
-        console.error('Erro ao finalizar compra:', err);
-        alert('❌ Erro ao processar pedido: ' + (err.message || 'Tente novamente.'));
+        console.error(err);
+        showToast('Erro ao processar pedido: ' + (err.message || 'Tente novamente.'), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = originalText; }
     }
 };
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', () => {
-    // Login
-    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('loginEmail').value.trim();
-        const hash = btoa(document.getElementById('loginPass').value || '');
-        try {
-            const users = await supabaseFetch(`users?select=*&email=eq.${email}&senha_hash=eq.${hash}&limit=1`);
-            if (users?.length) {
-                localStorage.setItem('electroUser', JSON.stringify(users[0]));
-                bootstrap.Modal.getInstance(document.getElementById('loginModal'))?.hide();
-                updateUI();
-                alert(`Bem-vindo, ${users[0].nome}!`);
-            } else {
-                alert('Email ou senha inválidos!');
-            }
-        } catch { alert('Erro ao fazer login.'); }
-    });
+// ============================================
+// TEMA (função global para o switch mobile)
+// ============================================
 
-    // Cadastro
-    document.getElementById('cadastroForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-            await supabaseFetch('users', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id: `user_${Date.now()}`,
-                    tipo: document.querySelector('input[name="cadastroTipo"]:checked')?.value || 'CLIENTE',
-                    nome: document.getElementById('cadastroNome').value.trim(),
-                    cpf: document.getElementById('cadastroCPF').value.trim(),
-                    email: document.getElementById('cadastroEmail').value.trim(),
-                    senha_hash: btoa(document.getElementById('cadastroSenha').value || ''),
-                    endereco: document.getElementById('cadastroEndereco').value.trim(),
-                    cidade: document.getElementById('cadastroCidade').value.trim(),
-                    estado: document.getElementById('cadastroEstado').value
-                })
-            });
-            bootstrap.Modal.getInstance(document.getElementById('cadastroModal'))?.hide();
-            alert('Cadastro realizado! Faça login.');
-        } catch { alert('Erro. Email/CPF já cadastrado?'); }
-    });
+window.toggleTema = function() {
+    document.body.classList.toggle('dark-theme');
+    const modoEscuro = document.body.classList.contains('dark-theme');
+    localStorage.setItem('modoEscuro', modoEscuro);
+    
+    const themeSwitch = document.getElementById('themeSwitchMobile');
+    if (themeSwitch) themeSwitch.checked = modoEscuro;
+
+    const desktopIcon = document.querySelector('#themeToggle i');
+    if (desktopIcon) {
+        desktopIcon.className = modoEscuro ? 'bi bi-sun' : 'bi bi-moon-stars';
+    }
+};
+
+// ============================================
+// INICIALIZAÇÃO
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Aplicar tema salvo
+    if (localStorage.getItem('modoEscuro') === 'true') {
+        document.body.classList.add('dark-theme');
+    }
 
     // Anunciar
     document.getElementById('announceForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const user = getSavedUser();
-        if (!user) return alert('Faça login!');
+        const user  = getSavedUser();
+        if (!user) { showToast('Faça login!', 'warning'); return; }
 
-        const btn = e.target.querySelector('button[type="submit"]');
-        const originalText = btn.textContent;
+        const btn  = e.target.querySelector('button[type="submit"]');
+        const orig = btn.textContent;
         const preco = +document.getElementById('prodPrice').value;
 
-        // Validação de Preço: Não permite menor que 0
-        if (preco < 0) {
-            alert('O preço não pode ser menor que zero!');
-            return;
-        }
-        
+        if (preco < 0) { showToast('O preço não pode ser menor que zero!', 'warning'); return; }
+
         try {
-            btn.disabled = true;
+            btn.disabled    = true;
             btn.textContent = 'Publicando...';
 
-        const editingId = e.target.dataset.editingId;
-        const productData = {
-            id: editingId || `prod_${Date.now()}`,
-            titulo: document.getElementById('prodTitle').value,
-            descricao: document.getElementById('prodDescription').value,
-            preco: preco,
-            quantidade: +document.getElementById('prodQuantity').value,
-            categoria: document.getElementById('prodCategory').value,
-            img: document.getElementById('prodImage').value || '',
-            loja: user.nome,
-            vendedor_id: user.id,
-            realizaentrega: document.getElementById('prodDelivery')?.checked ?? true
-        };
+            const editingId = e.target.dataset.editingId;
 
-        if (editingId) {
-            await supabaseFetch(`products?id=eq.${editingId}`, {
-                method: 'PATCH',
-                body: JSON.stringify(productData)
-            });
-        } else {
-            await supabaseFetch('products', {
-                method: 'POST',
-                body: JSON.stringify(productData)
-            });
-        }
+            let imgsArray = [];
+            for (let n = 1; n <= 3; n++) {
+                const fInput = document.getElementById(`prodImage${n}`);
+                const lInput = document.getElementById(`prodLink${n}`);
+                if (fInput && fInput.files.length > 0) {
+                    imgsArray.push(await fileToBase64(fInput.files[0]));
+                } else if (lInput && lInput.value.trim()) {
+                    imgsArray.push(lInput.value.trim());
+                }
+            }
 
-        bootstrap.Modal.getInstance(document.getElementById('announceModal'))?.hide();
+            if (imgsArray.length === 0 && editingId) {
+                imgsArray = allProductsCache.find(p => p.id === editingId)?.img || [];
+            }
+
+            const productData = {
+                id:           editingId || `prod_${Date.now()}`,
+                titulo:       document.getElementById('prodTitle').value,
+                descricao:    document.getElementById('prodDescription').value,
+                preco:        preco,
+                quantidade:   +document.getElementById('prodQuantity').value,
+                categoria:    document.getElementById('prodCategory').value,
+                img:          imgsArray,
+                loja:         user.nome,
+                vendedor_id:  user.id,
+                realizaentrega: document.getElementById('prodDelivery')?.checked ?? true
+            };
+
+            if (editingId) {
+                await supabaseFetch(`products?id=eq.${editingId}`, { method: 'PATCH', body: JSON.stringify(productData) });
+            } else {
+                await supabaseFetch('products', { method: 'POST', body: JSON.stringify(productData) });
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('announceModal'))?.hide();
             await loadPage();
-            alert(editingId ? 'Anúncio atualizado!' : 'Anúncio publicado!');
+            createPersistentNotification(editingId ? 'Seu anúncio foi atualizado.' : 'Novo anúncio publicado com sucesso!', 'success');
             e.target.reset();
         } catch (err) {
-            console.error('Erro ao publicar:', err);
-            alert('Erro ao salvar anúncio: ' + (err.message || 'Verifique sua conexão ou as colunas do banco.'));
+            console.error(err);
+            showToast('Erro ao publicar anúncio: verifique os campos.', 'error');
         } finally {
-            btn.disabled = false;
-            btn.textContent = originalText;
+            btn.disabled    = false;
+            btn.textContent = orig;
         }
     });
 
@@ -664,91 +890,435 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const user = getSavedUser();
         if (!user) return;
-        const updated = { ...user, nome: document.getElementById('editNome').value.trim() };
+
+        const fileInput   = document.getElementById('editAvatar');
+        let base64Avatar  = user.avatar;
+        if (fileInput.files.length > 0) base64Avatar = await fileToBase64(fileInput.files[0]);
+
+        const updated = { ...user, nome: document.getElementById('editNome').value.trim(), avatar: base64Avatar };
         await supabaseFetch(`users?id=eq.${user.id}`, { method: 'PATCH', body: JSON.stringify(updated) });
         localStorage.setItem('electroUser', JSON.stringify(updated));
         bootstrap.Offcanvas.getInstance(document.getElementById('profileEditOffcanvas'))?.hide();
         updateUI();
-        alert('Perfil atualizado!');
+        createPersistentNotification('Suas informações de perfil foram atualizadas.', 'success');
     });
 
-    // Busca
-    document.getElementById('btnSearch')?.addEventListener('click', () => {
-        loadPage(document.getElementById('searchInput')?.value?.trim() || 'eletronicos');
+    // Busca com debounce
+    let searchTimeout;
+    const searchInput = document.getElementById('searchInput');
+    const btnSearch   = document.getElementById('btnSearch');
+
+    btnSearch?.addEventListener('click', () => {
+        loadPage(searchInput?.value?.trim() || 'eletronicos');
     });
-    document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
+
+    searchInput?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') loadPage(e.target.value.trim() || 'eletronicos');
     });
 
-    // Tema
-    document.getElementById('themeToggle')?.addEventListener('click', () => {
-        document.body.classList.toggle('dark-theme');
-    });
-
-    // Iniciar
-    // Configurar formulário do chat (quando o modal abrir)
-    document.getElementById('chatModal')?.addEventListener('shown.bs.modal', () => {
-        const form = document.getElementById('chatMessageForm');
-        if (form) {
-            window.cancelReplyOrEdit();
-            form.onsubmit = window.sendChatMessage;
+    // Busca ao digitar (debounce 500ms)
+    searchInput?.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const val = e.target.value.trim();
+        if (val.length >= 3) {
+            searchTimeout = setTimeout(() => loadPage(val), 500);
+        } else if (val.length === 0) {
+            loadPage('eletronicos');
         }
     });
 
+    // Tema desktop
+    document.getElementById('themeToggle')?.addEventListener('click', window.toggleTema);
+
+    // Init
     updateUI();
     renderCart();
-    loadPage();
+    window.setupAutoComplete();
+
+    const user = getSavedUser();
+    if (user?.tipo === 'VENDEDOR') {
+        window.renderSellerPanel();
+    } else {
+        loadPage();
+    }
 });
 
-window.loadPage = loadPage;
-window.applyFilters = applyFilters;
-window.clearFilters = clearFilters;
-window.renderCart = renderCart;
-window.logout = () => { localStorage.removeItem('electroUser'); location.reload(); };
+// ============================================
+// UTILITÁRIOS
+// ============================================
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+/**
+ * Converte um arquivo em Base64 de baixa resolução usando Canvas
+ */
+function compressImage(file, maxWidth = 200) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = maxWidth / img.width;
+                canvas.width = maxWidth;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // Retorna JPG com 70% de qualidade para ser bem leve
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+        };
+    });
+}
+
+// ============================================
+// SISTEMA DE AUTOMAÇÃO - CPF, CEP E VALIDAÇÕES
+// ============================================
+
+/** Formata CPF: 000.000.000-00 */
+function formatarCPF(input) {
+    let v = input.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    if (input.value !== v) input.value = v; // Evita loop de input
+    return v.replace(/\D/g, '');
+}
+
+/** Valida dígitos verificadores do CPF */
+function validarCPF(cpf) {
+    cpf = cpf.replace(/\D/g, '');
+    // Removida a validação matemática complexa para ser compatível com a versão antiga (que permitia CPFs de teste).
+    // Validamos apenas se tem os 11 dígitos necessários.
+    return cpf.length === 11;
+}
+
+/** Formata CEP: 00000-000 */
+function formatarCEP(input) {
+    let valor = input.value.replace(/\D/g, '');
+    if (valor.length > 8) valor = valor.substring(0, 8);
+    valor = valor.replace(/(\d{5})(\d)/, '$1-$2');
+    input.value = valor;
+    return valor.replace(/\D/g, '');
+}
+
+/** Busca endereço pelo CEP (ViaCEP) */
+async function buscarEnderecoPorCep(cep) {
+    cep = cep.replace(/\D/g, '');
+    if (cep.length !== 8) return null;
+    try {
+        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await res.json();
+        if (data.erro) { showToast('CEP não encontrado!', 'error'); return null; }
+        return { logradouro: data.logradouro, bairro: data.bairro, cidade: data.localidade, estado: data.uf };
+    } catch { showToast('Erro ao buscar CEP.', 'error'); return null; }
+}
+
+/** Inferência de estado pelo 9º dígito do CPF */
+function buscarEstadoPorCPF(cpf) {
+    cpf = cpf.replace(/\D/g, '');
+    if (cpf.length < 9) return null;
+    const nono = parseInt(cpf.charAt(8));
+    const map = { 0:'RS', 1:'DF', 2:'AM', 3:'CE', 4:'PE', 5:'BA', 6:'MG', 7:'RJ', 8:'SP', 9:'PR' };
+    return map[nono] || 'SP';
+}
+
+/** Configura Listeners de Automação */
+function setupAutoComplete() {
+    // CPF Automático
+    ['v2CadCPF', 'cadastroCPF', 'editCPF'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', (e) => formatarCPF(e.target));
+        el.addEventListener('blur', async (e) => {
+            const clean = e.target.value.replace(/\D/g, '');
+            
+            // Limpa estados se o campo for esvaziado
+            if (!clean) {
+                el.classList.remove('cpf-invalido', 'cpf-valido');
+                return;
+            }
+            
+            if (!validarCPF(clean)) {
+                el.classList.add('cpf-invalido');
+                el.classList.remove('cpf-valido');
+                showToast('CPF Inválido!', 'error', 2000);
+            } else {
+                el.classList.add('cpf-valido');
+                el.classList.remove('cpf-invalido');
+                const uf = buscarEstadoPorCPF(clean);
+                const ufField = document.getElementById('v2CadUF') || document.getElementById('cadastroEstado') || document.getElementById('editEstado');
+                if (ufField && !ufField.value) {
+                    ufField.value = uf;
+                    showToast(`Estado ${uf} detectado pelo CPF`, 'info', 2000);
+                }
+            }
+        });
+    });
+
+    // CEP Automático
+    ['v2CadCEP', 'cadastroCEP', 'editCEP'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', (e) => formatarCEP(e.target));
+        
+        const handler = async () => {
+            const clean = el.value.replace(/\D/g, '');
+            if (clean.length !== 8) return;
+            
+            el.classList.add('buscando-cep');
+            const data = await buscarEnderecoPorCep(clean);
+            el.classList.remove('buscando-cep');
+            
+            if (data) {
+                el.classList.add('cep-valido');
+                preencherCamposEndereco(data, id);
+            }
+        };
+
+        el.addEventListener('blur', handler);
+        el.addEventListener('keypress', (e) => e.key === 'Enter' && (e.preventDefault(), handler()));
+    });
+}
+
+/** Distribui dados de endereço nos campos corretos */
+function preencherCamposEndereco(data, sourceId) {
+    if (sourceId === 'v2CadCEP') {
+        document.getElementById('v2CadEnd').value = data.logradouro;
+        document.getElementById('v2CadBairro').value = data.bairro || '';
+        document.getElementById('v2CadCid').value = data.cidade;
+        document.getElementById('v2CadUF').value = data.estado;
+        document.getElementById('v2CadNum')?.focus();
+    } else {
+        const end = document.getElementById('cadastroEndereco') || document.getElementById('editEndereco');
+        const cid = document.getElementById('cadastroCidade') || document.getElementById('editCidade');
+        const est = document.getElementById('cadastroEstado') || document.getElementById('editEstado');
+        
+        if (end) end.value = data.logradouro + (data.bairro ? ` - ${data.bairro}` : '');
+        if (cid) cid.value = data.cidade;
+        if (est) est.value = data.estado;
+    }
+    showToast('Endereço preenchido via CEP!', 'success', 2000);
+}
+
+// ============================================
+// EXPORTS GLOBAIS
+// ============================================
+
+window.loadPage          = loadPage;
+window.applyFilters      = applyFilters;
+window.clearFilters      = clearFilters;
+window.renderCart        = renderCart;
+window.showToast         = showToast;
+window.logout            = () => {
+    localStorage.removeItem('electroUser');
+    showToast('Sessão encerrada com sucesso', 'info', 2000);
+    setTimeout(() => location.reload(), 600);
+};
+
 window.showProfileEdit = () => {
     const user = getSavedUser();
-    if (!user) return;
-    document.getElementById('editNome').value = user.nome || '';
-    document.getElementById('editEmail').value = user.email || '';
-    document.getElementById('editCPF').value = user.cpf || '';
+    if (!user) {
+        window.showAuthScreen('login');
+        return;
+    }
+    const editNome = document.getElementById('editNome');
+    if (editNome) editNome.value = user.nome || '';
+
+    document.getElementById('editEmail').value    = user.email    || '';
+    document.getElementById('editCPF').value      = user.cpf      || '';
     document.getElementById('editEndereco').value = user.endereco || '';
-    document.getElementById('editCidade').value = user.cidade || '';
-    document.getElementById('editEstado').value = user.estado || '';
-    new bootstrap.Offcanvas(document.getElementById('profileEditOffcanvas')).show();
+    document.getElementById('editCidade').value   = user.cidade   || '';
+    document.getElementById('editEstado').value   = user.estado   || '';
+    document.getElementById('editPagamento').value = user.pagamento || 'pix';
+
+    const preview = document.getElementById('profilePreview');
+    if (preview) {
+        preview.src = user.avatar?.startsWith('http') ? user.avatar : 'https://via.placeholder.com/100';
+    }
+
+    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas')).show();
 };
+
+window.showAuthScreen = function(mode = 'login', autoCloseMenu = true) {
+  const overlay = document.getElementById('authScreen');
+  if (!overlay) return;
+  overlay.classList.remove('d-none');
+  window.toggleAuthMode(mode);
+};
+
+window.hideAuthScreen = function() {
+  const overlay = document.getElementById('authScreen');
+  if (overlay) overlay.classList.add('d-none');
+};
+
+window.toggleAuthMode = function(mode) {
+    const body = document.body;
+    
+    // Remove classes anteriores
+    body.classList.remove('sign-in-js', 'sign-up-js');
+    
+    // Força reflow para reiniciar animações
+    void body.offsetWidth;
+    
+    // Aplica nova classe
+    if (mode === 'login') {
+        body.classList.add('sign-in-js');
+    } else {
+        body.classList.add('sign-up-js');
+    }
+};
+
+window.toggleAuthPass = function(inputId, iconEl) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isPass = input.type === 'password';
+  input.type = isPass ? 'text' : 'password';
+  if (iconEl) {
+      iconEl.classList.toggle('bi-eye', !isPass);
+      iconEl.classList.toggle('bi-eye-slash', isPass);
+  }
+};
+
+// Formulários da tela de auth
+document.addEventListener('submit', async (e) => {
+    if (e.target.id === 'cadFormAnim') {
+        e.preventDefault();
+        const btn  = e.target.querySelector('button[type="submit"]');
+        const orig = btn?.textContent;
+        if (btn) { btn.disabled = true; btn.textContent = 'Criando conta...'; }
+
+        const avatarInput = document.getElementById('v2CadAvatar');
+        const avatarLink  = document.getElementById('v2CadAvatarLink');
+        let base64Avatar  = '';
+
+        // Prioridade 1: Arquivo local (com compressão)
+        if (avatarInput?.files.length > 0) {
+            base64Avatar = await compressImage(avatarInput.files[0], 200); // 200px de largura
+        } 
+        // Prioridade 2: Link externo
+        else if (avatarLink && avatarLink.value.trim()) {
+            base64Avatar = avatarLink.value.trim();
+        }
+
+        const payload = {
+            id:       `user_${Date.now()}`,
+            tipo:     document.getElementById('v2CadTipo').value,
+            nome:     document.getElementById('v2CadNome').value,
+            cpf:      document.getElementById('v2CadCPF').value.replace(/\D/g, ''),
+            email:    document.getElementById('v2CadEmail').value,
+            senha_hash: btoa(document.getElementById('v2CadPass').value),
+            endereco: `${document.getElementById('v2CadEnd').value}, ${document.getElementById('v2CadNum').value} - ${document.getElementById('v2CadBairro').value}`,
+            cidade:   document.getElementById('v2CadCid').value,
+            estado:   document.getElementById('v2CadUF').value,
+            avatar:   base64Avatar,
+            pagamento: document.getElementById('v2CadPagamento').value
+        };
+
+        // Validação de segurança do CPF antes de enviar ao banco
+        if (!validarCPF(payload.cpf)) {
+            showToast('CPF inválido! Por favor, verifique os números.', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = orig; }
+            return;
+        }
+
+        try {
+            await supabaseFetch('users', { method: 'POST', body: JSON.stringify(payload) });
+            
+            // LOGIN AUTOMÁTICO: Salva o novo usuário localmente
+            localStorage.setItem('electroUser', JSON.stringify(payload));
+            
+            // Atualiza a interface imediatamente e fecha a tela de auth
+            updateUI();
+            window.hideAuthScreen();
+
+            await createPersistentNotification(`Bem-vindo à ElectroMarket, ${payload.nome.split(' ')[0]}!`, 'success', payload.id);
+            setTimeout(() => location.reload(), 1000);
+        } catch (err) {
+            console.error("Erro no cadastro:", err);
+            showToast('Erro no cadastro. Email/CPF já cadastrado?', 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = orig; }
+        }
+    }
+
+    if (e.target.id === 'loginFormAnimV2') {
+        e.preventDefault();
+        const btn  = e.target.querySelector('button[type="submit"]');
+        const orig = btn?.textContent;
+        if (btn) { btn.disabled = true; btn.textContent = 'Entrando...'; }
+
+        const email = document.getElementById('v2LogEmail').value;
+        const hash  = btoa(document.getElementById('v2LogPass').value);
+
+        try {
+            const users = await supabaseFetch(`users?select=*&email=eq.${email}&senha_hash=eq.${hash}&limit=1`);
+            if (users?.length) {
+                localStorage.setItem('electroUser', JSON.stringify(users[0]));
+                window.hideAuthScreen();
+                
+                await createPersistentNotification(`Novo acesso detectado em sua conta.`, 'info', users[0].id);
+                setTimeout(() => location.reload(), 400);
+            } else {
+                showToast('Email ou senha incorretos.', 'error');
+            }
+        } catch { showToast('Erro de conexão.', 'error'); }
+        finally {
+            if (btn) { btn.disabled = false; btn.textContent = orig; }
+        }
+    }
+});
+
+// ============================================
+// FAVORITOS E HISTÓRICO
+// ============================================
+
 window.renderLikedProducts = () => {
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
     document.getElementById('gridTitle').textContent = 'Seus Favoritos';
     renderGrid(allProductsCache.filter(p => likedProducts.includes(p.id)));
+    window.closeMobileMenu();
 };
+
 window.renderAccessHistory = () => {
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
     document.getElementById('gridTitle').textContent = 'Vistos Recentemente';
-    
-    // Busca os produtos do cache seguindo a ordem do histórico (IDs salvos no localStorage)
     const historyProducts = accessHistory.map(id => allProductsCache.find(p => p.id == id)).filter(Boolean);
     renderGrid(historyProducts);
     window.closeMobileMenu();
 };
-window.closeMobileMenu = () => bootstrap.Offcanvas.getInstance(document.getElementById('mobileMenu'))?.hide();
 
-// Gestão de Pedidos e Solicitações
+window.closeMobileMenu = () =>
+    bootstrap.Offcanvas.getInstance(document.getElementById('mobileMenu'))?.hide();
+
+// ============================================
+// GESTÃO DE PEDIDOS
+// ============================================
+
 window.renderOrderManagement = async function(type = 'buyer') {
     const user = getSavedUser();
-    if (!user) return alert('Faça login!');
+    if (!user) { showToast('Faça login!', 'warning'); return; }
 
-    const grid = document.getElementById('productsGrid');
-    const hero = document.getElementById('heroSection');
-    if (hero) hero.classList.add('d-none');
-    
+    const grid  = document.getElementById('productsGrid');
+    const hero  = document.getElementById('heroSection');
     const title = document.getElementById('gridTitle');
-    grid.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>';
+    if (hero) hero.classList.add('d-none');
 
-    // Reset do layout de grid para modo lista
-    grid.style.display = 'block'; 
+    grid.style.display = 'block';
     grid.classList.add('order-view-active');
+    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Carregando pedidos...</p></div>';
 
     try {
         let path = 'orders?select=*';
@@ -760,72 +1330,79 @@ window.renderOrderManagement = async function(type = 'buyer') {
             title.textContent = type === 'seller_requests' ? 'Solicitações Pendentes' : 'Minhas Vendas';
         }
 
-        let orders = await supabaseFetch(path); // Busca os pedidos
+        let orders = await supabaseFetch(path);
         ordersCache = orders;
 
         if (type === 'seller_requests') orders = orders.filter(o => o.status === 'pending');
         else if (type === 'seller_sales') orders = orders.filter(o => o.status !== 'pending');
 
         if (!orders.length) {
-            grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Nenhum pedido encontrado.</h5></div>';
+            grid.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                    <h5>Nenhum pedido encontrado.</h5>
+                </div>`;
             return;
         }
 
         grid.innerHTML = orders.map(order => {
-            const st = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
+            const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
             const isPending = order.status === 'pending';
             const isCancelled = order.status === 'cancelled';
-            const isBuyer = type === 'buyer';
+            const isBuyer   = type === 'buyer';
 
             return `
             <div class="col-12 col-xl-10 mx-auto mb-3">
-                <div class="card p-3 shadow-sm border-0" style="border-radius: 15px;">
+                <div class="card p-3 shadow-sm border-0" style="border-radius:14px;">
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-center align-items-md-start">
-                        <img src="${order.product_img || ''}" class="rounded border" 
-                             style="width:100px;height:100px;object-fit:cover;" 
-                             onerror="this.src='https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=100'">
-                        
+                        <img src="${order.product_img || ''}" class="rounded border"
+                             style="width:90px;height:90px;object-fit:cover;"
+                             onerror="this.src='https://placehold.co/90'">
+
                         <div class="flex-grow-1 w-100">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
-                                    <h6 class="fw-bold mb-1" style="font-size: 1.05rem;">${order.product_title}</h6>                                    
-                                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                                    <h6 class="fw-bold mb-1">${order.product_title}</h6>
+                                    <p class="text-muted mb-0" style="font-size:0.78rem;">
                                         ${isBuyer ? `Vendedor: ${order.seller_name}` : `Comprador: ${order.buyer_name}`}<br>
                                         ID: #${order.id.slice(-6).toUpperCase()}
                                     </p>
                                 </div>
-                                <span class="badge ${st.class} py-2 px-3 rounded-pill" style="font-size: 0.75rem;">${st.text}</span>
+                                <span class="badge ${st.class} py-2 px-3 rounded-pill" style="font-size:0.7rem;">${st.text}</span>
                             </div>
-                            
-                            <p class="text-dark fw-bold mb-3" style="font-size: 0.95rem;">
-                                Total: R$ ${parseFloat(order.total).toLocaleString('pt-BR')} 
-                                <span class="text-muted fw-normal" style="font-size: 0.8rem;">(${order.quantity} un.)</span><br>
+
+                            <p class="fw-bold mb-3" style="font-size:0.92rem;">
+                                R$ ${parseFloat(order.total).toLocaleString('pt-BR')}
+                                <span class="text-muted fw-normal" style="font-size:0.78rem;">(${order.quantity} un.)</span>
                             </p>
 
-                            <div class="d-flex flex-wrap gap-2 justify-content-end align-items-center">
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 ${isPending && type === 'seller_requests' ? `
-                                    <button class="btn btn-sm btn-success px-4 fw-bold shadow-sm" onclick="window.updateOrderStatus('${order.id}', 'accepted')">Aceitar</button>
-                                    <button class="btn btn-sm btn-danger px-4 fw-bold shadow-sm" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">Recusar</button>
-                                ` : ''}
-
-                                ${!isPending && !isCancelled ? `
-                                    <button class="btn btn-sm btn-primary px-4 fw-bold shadow-sm" onclick="window.showChat('${order.id}')">
-                                        <i class="bi bi-chat-dots me-1"></i> Abrir Chat
+                                    <button class="btn btn-sm btn-success px-4 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                                        <i class="bi bi-check-lg me-1"></i>Aceitar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger px-4" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                                        Recusar
                                     </button>
                                 ` : ''}
-
-                                ${isPending ? `
-                                    <span class="badge bg-warning text-dark py-2 px-3 rounded-pill">⏳ Aguardando aprovação</span>
-                                    ${type === 'buyer' ? `
-                                        <button class="btn btn-sm btn-danger px-3 fw-bold shadow-sm rounded-pill" onclick="window.cancelOrderBuyer('${order.id}')">Cancelar</button>
-                                    ` : ''}
+                                ${isPending && type === 'buyer' ? `
+                                    <button class="btn btn-sm btn-outline-danger px-3" onclick="window.cancelOrderBuyer('${order.id}')">
+                                        Cancelar Pedido
+                                    </button>
                                 ` : ''}
+                                ${!isPending && !isCancelled ? `
+                                    <button class="btn btn-sm btn-primary px-4 fw-bold" onclick="window.showChat('${order.id}')">
+                                        <i class="bi bi-chat-dots me-1"></i>Abrir Chat
+                                    </button>
+                                ` : ''}
+                                ${isPending ? `<span class="badge bg-warning text-dark mt-1">⏳ Aguardando aprovação</span>` : ''}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>`;
         }).join('');
+
         window.closeMobileMenu();
     } catch (e) {
         grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Erro ao carregar pedidos.</h5></div>';
@@ -838,31 +1415,31 @@ window.updateOrderStatus = async function(orderId, newStatus) {
             method: 'PATCH',
             body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
         });
-        alert(`Pedido atualizado para: ${newStatus}`);
+        showToast(`Pedido ${newStatus === 'accepted' ? 'aceito' : 'recusado'}!`, newStatus === 'accepted' ? 'success' : 'info');
         window.renderOrderManagement(newStatus === 'accepted' ? 'seller_sales' : 'seller_requests');
-    } catch (e) { alert('Erro ao atualizar pedido.'); }
+    } catch { showToast('Erro ao atualizar pedido.', 'error'); }
 };
 
 window.cancelOrderBuyer = async function(orderId) {
-    if (!confirm('Tem certeza que deseja cancelar seu pedido?')) return;
+    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
     try {
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
             body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
         });
-        alert('Pedido cancelado!');
+        showToast('Pedido cancelado!', 'info');
         window.renderOrderManagement('buyer');
-    } catch (e) { alert('Erro ao cancelar pedido.'); }
+    } catch { showToast('Erro ao cancelar pedido.', 'error'); }
 };
 
 window.deleteProduct = async function(pid) {
     if (!confirm('Tem certeza que deseja excluir este anúncio?')) return;
     try {
         await supabaseFetch(`products?id=eq.${pid}`, { method: 'DELETE' });
-        alert('Produto removido!');
+        showToast('Produto removido!', 'success');
         bootstrap.Modal.getInstance(document.getElementById('productDetailModal'))?.hide();
         loadPage();
-    } catch (e) { alert('Erro ao excluir produto.'); }
+    } catch { showToast('Erro ao excluir produto.', 'error'); }
 };
 
 window.resetAnnounceModal = function() {
@@ -870,453 +1447,219 @@ window.resetAnnounceModal = function() {
     if (form) {
         form.reset();
         delete form.dataset.editingId;
-
-        // Reseta os textos do Modal para o padrão original
         const modalTitle = document.querySelector('#announceModal .modal-title');
-        const submitBtn = document.querySelector('#announceForm button[type="submit"]');
+        const submitBtn  = document.querySelector('#announceForm button[type="submit"]');
         if (modalTitle) modalTitle.textContent = 'O que você quer vender?';
-        if (submitBtn) submitBtn.textContent = 'Publicar Anúncio';
+        if (submitBtn)  submitBtn.textContent   = 'Publicar Anúncio';
     }
 };
 
 // ============================================
-// CHAT COMPLETO - COM IMAGENS, LINKS E ARQUIVOS
+// CHAT COMPLETO
 // ============================================
 
 window.showChat = async function(orderId) {
     const user = getSavedUser();
-    if (!user) return alert('Faça login!');
+    if (!user) { showToast('Faça login!', 'warning'); return; }
 
-    // Buscar pedido
     let order = ordersCache.find(o => o.id === orderId);
     if (!order) {
         const result = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
         order = result[0];
     }
-    if (!order) return alert('Pedido não encontrado.');
+    if (!order) { showToast('Pedido não encontrado.', 'error'); return; }
 
     currentChat = orderId;
 
-    // 1. Atualiza o resumo do topo (Onde aparecia Produto R$ 0,00)
-    const titleEl = document.getElementById('chatProdTitle');
-    const priceEl = document.getElementById('chatProdPrice');
-    const imgEl = document.getElementById('chatProdImg');
-    const orderIdEl = document.getElementById('chatOrderIdDisplay');
-
-    if (titleEl) titleEl.textContent = order.product_title;
-    if (priceEl) priceEl.textContent = `R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-    if (imgEl) imgEl.src = order.product_img || 'https://placehold.co/45?text=📦';
-    if (orderIdEl) orderIdEl.textContent = `#${order.id.slice(-8).toUpperCase()}`;
-
-    // Garante que a área de ações comece fechada ao abrir o chat
-    const actionsArea = document.getElementById('chatActionsArea');
-    if (actionsArea) actionsArea.classList.add('d-none');
-
-    // Nome do outro participante
     const otherName = user.id === order.buyer_id ? order.seller_name : order.buyer_name;
     document.getElementById('chatPartnerNameHeader').textContent = otherName || 'Chat';
-    document.getElementById('chatPartnerAvatar').src = 
+    document.getElementById('chatPartnerAvatar').src =
         `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`;
 
-    // Mostrar modal
+    // Popula resumo do produto
+    document.getElementById('chatProdImg').src = order.product_img || 'https://placehold.co/45?text=📦';
+    document.getElementById('chatProdTitle').textContent = order.product_title || 'Produto';
+    document.getElementById('chatProdPrice').textContent = `R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+    document.getElementById('chatOrderIdDisplay').textContent = `#${order.id.slice(-6).toUpperCase()}`;
+    document.getElementById('chatOrderIdDisplayHeader').textContent = `#${order.id.slice(-6).toUpperCase()}`;
+
     new bootstrap.Modal(document.getElementById('chatModal')).show();
-    
-    // Carregar mensagens
     await loadChatMessages(orderId);
 };
 
 async function loadChatMessages(orderId) {
     const container = document.getElementById('chatMessagesContainer');
-    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>';
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando mensagens...</p></div>';
 
     try {
         const user = getSavedUser();
-        
-        // Buscar pedido atualizado
-        const orderResult = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
-        const order = orderResult?.[0];
-        
+        let order  = ordersCache.find(o => o.id === orderId);
         if (!order) {
-            container.innerHTML = '<div class="text-center py-4 text-danger">Pedido não encontrado</div>';
-            return;
+            const r = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+            order   = r?.[0];
         }
 
-        // Atualizar cache
-        const idx = ordersCache.findIndex(o => o.id === orderId);
-        if (idx >= 0) ordersCache[idx] = order;
-        else ordersCache.push(order);
-
-        // Buscar ou criar chat
         let chatResult = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatResult?.[0];
+        let chat       = chatResult?.[0];
 
-        // Se não existe chat, cria um
-        if (!chat) {
+        if (!chat && order) {
             const newChat = {
-                id: `chat_${Date.now()}`,
-                order_id: orderId,
-                seller_id: order.seller_id,
-                seller_name: order.seller_name,
-                buyer_id: order.buyer_id,
-                buyer_name: order.buyer_name,
+                id:           `chat_${Date.now()}`,
+                order_id:     orderId,
+                seller_id:    order.seller_id,
+                seller_name:  order.seller_name,
+                buyer_id:     order.buyer_id,
+                buyer_name:   order.buyer_name,
                 participants: [order.seller_id, order.buyer_id],
-                messages: [],
+                messages:     [{
+                    senderId:  'system',
+                    text:      `🛒 Pedido #${orderId.slice(-8).toUpperCase()}`,
+                    timestamp: new Date().toISOString(),
+                    type:      'system'
+                }],
                 logistics_agreed: false
             };
             await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
             chat = newChat;
         }
 
-        // ============================================
-        // MONTAR HTML DO CHAT
-        // ============================================
-        let html = '';
-
-        // Criar ou atualizar container de preview do input (barra de responder/editar)
-        if (!document.getElementById('chatInputPreview')) {
-            const form = document.getElementById('chatMessageForm');
-            const preview = document.createElement('div');
-            preview.id = 'chatInputPreview';
-            preview.className = 'p-2 bg-light border-bottom d-flex justify-content-between align-items-center d-none';
-            form?.parentNode.insertBefore(preview, form);
+        if (!chat?.messages) {
+            container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
+            return;
         }
 
-        // 💬 MENSAGENS
-        if (chat.messages && chat.messages.length > 0) {
-            html += chat.messages.map((msg, index) => {
-                // Mensagem do sistema
-                if (msg.type === 'system' || msg.senderId === 'system') {
-                    return `<div class="text-center my-3">
-                        <span class="badge bg-light text-dark px-3 py-2">${msg.text}</span>
-                    </div>`;
-                }
-
-                const isMe = msg.senderId === user.id || msg.senderId === String(user.id);
-                
-                const replyHtml = msg.replyTo ? `
-                    <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-25'} small border-start border-4 border-info">
-                        <div class="fw-bold" style="font-size: 0.7rem;">${msg.replyTo.senderName}</div>
-                        <div class="text-truncate" style="max-height: 20px;">${msg.replyTo.text}</div>
-                    </div>
-                ` : '';
-
-                return `
-                <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-3">
-                    <div class="p-3 rounded shadow-sm ${isMe ? 'bg-primary text-white' : 'bg-light'}" 
-                         style="max-width: 75%; word-break: break-word;">
-                        <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
-                            <small class="fw-bold" style="font-size: 0.7rem;">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</small>
-                            <div class="dropdown">
-                                <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                    <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startReply(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>
-                                    ${isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startEdit(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
-                                </ul>
-                            </div>
-                        </div>
-
-                        ${replyHtml}
-
-                        ${msg.image ? `
-                            <img src="${msg.image}" class="img-fluid rounded mb-2" 
-                                 style="max-width: 250px; cursor: pointer;" 
-                                 onclick="window.openImageFull('${msg.image}')">
-                        ` : ''}
-                        
-                        ${msg.file ? `
-                            <div class="d-flex align-items-center gap-2 p-2 bg-white rounded mb-2">
-                                <i class="bi bi-file-earmark fs-4"></i>
-                                <a href="${msg.file.url}" target="_blank" class="small text-primary">
-                                    📎 ${msg.file.name || 'Arquivo anexado'}
-                                </a>
-                            </div>
-                        ` : ''}
-                        
-                        <div style="white-space: pre-wrap;">${formatLinks(msg.text)}</div>
-                        
-                        <div style="font-size: 0.65rem;" class="text-end mt-1 ${isMe ? 'text-white-50' : 'text-muted'} d-flex justify-content-end gap-1">
-                            ${msg.edited ? '<span>(editada)</span>' : ''}
-                            <span>${new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                    </div>
+        container.innerHTML = chat.messages.map(msg => {
+            if (msg.type === 'system' || msg.senderId === 'system') {
+                return `<div class="text-center my-3">
+                    <span class="badge bg-light text-dark border px-3 py-2" style="font-size:0.72rem;">${msg.text}</span>
                 </div>`;
-            }).join('');
-        } else {
-            html += '<div class="text-center py-4 text-muted">📝 Nenhuma mensagem ainda. Envie a primeira!</div>';
-        }
+            }
 
-        container.innerHTML = html;
+            const isMe = msg.senderId === user.id;
+            return `
+            <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-3">
+                <div class="p-3 rounded shadow-sm ${isMe ? 'bg-primary text-white' : 'bg-light'}"
+                     style="max-width:75%;word-break:break-word;border-radius:${isMe?'18px 18px 2px 18px':'18px 18px 18px 2px'}!important;">
+
+                    ${msg.image ? `
+                        <img src="${msg.image}" class="img-fluid rounded mb-2"
+                             style="max-width:220px;cursor:pointer;"
+                             onclick="window.openImageFull('${msg.image}')">
+                    ` : ''}
+
+                    ${msg.file ? `
+                        <div class="d-flex align-items-center gap-2 p-2 bg-white rounded mb-2" style="border-radius:8px;">
+                            <i class="bi bi-file-earmark fs-5"></i>
+                            <a href="${msg.file.url}" target="_blank" class="small text-primary">
+                                📎 ${msg.file.name || 'Arquivo'}
+                            </a>
+                        </div>
+                    ` : ''}
+
+                    <div style="white-space:pre-wrap;">${formatLinks(msg.text)}</div>
+                    <div style="font-size:0.62rem;" class="text-end mt-1 ${isMe?'text-white-50':'text-muted'}">
+                        ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
         container.scrollTop = container.scrollHeight;
-
-        // Atualizar área de logística e status
         updateChatLogistics(order, user);
 
     } catch (e) {
-        console.error('❌ Erro ao carregar chat:', e);
+        console.error(e);
         container.innerHTML = `
             <div class="text-center py-4 text-danger">
-                <i class="bi bi-exclamation-triangle fs-1"></i>
+                <i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i>
                 <p>Erro ao carregar mensagens</p>
-                <small>${e.message}</small>
-                <br>
-                <button class="btn btn-primary btn-sm mt-2" onclick="loadChatMessages('${orderId}')">Tentar Novamente</button>
+                <button class="btn btn-primary btn-sm" onclick="loadChatMessages('${orderId}')">Tentar novamente</button>
             </div>`;
     }
 }
 
 function formatLinks(text) {
     if (!text) return '';
-    // Detecta URLs e transforma em links clicáveis
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.replace(urlRegex, (url) => {
-        return `<a href="${url}" target="_blank" style="color: inherit; text-decoration: underline;">🔗 ${url}</a>`;
-    });
+    return text.replace(urlRegex, url =>
+        `<a href="${url}" target="_blank" class="text-info text-decoration-underline small">🔗 ${url.substring(0,40)}${url.length>40?'...':''}</a>`
+    );
 }
 
 function updateChatLogistics(order, user) {
-    // Atualizar a barra de status visual
-    const statusBar = document.getElementById('orderStatusBar');
-    if (statusBar) {
-        const st = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
-        statusBar.innerHTML = `<div class="badge ${st.class} w-100 py-2 shadow-sm">${st.text}</div>`;
-    }
+    const logisticsArea    = document.getElementById('logisticsAgreementArea');
+    const logisticsButtons = document.getElementById('logisticsButtons');
+    if (!logisticsArea || !logisticsButtons) return;
 
-    const actionsArea = document.getElementById('chatActionsArea');
-    if (!actionsArea) return;
-    actionsArea.innerHTML = '';
-
-    const isBuyer = user.id === order.buyer_id;
-
-    // Combinar logística
     if (['accepted', 'agreement'].includes(order.status)) {
-        const buyerAgreed = order.agree_buyer;
-        const sellerAgreed = order.agree_seller;
-        const userAgreed = isBuyer ? buyerAgreed : sellerAgreed;
+        logisticsArea.classList.remove('d-none');
+        const isBuyer    = user.id === order.buyer_id;
+        const userAgreed = isBuyer ? order.agree_buyer : order.agree_seller;
 
         if (!userAgreed) {
-            actionsArea.innerHTML = `
-                <p class="small fw-bold mb-2"><i class="bi bi-truck me-1"></i> Combine a entrega:</p>
-                <div class="d-flex gap-2 flex-wrap">
-                    <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">🏪 Retirada</button>
-                    <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">🚚 Entrega</button>
-                    <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">📱 App</button>
-                </div>`;
+            logisticsButtons.innerHTML = `
+                <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">🏪 Retirada no Local</button>
+                <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">🚚 Entrega pelo Vendedor</button>
+                <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">📱 App de Entrega</button>`;
         } else {
-            actionsArea.innerHTML = `<div class="alert alert-info mb-0 small py-2">⏳ Aguardando a outra parte confirmar...</div>`;
+            logisticsButtons.innerHTML = `<div class="alert alert-info mb-0 small w-100">⏳ Aguardando a outra parte confirmar...</div>`;
         }
+    } else {
+        logisticsArea.classList.add('d-none');
     }
 
-    // Confirmar recebimento (comprador)
-    if (['shipping', 'awaiting_pickup'].includes(order.status) && isBuyer) {
-        actionsArea.innerHTML = `
-            <p class="small fw-bold mb-2">📦 O produto chegou?</p>
-            <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-success flex-grow-1 fw-bold" onclick="window.confirmReceipt('${order.id}')">
-                    <i class="bi bi-check-circle me-1"></i> Sim, recebi!
-                </button>
-                <button class="btn btn-sm btn-outline-warning" onclick="window.reportProblem('${order.id}')">
-                    ⚠️ Reportar
-                </button>
+    const statusBar = document.getElementById('orderStatusBar');
+    if (statusBar && order) {
+        const statusMap = {
+            'pending':         '⏳ Aguardando Aprovação',
+            'accepted':        '✅ Aprovado - Combinar Entrega',
+            'agreement':       '🤝 Definindo Logística',
+            'shipping':        '📦 Em Transporte',
+            'awaiting_pickup': '📍 Aguardando Retirada',
+            'finished':        '🎉 Finalizado',
+            'cancelled':       '❌ Cancelado',
+            'dispute':         '⚠️ Em Disputa'
+        };
+        const alertClass = order.status === 'finished' ? 'success' : order.status === 'cancelled' ? 'danger' : 'info';
+        statusBar.innerHTML = `
+            <div class="alert alert-${alertClass} mb-0 py-2 text-center small">
+                ${statusMap[order.status] || order.status}
             </div>`;
-    }
-
-    // Pedido finalizado
-    if (order.status === 'finished') {
-        actionsArea.innerHTML = `<div class="alert alert-success mb-0 py-2 text-center small fw-bold">🎉 Negociação finalizada com sucesso!</div>`;
-    }
-
-    // Pedido cancelado
-    if (order.status === 'cancelled') {
-        actionsArea.innerHTML = `<div class="alert alert-danger mb-0 py-2 text-center small fw-bold">❌ Este pedido foi cancelado.</div>`;
-    }
-
-    // Botão cancelar (sempre visível enquanto ativo)
-    if (!['finished', 'cancelled', 'dispute'].includes(order.status)) {
-        actionsArea.innerHTML += `
-            <button class="btn btn-link btn-sm text-danger text-decoration-none mt-2 p-0 fw-bold" 
-                    onclick="window.cancelOrderFromChat('${order.id}')">
-                <i class="bi bi-x-circle me-1"></i> Cancelar Pedido
-            </button>`;
     }
 }
 
-// --- Novas Funções de Status ---
-
-window.confirmReceipt = async function(orderId) {
-    if (!confirm('Você confirma que recebeu o produto conforme anunciado? Isso liberará o pagamento.')) return;
-    try {
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
-        });
-        
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
-        if (chat) {
-            chat.messages.push({ senderId: 'system', text: `✅ Comprador confirmou o recebimento. Pedido finalizado!`, timestamp: new Date().toISOString(), type: 'system' });
-            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-        }
-        alert('Parabéns! Compra finalizada.');
-        loadChatMessages(orderId);
-    } catch (e) { alert('Erro ao finalizar pedido.'); }
-};
-
-window.reportProblem = async function(orderId) {
-    const motivo = prompt('Descreva brevemente o problema encontrado:');
-    if (!motivo) return;
-    try {
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'dispute', updated_at: new Date().toISOString() })
-        });
-        
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
-        if (chat) {
-            chat.messages.push({ senderId: 'system', text: `⚠️ O comprador reportou um problema: "${motivo}". Negociação em disputa.`, timestamp: new Date().toISOString(), type: 'system' });
-            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-        }
-        loadChatMessages(orderId);
-    } catch (e) { alert('Erro ao reportar problema.'); }
-};
-
 window.sendChatMessage = async function(event) {
     event.preventDefault();
-    event.stopPropagation();
-    
     const input = document.getElementById('chatMessageInput');
-    const text = input?.value?.trim();
-    const user = getSavedUser();
-    
-    console.log('📤 Enviando mensagem:', text, '| Chat:', currentChat, '| User:', user?.id);
-    
-    if (!text || !user || !currentChat) {
-        console.warn('⚠️ Dados faltando:', { text: !!text, user: !!user, chat: !!currentChat });
-        return false;
-    }
+    const text  = input?.value?.trim();
+    const user  = getSavedUser();
+    if (!text || !user || !currentChat) return;
 
     try {
-        // Buscar chat
         const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-        let chat = chatResult?.[0];
+        const chat       = chatResult?.[0];
+        if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
 
-        if (!chat) {
-            alert('Chat não encontrado.');
-            return false;
-        }
+        chat.messages.push({
+            senderId:   user.id,
+            senderName: user.nome,
+            text,
+            timestamp:  new Date().toISOString(),
+            type:       'message'
+        });
 
-        if (editingMessageIndex !== null) {
-            // Lógica de Edição
-            chat.messages[editingMessageIndex].text = text;
-            chat.messages[editingMessageIndex].edited = true;
-        } else {
-            // Lógica de Nova Mensagem
-            const newMessage = {
-                senderId: String(user.id),
-                senderName: user.nome || 'Usuário',
-                text: text,
-                timestamp: new Date().toISOString(),
-                type: 'message'
-            };
-
-            if (currentReplyIndex !== null) {
-                const repliedMsg = chat.messages[currentReplyIndex];
-                newMessage.replyTo = {
-                    text: repliedMsg.text,
-                    senderName: repliedMsg.senderName
-                };
-            }
-
-            chat.messages.push(newMessage);
-        }
-
-        // Salvar no Supabase
-        const result = await supabaseFetch(`chats?id=eq.${chat.id}`, {
+        await supabaseFetch(`chats?id=eq.${chat.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ messages: chat.messages })
         });
 
-        console.log('✅ Mensagem salva!', result);
-
-        // Limpar input e estados de UI
-        window.cancelReplyOrEdit();
         input.value = '';
-        
-        // Recarregar mensagens
         await loadChatMessages(currentChat);
-
     } catch (e) {
-        console.error('❌ Erro ao enviar mensagem:', e);
-        alert('Erro ao enviar mensagem: ' + e.message);
-    }
-    
-    return false;
-};
-
-// Alterna a visibilidade da área de opções do pedido
-window.toggleChatActions = function() {
-    const area = document.getElementById('chatActionsArea');
-    if (area) {
-        area.classList.toggle('d-none');
+        showToast('Erro ao enviar mensagem.', 'error');
     }
 };
 
-// ============================================
-// LÓGICA DE RESPOSTA E EDIÇÃO
-// ============================================
-
-window.startReply = async function(index) {
-    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-    const msg = chatResult?.[0]?.messages[index];
-    if (!msg) return;
-
-    currentReplyIndex = index;
-    editingMessageIndex = null;
-    
-    window.updateChatInputUI(`Respondendo a ${msg.senderName}`, msg.text);
-    document.getElementById('chatMessageInput')?.focus();
-};
-
-window.startEdit = async function(index) {
-    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-    const msg = chatResult?.[0]?.messages[index];
-    if (!msg) return;
-
-    editingMessageIndex = index;
-    currentReplyIndex = null;
-
-    const input = document.getElementById('chatMessageInput');
-    if (input) input.value = msg.text;
-    
-    window.updateChatInputUI(`Editando sua mensagem`, msg.text);
-    input?.focus();
-};
-
-window.cancelReplyOrEdit = function() {
-    currentReplyIndex = null;
-    editingMessageIndex = null;
-    const preview = document.getElementById('chatInputPreview');
-    if (preview) {
-        preview.classList.add('d-none');
-        preview.innerHTML = '';
-    }
-};
-
-window.updateChatInputUI = function(title, text) {
-    const preview = document.getElementById('chatInputPreview');
-    if (!preview) return;
-
-    preview.innerHTML = `
-        <div class="small text-truncate" style="max-width: 80%;">
-            <strong class="text-primary d-block" style="font-size: 0.7rem;">${title}</strong>
-            <span class="text-muted" style="font-size: 0.8rem;">${text}</span>
-        </div>
-        <button type="button" class="btn-close" style="font-size: 0.6rem;" onclick="window.cancelReplyOrEdit()"></button>
-    `;
-    preview.classList.remove('d-none');
-};
-
-// Enviar imagem
 window.sendChatImage = async function() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1324,106 +1667,51 @@ window.sendChatImage = async function() {
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const user = getSavedUser();
         if (!user || !currentChat) return;
-
-        // Converter para base64
         const reader = new FileReader();
         reader.onload = async (ev) => {
             try {
                 const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-                let chat = chatResult?.[0];
+                const chat       = chatResult?.[0];
                 if (!chat) return;
-
                 chat.messages.push({
-                    senderId: user.id,
-                    senderName: user.nome,
-                    text: '📷 Imagem',
-                    image: ev.target.result,
-                    timestamp: new Date().toISOString(),
-                    type: 'image'
+                    senderId: user.id, senderName: user.nome,
+                    text: '📷 Imagem', image: ev.target.result,
+                    timestamp: new Date().toISOString(), type: 'image'
                 });
-
-                await supabaseFetch(`chats?id=eq.${chat.id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ messages: chat.messages })
-                });
-
+                await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
                 await loadChatMessages(currentChat);
-            } catch (err) {
-                console.error(err);
-                alert('Erro ao enviar imagem.');
-            }
+            } catch { showToast('Erro ao enviar imagem.', 'error'); }
         };
         reader.readAsDataURL(file);
     };
     input.click();
 };
 
-// Função para cancelar o pedido diretamente pelo chat
-window.cancelOrderFromChat = async function(orderId) {
-    if (!confirm('Deseja realmente cancelar este pedido? Esta ação não pode ser desfeita.')) return;
-    try {
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
-        });
-
-        // Adiciona aviso do sistema no chat
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
-        if (chat) {
-            chat.messages.push({ senderId: 'system', text: `🚫 Pedido cancelado através do chat.`, timestamp: new Date().toISOString(), type: 'system' });
-            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-        }
-
-        alert('Pedido cancelado!');
-        loadChatMessages(orderId);
-    } catch (e) { alert('Erro ao cancelar pedido.'); }
-};
-
-// Enviar arquivo
 window.sendChatFile = async function() {
     const input = document.createElement('input');
     input.type = 'file';
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         const user = getSavedUser();
         if (!user || !currentChat) return;
-
         const reader = new FileReader();
         reader.onload = async (ev) => {
             try {
                 const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-                let chat = chatResult?.[0];
+                const chat       = chatResult?.[0];
                 if (!chat) return;
-
                 chat.messages.push({
-                    senderId: user.id,
-                    senderName: user.nome,
+                    senderId: user.id, senderName: user.nome,
                     text: `📎 ${file.name}`,
-                    file: {
-                        name: file.name,
-                        url: ev.target.result,
-                        size: file.size
-                    },
-                    timestamp: new Date().toISOString(),
-                    type: 'file'
+                    file: { name: file.name, url: ev.target.result, size: file.size },
+                    timestamp: new Date().toISOString(), type: 'file'
                 });
-
-                await supabaseFetch(`chats?id=eq.${chat.id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ messages: chat.messages })
-                });
-
+                await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
                 await loadChatMessages(currentChat);
-            } catch (err) {
-                console.error(err);
-                alert('Erro ao enviar arquivo.');
-            }
+            } catch { showToast('Erro ao enviar arquivo.', 'error'); }
         };
         reader.readAsDataURL(file);
     };
@@ -1432,56 +1720,321 @@ window.sendChatFile = async function() {
 
 window.openImageFull = function(src) {
     const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-    modal.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;">`;
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    modal.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;">`;
     modal.onclick = () => modal.remove();
     document.body.appendChild(modal);
 };
 
-// Função para definir logística (chamada do chat)
+/**
+ * Helper function to get descriptive text for logistics types.
+ */
+function getLogisticsTypeText(type) {
+    if (type === 'pickup') return 'Retirada no Local';
+    if (type === 'seller_delivery') return 'Entrega pelo Vendedor';
+    if (type === 'external_app') return 'App de Entrega';
+    return type;
+}
+
 window.setLogistics = async function(orderId, type) {
-    const user = getSavedUser();
-    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
-    if (!order) return alert('Pedido não encontrado.');
-
-    const isBuyer = user.id === order.buyer_id;
-    const updateBody = {
-        logistics_type: type,
-        updated_at: new Date().toISOString()
-    };
-
-    if (isBuyer) updateBody.agree_buyer = true;
-    else updateBody.agree_seller = true;
-
-    // Se ambos concordaram, muda o status do pedido
-    if ((isBuyer && order.agree_seller) || (!isBuyer && order.agree_buyer)) {
-        updateBody.status = (type === 'pickup' ? 'awaiting_pickup' : 'shipping');
-    } else {
-        updateBody.status = 'agreement'; // Aguardando a outra parte
+    const user  = getSavedUser();
+    let order   = ordersCache.find(o => o.id === orderId);
+    if (!order) {
+        const r = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        order   = r[0];
     }
+    if (!order) { showToast('Pedido não encontrado.', 'error'); return; }
 
+    const isBuyer    = user.id === order.buyer_id;
+    const updateBody = { logistics_type: type, updated_at: new Date().toISOString() };
+
+    if (isBuyer) updateBody.agree_buyer  = true;
+    else         updateBody.agree_seller = true;
+
+    const isAccepting = order.status === 'agreement';
+    updateBody.status = 'agreement';
+
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify(updateBody) });
+
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat     = chatData[0];
+        if (chat) {
+            const msgText = isAccepting 
+                ? `🤝 ${user.nome} aceitou a proposta de: ${getLogisticsTypeText(type)}.`
+                : `${user.nome} propôs a logística: ${getLogisticsTypeText(type)}.`;
+
+            chat.messages.push({
+                senderId:  'system',
+                text:      msgText,
+                timestamp: new Date().toISOString(),
+                type:      'system'
+            });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        loadChatMessages(orderId);
+        showToast(isAccepting ? 'Proposta aceita!' : 'Logística proposta!', 'success');
+    } catch { showToast('Erro ao definir logística.', 'error'); }
+};
+
+window.advanceLogisticsStatus = async function(orderId, nextStatus) {
     try {
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
-            body: JSON.stringify(updateBody)
+            body: JSON.stringify({ status: nextStatus, updated_at: new Date().toISOString() })
         });
-
-        // Adiciona mensagem do sistema no chat
+        
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        let chat = chatData[0];
+        const chat = chatData[0];
         if (chat) {
-            const systemMessage = {
-                senderId: 'system',
-                text: `${user.nome} propôs a logística: ${type === 'pickup' ? 'Retirada' : (type === 'seller_delivery' ? 'Entrega pelo Vendedor' : 'App de Entrega')}.`,
-                timestamp: new Date().toISOString(),
-                type: 'system'
-            };
-            chat.messages.push(systemMessage);
+            const text = nextStatus === 'shipping' ? '🚚 O vendedor colocou o pedido em rota de entrega!' : '📍 O pedido está aguardando retirada no local!';
+            chat.messages.push({ senderId: 'system', text, timestamp: new Date().toISOString(), type: 'system' });
             await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         }
-        
+        showToast('Status atualizado!', 'success');
         loadChatMessages(orderId);
-    } catch (e) { console.error('Erro ao definir logística:', e); alert('Erro ao definir logística.'); }
+    } catch { showToast('Erro ao atualizar status.', 'error'); }
 };
 
-// Painel do Vendedor
+window.confirmReceipt = async function(orderId) {
+    if (!confirm('Confirmar que recebeu o produto? Esta ação finalizará o pedido.')) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
+        });
+        
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData[0];
+        if (chat) {
+            chat.messages.push({ senderId: 'system', text: '🎉 O comprador confirmou o recebimento. Compra finalizada!', timestamp: new Date().toISOString(), type: 'system' });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        showToast('Pedido finalizado!', 'success');
+        loadChatMessages(orderId);
+    } catch { showToast('Erro ao confirmar recebimento.', 'error'); }
+};
+
+// ============================================
+// PAINEL DO VENDEDOR
+// ============================================
+
+window.renderSellerPanel = async function() {
+    const user = getSavedUser();
+    if (!user)                                           { showToast('Faça login!', 'warning'); return; }
+    if (user.tipo !== 'VENDEDOR' && user.tipo !== 'ADMIN') { showToast('Acesso restrito a vendedores!', 'warning'); return; }
+
+    document.getElementById('gridTitle').textContent = 'Meus Produtos';
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+
+    const grid = document.getElementById('productsGrid');
+    grid.style.display = 'grid';
+    grid.classList.remove('order-view-active');
+    grid.innerHTML = Array(6).fill(0).map(() => `
+        <div class="card border-0" style="border-radius:10px;overflow:hidden;">
+            <div class="skeleton" style="height:150px;"></div>
+            <div style="padding:12px;">
+                <div class="skeleton mb-2" style="height:14px;width:75%;"></div>
+                <div class="skeleton" style="height:20px;width:45%;"></div>
+            </div>
+        </div>`).join('');
+
+    try {
+        const sellerProducts = await supabaseFetch(`products?select=*&vendedor_id=eq.${user.id}`);
+
+        if (!sellerProducts.length) {
+            grid.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-box-seam" style="font-size:3.5rem;color:#ccc;"></i>
+                <h5 class="mt-3">Você ainda não tem produtos</h5>
+                <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#announceModal">
+                    <i class="bi bi-plus-circle me-2"></i>Anunciar Produto
+                </button>
+            </div>`;
+        } else {
+            renderGrid(sellerProducts);
+        }
+        window.closeMobileMenu();
+    } catch {
+        grid.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <h5>Erro ao carregar produtos</h5>
+                <button class="btn btn-primary mt-3" onclick="window.renderSellerPanel()">Tentar novamente</button>
+            </div>`;
+    }
+};
+
+// ============================================
+// PAINEL ADMINISTRATIVO
+// ============================================
+
+/**
+ * Renderiza a interface de controle total para administradores
+ */
+window.renderAdminPanel = async function() {
+    const user = getSavedUser();
+    if (!user || user.tipo !== 'ADMIN') {
+        showToast('Acesso restrito a administradores!', 'error');
+        return;
+    }
+
+    document.getElementById('gridTitle').textContent = 'Painel Administrativo';
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+
+    const grid = document.getElementById('productsGrid');
+    grid.style.display = 'block';
+    grid.classList.add('order-view-active');
+    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando base de dados...</p></div>';
+
+    try {
+        // Busca todos os usuários e produtos para gestão
+        const [users, products] = await Promise.all([
+            supabaseFetch('users?select=*&order=nome.asc'),
+            supabaseFetch('products?select=*&order=created_at.desc')
+        ]);
+
+        grid.innerHTML = `
+            <div class="container-fluid py-2">
+                <nav class="mb-4 d-flex justify-content-center">
+                    <div class="nav nav-pills border-0 bg-light p-1 rounded-pill shadow-sm" id="nav-tab" role="tablist">
+                        <button class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-users" type="button">Usuários (${users.length})</button>
+                        <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-cats" type="button">Categorias</button>
+                        <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-prods" type="button">Publicações (${products.length})</button>
+                    </div>
+                </nav>
+                <div class="tab-content" id="nav-tabContent">
+                    <div class="tab-pane fade show active" id="admin-users">
+                        <div class="list-group shadow-sm mt-2">
+                            ${users.map(u => `
+                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
+                                    <div class="d-flex align-items-center gap-3 text-dark">
+                                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.nome)}" class="rounded-circle border" width="45" height="45" style="object-fit:cover;">
+                                        <div>
+                                            <h6 class="mb-0 fw-bold">${u.nome}</h6>
+                                            <small class="text-muted">${u.email} • <span class="badge ${u.tipo==='ADMIN'?'bg-danger':'bg-primary'}">${u.tipo}</span></small>
+                                        </div>
+                                    </div>
+                                    ${u.id !== user.id ? `
+                                        <button class="btn btn-sm btn-outline-danger border-0" onclick="window.adminDeleteUser('${u.id}', '${u.nome}')" title="Apagar Conta">
+                                            <i class="bi bi-person-x fs-5"></i>
+                                        </button>
+                                    ` : '<span class="badge bg-light text-dark border">Você</span>'}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="admin-cats">
+                        <div class="list-group shadow-sm mt-2">
+                            ${[...new Set(products.map(p => p.categoria || 'Geral'))].map(cat => `
+                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
+                                    <h6 class="mb-0 fw-bold">${cat}</h6>
+                                    <span class="badge bg-light text-dark border">${products.filter(p => p.categoria === cat).length} anúncios</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="admin-prods">
+                        <div class="list-group shadow-sm mt-2">
+                            ${products.map(p => `
+                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
+                                    <div class="d-flex align-items-center gap-3 text-dark">
+                                        <img src="${Array.isArray(p.img) ? p.img[0] : p.img}" class="rounded" width="45" height="45" style="object-fit:cover;" onerror="this.src='https://placehold.co/45'">
+                                        <div style="max-width: 250px;">
+                                            <h6 class="mb-0 fw-bold text-truncate">${p.titulo}</h6>
+                                            <small class="text-muted">Loja: ${p.loja} • R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}</small>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger border-0" onclick="window.adminDeleteProduct('${p.id}', '${p.titulo}')" title="Remover Publicação">
+                                        <i class="bi bi-trash fs-5"></i>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        window.closeMobileMenu();
+    } catch (e) {
+        console.error(e);
+        grid.innerHTML = '<div class="alert alert-danger">Erro ao acessar o banco de dados.</div>';
+    }
+};
+
+window.adminDeleteUser = async function(userId, userName) {
+    if (!confirm(`ATENÇÃO: Deseja realmente excluir a conta de ${userName}?\nEsta ação removerá todos os dados do usuário.`)) return;
+    try {
+        await supabaseFetch(`users?id=eq.${userId}`, { method: 'DELETE' });
+        showToast(`Usuário ${userName} removido.`, 'success');
+        window.renderAdminPanel(); // Atualiza a lista
+    } catch (e) { showToast('Erro ao remover conta.', 'error'); }
+};
+
+window.adminDeleteProduct = async function(pid, title) {
+    if (!confirm(`Remover publicação "${title}" permanentemente?`)) return;
+    try {
+        await supabaseFetch(`products?id=eq.${pid}`, { method: 'DELETE' });
+        showToast('Publicação removida pelo administrador.', 'success');
+        window.renderAdminPanel(); // Atualiza a lista
+    } catch (e) { showToast('Erro ao remover produto.', 'error'); }
+};
+
+// ============================================
+// COMPARTILHAR
+// ============================================
+
+window.shareProduct = function(pid) {
+    const item = allProductsCache.find(x => x.id === pid || x.id == pid);
+    if (!item) return;
+    const url  = window.location.href;
+    const text = `Confira: ${item.titulo} no ElectroMarket!`;
+
+    if (navigator.share) {
+        navigator.share({ title: 'ElectroMarket', text, url }).catch(console.error);
+    } else {
+        navigator.clipboard.writeText(url).then(() => showToast('Link copiado!', 'success', 2000));
+    }
+};
+
+// ============================================
+// MOBILE NAV ACTIVE STATE
+// ============================================
+
+window.updateMobileNavActive = function(page) {
+    document.querySelectorAll('.mobile-nav-row .nav-item').forEach(el => el.classList.remove('active'));
+    const map = {
+        'eletronicos':            0,
+        'renderLikedProducts':    1,
+        'renderOrderManagement':  2,
+        'cartOffcanvas':          3,
+        'mobileMenu':             4
+    };
+    const idx = map[page];
+    if (idx !== undefined) {
+        const items = document.querySelectorAll('.mobile-nav-row .nav-item');
+        if (items[idx]) items[idx].classList.add('active');
+    }
+};
+
+/** Toggle Chat Actions (Placeholder para funcionalidade futura) */
+window.toggleChatActions = function() {
+    showToast('Opções de gerenciamento de pedido em breve!', 'info');
+};
+
+/** Finalizar Compra do Carrinho */
+window.finalizarCompraCarrinho = function() {
+    if (!getSavedUser()) {
+        showToast('Você precisa estar logado para finalizar!', 'warning');
+        window.showAuthScreen('login', true);
+        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).hide();
+        return;
+    }
+    if (cart.length === 0) {
+        showToast('Seu carrinho está vazio!', 'warning');
+        return;
+    }
+    showToast('Processando seu pedido... Por favor, aguarde.', 'info');
+    // Aqui chamaria a lógica de compra em lote ou apenas avisa que deve comprar item a item
+    alert('Funcionalidade de Checkout Global em desenvolvimento. Por enquanto, utilize o botão "Comprar" em cada item.');
+};
