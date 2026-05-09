@@ -1,3 +1,53 @@
+
+/* ============================================ */
+/* FEEDBACK VISUAL - CPF E CEP                  */
+/* ============================================ */
+
+/* Feedback Visual de Validação */
+.cpf-valido, .cep-valido, .form-control.is-valid {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 2px rgba(40,167,69,0.2) !important;
+}
+
+.cpf-invalido, .cep-invalido, .form-control.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 2px rgba(220,53,69,0.2) !important;
+}
+
+/* Botões do Header Faltantes */
+.btn-simple {
+    background: transparent;
+    border: none;
+    color: white !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    transition: opacity 0.2s;
+}
+.btn-simple:hover { opacity: 0.8; }
+
+.btn-simple.btn-solid {
+    background: var(--market-color, #2dcc71) !important;
+    padding: 6px 20px;
+    border-radius: 20px;
+}
+/* Animação de busca */
+@keyframes pulseBusca {
+    0%, 100% { background-color: var(--input-bg); }
+    50% { background-color: #fffde7; }
+}
+
+.buscando-cep {
+    animation: pulseBusca 0.8s ease-in-out infinite;
+    cursor: wait;
+}
+
+/* Placeholder discreto */
+input::placeholder {
+    color: #bbb;
+    font-style: italic;
+    font-size: 0.82rem;
+}
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Montserrat:wght@700;800&family=Sora:wght@400;600&display=swap');
 
 :root {
@@ -14,22 +64,202 @@
     --modal-bg: #ffffff;
     --hover-bg: #f5f5f5;
     --shadow-color: rgba(0,0,0,0.1);
+    --footer-bg: #001529;
 }
 
-body.dark-theme {
-    --header-bg: #0a0a0a;
-    --primary-blue: #1a1a2e;
-    --market-color: #00ff88;
-    --primary-action: #E50914;
-    --bg-color: #121212;
-    --card-bg: #1e1e1e;
-    --text-main: #f0f0f0;
-    --text-muted: #b0b0b0;
+body.dark-theme { /* Tema Netflix: Preto e Vermelho */
+    --bg-color: #000000; /* Preto Netflix */
+    --card-bg: #141414;
+    --header-bg: #000000;
+    --text-main: #ffffff;
+    --text-muted: #b3b3b3;
     --border-light: #333333;
-    --input-bg: #2a2a2a;
-    --modal-bg: #1e1e1e;
-    --hover-bg: #2a2a2a;
-    --shadow-color: rgba(0,0,0,0.5);
+    --input-bg: #232323;
+    --modal-bg: #181818;
+    --hover-bg: #222222;
+    --market-color: #E50914; /* Vermelho Netflix */
+    --primary-blue: #E50914;
+    --primary-action: #b9090b;
+    --shadow-color: rgba(0,0,0,0.8);
+    --footer-bg: #000000;
+}
+
+/* ============================================ */
+/* RIVE AUTH - STYLES                            */
+/* ============================================ */
+
+.svgContainer {
+    display: none !important; /* Remove o container do urso que não carregava */
+}
+
+#riveCanvas {
+    display: none;
+}
+
+/* ── Novo Ícone Estilo Belluzi ──────────────────────────────── */
+.login-icon-v3 {
+    width: 180px; /* Aumentado conforme solicitado */
+    height: 180px;
+    background: transparent; /* Removido o círculo azul */
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    box-shadow: none;
+    font-size: 3.5rem;
+    flex-shrink: 0;
+}
+
+.login-icon-v3 img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 15px 25px rgba(0, 48, 112, 0.35)); /* Efeito flutuante */
+}
+
+/* ── Formulário de auth ─────────────────────────────────────── */
+.auth-form-v2 {
+  width: 100%;
+  max-width: 360px;
+}
+
+.auth-form-v2 input,
+.auth-form-v2 select {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: #f9f9f9;
+  color: #333;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+}
+
+.auth-form-v2 input:focus,
+.auth-form-v2 select:focus {
+  border-color: #2dcc71;
+  box-shadow: 0 0 0 3px rgba(45, 204, 113, 0.18);
+  outline: none;
+  background: #fff;
+}
+
+/* ── Layout auth-screen ─────────────────────────────────────── */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0,48,112,0.8), rgba(0,0,0,0.9)), url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1920&q=80');
+  background-size: cover;
+  background-position: center;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
+.auth-wrapper {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  width: 960px;
+  max-width: 96vw;
+  height: 620px;
+  max-height: 92vh;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  display: flex;
+}
+
+.auth-close-btn {
+  position: absolute;
+  top: 14px; right: 14px;
+  z-index: 200;
+  background: rgba(0,0,0,0.18);
+  border-radius: 50%;
+  padding: 6px;
+  opacity: .85;
+  transition: background .2s, opacity .2s;
+}
+.auth-close-btn:hover { background: #dc3545 !important; opacity: 1; filter: none !important; }
+
+.auth-content {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+  transition: transform 0.5s cubic-bezier(.4,0,.2,1), opacity 0.4s ease;
+}
+
+.auth-column-side {
+  width: 40%;
+  background: rgba(0, 48, 112, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.auth-column-form {
+  width: 60%;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* Alinha pelo topo para não cortar no scroll */
+  align-items: center;
+  padding: 60px 30px 40px; /* Espaço superior para o título aparecer bem */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+
+.title-primary       { color: #fff;     font-weight: 700; font-size: 1.5rem; margin-bottom: 10px; }
+.description-primary { color: rgba(255,255,255,.8); font-size: .88rem; margin: 4px 0; }
+.title-second        { color: #003070;  font-weight: 700; font-size: 1.35rem; margin-bottom: 14px; }
+
+.btn-primary-outline {
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
+  padding: 10px 40px;
+  border-radius: 25px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: .88rem;
+}
+/* Estilo dark para o formulário dentro do vidro */
+body.dark-theme .auth-column-form {
+    background: rgba(30, 30, 30, 0.95);
+}
+
+body.dark-theme .title-second {
+    color: var(--market-color);
+}
+
+/* Estilo moderno para inputs no login */
+.auth-form-v2 input {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #ddd;
+    border-radius: 0;
+    padding: 12px 4px;
+    margin-bottom: 15px;
+}
+
+.auth-form-v2 input:focus {
+    background: transparent;
+    border-bottom-color: var(--market-color);
+    box-shadow: none;
 }
 
 * {
@@ -186,8 +416,13 @@ body.dark-theme .modal-header .btn-close {
     color: var(--text-main);
 }
 
-.offcanvas-header {
-    border-bottom: 1px solid var(--border-light);
+.mobile-menu-header {
+    background: linear-gradient(135deg, var(--primary-blue), #1a237e);
+    border-bottom: none;
+}
+
+body.dark-theme .mobile-menu-header {
+    background: var(--primary-blue) !important; /* Fica apenas vermelho no tema dark */
 }
 
 .offcanvas .list-group-item {
@@ -414,8 +649,8 @@ body.dark-theme .btn-close {
 
 #productsGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(6, 1fr); /* 6 por linha estilo ML */
+    gap: 12px;
     padding: 10px 0;
 }
 
@@ -430,6 +665,11 @@ body.dark-theme .btn-close {
         height: 150px;
         padding: 10px;
     }
+}
+
+/* Classe para modo lista (compras/vendas) */
+#productsGrid.order-view-active {
+    display: block !important;
 }
 
 .product-card-ml {
@@ -1284,7 +1524,7 @@ a:hover {
 /* ============================================ */
 
 footer.main-footer-dock {
-    background-color: #001529 !important; /* Azul escuro fixo mesmo no tema claro */
+    background-color: var(--footer-bg) !important;
     color: #ffffff !important;
     box-shadow: 0 -5px 25px rgba(0,0,0,0.3);
     backdrop-filter: blur(12px);
@@ -1315,6 +1555,10 @@ footer.main-footer-dock {
 .main-footer-dock .nav-item.active {
     color: var(--market-color);
     transform: scale(1.1);
+}
+
+.mobile-menu-switch {
+    padding: 12px 20px;
 }
 
 .footer-copyright {
@@ -1348,8 +1592,280 @@ footer.main-footer-dock {
 .theme-invert {
     filter: invert(1) brightness(2); /* Ajusta ícones pretos (Vercel) para ficarem brancos */
 }
+.auth-wrapper {
+    position: relative;
+    overflow: hidden;
+    background: #fff;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+}
 
-footer.fixed-bottom {
-    z-index: 1030;
-    border-top: 1px solid rgba(255,255,255,0.1) !important;
+.auth-wrapper::before {
+    content: "";
+    position: absolute;
+    background-color: #003070;
+    width: 40%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    z-index: 5;
+    border-radius: 0;
+    transition: left 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    pointer-events: none;
+}
+
+body.sign-in-js .auth-wrapper::before {
+    left: 60%;
+}
+
+.first-content,
+.second-content {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    display: flex;
+    z-index: 10; /* Fica acima da barra azul (z-index 5) */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+}
+
+.second-content {
+    flex-direction: row-reverse; /* Inverte para o login: Form Esquerda, Azul Direita */
+    visibility: hidden;
+}
+
+.first-content .first-column,
+.second-content .first-column,
+.first-content .auth-column-side,
+.second-content .auth-column-side {
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 5%;
+    color: #fff;
+    position: relative;
+    z-index: 15; /* ← ADICIONADO: texto sempre visível */
+}
+
+/* Coluna do formulário */
+.first-content .second-column,
+.second-content .second-column,
+.first-content .auth-column-form,
+.second-content .auth-column-form {
+    width: 60%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 60px 5% 40px;
+    z-index: 15; /* ← ADICIONADO: formulário sempre visível */
+}
+/* ============================================ */
+/* Z-INDEX CORRETO                              */
+/* ============================================ */
+
+/* Primeiro conteúdo (cadastro) */
+.first-content {
+    z-index: 10;
+}
+
+/* Segundo conteúdo (login) */
+.second-content {
+    z-index: 10;
+}
+
+/* Modo LOGIN: mostra login, esconde cadastro */
+body.sign-in-js .first-content {
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+body.sign-in-js .first-content .second-column {
+    animation: deslocamentoEsq 0.3s ease-in-out forwards;
+}
+
+body.sign-in-js .second-content {
+    opacity: 1;
+    visibility: visible;
+    z-index: 11;
+    pointer-events: all;
+}
+
+/* Modo CADASTRO: mostra cadastro, esconde login */
+body.sign-up-js .first-content {
+    opacity: 1;
+    visibility: visible;
+    z-index: 11;
+    pointer-events: all;
+}
+
+body.sign-up-js .second-content {
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+body.sign-up-js .second-content .second-column {
+    animation: deslocamentoDir 0.3s ease-in-out forwards;
+}
+
+/* ============================================ */
+/* KEYFRAMES DAS ANIMAÇÕES                      */
+/* ============================================ */
+
+@keyframes deslocamentoEsq {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(-60px);
+        opacity: 0;
+    }
+}
+
+@keyframes deslocamentoDir {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(60px);
+        opacity: 0;
+    }
+}
+
+@keyframes slidein {
+    from { left: 0; width: 40%; }
+    25% { left: 5%; width: 50%; }
+    50% { left: 25%; width: 60%; }
+    75% { left: 45%; width: 50%; }
+    to { left: 60%; width: 40%; }
+}
+
+@keyframes slideout {
+    from { left: 60%; width: 40%; }
+    25% { left: 45%; width: 50%; }
+    50% { left: 25%; width: 60%; }
+    75% { left: 5%; width: 50%; }
+    to { left: 0; width: 40%; }
+}
+
+/* Estilos de Texto */
+.title-second { color: var(--primary-blue); font-weight: bold; }
+.description-second { color: #7f8c8d; }
+.password-link { color: #34495e; font-size: 0.8rem; text-decoration: none; }
+
+/* Cor diferenciada para o botão de fechar login */
+.auth-close-btn:hover {
+    background-color: #ff4d4d !important; 
+    border-radius: 50%;
+    opacity: 1;
+    filter: invert(0) !important; /* Remove o filtro de inversão para mostrar a cor real */
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+}
+
+/* --- Botões Padrão "Comprar Agora" --- */
+.auth-column-form .btn-market-solid {
+    background-color: #3483fa; /* Cor azul oficial do botão comprar */
+    border: none;
+    color: #fff !important;
+    border-radius: 6px;
+    padding: 14px;
+    font-weight: 600;
+    width: 100%;
+    text-transform: none;
+    transition: background 0.2s, transform 0.15s, letter-spacing 0.2s;
+    cursor: pointer;
+}
+
+/* Melhoria no Modal de Notificações */
+#notificacoesList .list-group-item {
+    transition: all 0.2s;
+    cursor: pointer;
+    border-left: 4px solid transparent !important;
+}
+
+#notificacoesList .list-group-item:hover {
+    background-color: var(--hover-bg) !important;
+    border-left-color: var(--market-color) !important;
+}
+
+#notificacoesList .bg-light {
+    background-color: rgba(45, 204, 113, 0.05) !important;
+    border-left-color: var(--primary-blue) !important;
+}
+
+/* ============================================ */
+/* POPUP DE NOTIFICAÇÕES (ESTILO SACFLOW)       */
+/* ============================================ */
+
+.toast-container-custom {
+    position: fixed;
+    top: 25px;
+    bottom: 110px; /* Posicionado acima do dock (footer) */
+    right: 25px;
+    z-index: 11000; /* Garante que fique acima de modais e headers */
+    display: flex;
+    flex-direction: column;
+    flex-direction: column-reverse; /* Inverte para empilhar de baixo para cima */
+    gap: 12px;
+    pointer-events: none;
+}
+
+.toast-custom {
+    pointer-events: auto;
+    min-width: 320px;
+    max-width: 420px;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-left: 6px solid var(--primary-blue);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: blur(15px);
+    padding: 18px 22px !important;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: #222;
+    font-weight: 500;
+    animation: toastPopIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.toast-custom.success { border-left-color: var(--market-color); }
+.toast-custom.error   { border-left-color: #dc3545; }
+.toast-custom.warning { border-left-color: #ffc107; }
+
+@keyframes toastPopIn {
+    from { transform: scale(0.8) translateY(-20px); opacity: 0; }
+    from { transform: scale(0.8) translateY(20px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.toast-custom.fade-out {
+    animation: toastPopOut 0.3s ease-in forwards;
+}
+
+@keyframes toastPopOut {
+    to { transform: scale(0.9) opacity: 0; }
+}
+
+.cursor-pointer { cursor: pointer; }
+
+.auth-column-form .btn-market-solid:hover {
+    background-color: #2968c8;
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+    letter-spacing: 0.02rem;
 }
