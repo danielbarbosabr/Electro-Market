@@ -11,6 +11,8 @@ let likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || []
 let accessHistory     = JSON.parse(localStorage.getItem('electroHistory')) || [];
 let currentChat       = null;
 let ordersCache       = [];
+let currentReplyIndex   = null;
+let editingMessageIndex = null;
 let riveInstance      = null;
 let chatsCache        = [];
 let notificationsCache = JSON.parse(localStorage.getItem('electroNotifs')) || [];
@@ -301,7 +303,7 @@ window.showDetail = async function(pid) {
     if (!item) return;
 
     const user    = getSavedUser();
-    const isOwner = user && item.vendedor_id === user.id;
+    const isOwner = user && (item.vendedor_id == user.id);
 
     // Histórico
     accessHistory = accessHistory.filter(id => id != pid);
@@ -315,9 +317,19 @@ window.showDetail = async function(pid) {
         document.getElementById('prodPrice').value       = item.preco;
         document.getElementById('prodQuantity').value    = item.quantidade;
         document.getElementById('prodCategory').value    = item.categoria;
-        document.getElementById('prodImage').value       = item.img || '';
         document.getElementById('prodDelivery').checked  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
         document.getElementById('announceForm').dataset.editingId = item.id;
+
+        // Popula links de imagens no formulário de edição
+        for (let i = 1; i <= 3; i++) {
+            const el = document.getElementById(`prodLink${i}`);
+            if (el) el.value = '';
+        }
+        const imgs = Array.isArray(item.img) ? item.img : [item.img].filter(Boolean);
+        imgs.forEach((url, i) => {
+            const el = document.getElementById(`prodLink${i+1}`);
+            if (el) el.value = url;
+        });
 
         const modalTitle = document.querySelector('#announceModal .modal-title');
         const submitBtn  = document.querySelector('#announceForm button[type="submit"]');
@@ -1324,10 +1336,10 @@ window.renderOrderManagement = async function(type = 'buyer') {
         let path = 'orders?select=*';
         if (type === 'buyer') {
             path += `&buyer_id=eq.${user.id}`;
-            title.textContent = 'Minhas Compras';
+            if (title) title.textContent = 'Minhas Compras';
         } else {
             path += `&seller_id=eq.${user.id}`;
-            title.textContent = type === 'seller_requests' ? 'Solicitações Pendentes' : 'Minhas Vendas';
+            if (title) title.textContent = type === 'seller_requests' ? 'Solicitações Pendentes' : 'Minhas Vendas';
         }
 
         let orders = await supabaseFetch(path);
@@ -1348,8 +1360,8 @@ window.renderOrderManagement = async function(type = 'buyer') {
         grid.innerHTML = orders.map(order => {
             const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
             const isPending = order.status === 'pending';
-            const isCancelled = order.status === 'cancelled';
-            const isBuyer   = type === 'buyer';
+            const isBuyer   = user.id === order.buyer_id;
+            const isSeller  = user.id === order.seller_id;
 
             return `
             <div class="col-12 col-xl-10 mx-auto mb-3">
@@ -1365,7 +1377,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
                                     <h6 class="fw-bold mb-1">${order.product_title}</h6>
                                     <p class="text-muted mb-0" style="font-size:0.78rem;">
                                         ${isBuyer ? `Vendedor: ${order.seller_name}` : `Comprador: ${order.buyer_name}`}<br>
-                                        ID: #${order.id.slice(-6).toUpperCase()}
+                                        ID: #${order.id.slice(-8).toUpperCase()}
                                     </p>
                                 </div>
                                 <span class="badge ${st.class} py-2 px-3 rounded-pill" style="font-size:0.7rem;">${st.text}</span>
@@ -1378,24 +1390,32 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
                             <div class="d-flex flex-wrap gap-2 justify-content-end">
                                 ${isPending && type === 'seller_requests' ? `
-                                    <button class="btn btn-sm btn-success px-4 fw-bold" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                                    <button class="btn btn-sm btn-success px-4 fw-bold rounded-pill" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
                                         <i class="bi bi-check-lg me-1"></i>Aceitar
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger px-4" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                                    <button class="btn btn-sm btn-outline-danger px-4 rounded-pill" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
                                         Recusar
                                     </button>
                                 ` : ''}
                                 ${isPending && type === 'buyer' ? `
-                                    <button class="btn btn-sm btn-outline-danger px-3" onclick="window.cancelOrderBuyer('${order.id}')">
+                                    <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" onclick="window.cancelOrderBuyer('${order.id}')">
                                         Cancelar Pedido
                                     </button>
                                 ` : ''}
-                                ${!isPending && !isCancelled ? `
-                                    <button class="btn btn-sm btn-primary px-4 fw-bold" onclick="window.showChat('${order.id}')">
+                                
+                                ${!isPending && order.status !== 'cancelled' ? `
+                                    <button class="btn btn-sm btn-primary px-4 fw-bold rounded-pill" onclick="window.showChat('${order.id}')">
                                         <i class="bi bi-chat-dots me-1"></i>Abrir Chat
                                     </button>
                                 ` : ''}
-                                ${isPending ? `<span class="badge bg-warning text-dark mt-1">⏳ Aguardando aprovação</span>` : ''}
+                                
+                                ${isPending && isSeller && type === 'seller_sales' ? `<span class="badge bg-warning text-dark mt-1">⏳ Aguardando sua aprovação</span>` : ''}
+                                
+                                ${(order.status === 'cancelled' || order.status === 'finished') ? `
+                                    <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill" onclick="window.removeOrderFromHistory('${order.id}', '${type}')">
+                                        <i class="bi bi-trash me-1"></i>Remover do Histórico
+                                    </button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -1418,6 +1438,22 @@ window.updateOrderStatus = async function(orderId, newStatus) {
         showToast(`Pedido ${newStatus === 'accepted' ? 'aceito' : 'recusado'}!`, newStatus === 'accepted' ? 'success' : 'info');
         window.renderOrderManagement(newStatus === 'accepted' ? 'seller_sales' : 'seller_requests');
     } catch { showToast('Erro ao atualizar pedido.', 'error'); }
+};
+
+window.removeOrderFromHistory = async function(orderId, type) {
+    if (!confirm('Deseja remover este registro do seu histórico?')) return;
+    try {
+        // Primeiro remove o chat (devido a restrições de chave estrangeira)
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
+        // Depois remove o pedido
+        await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
+        
+        showToast('Pedido removido do histórico!', 'info');
+        window.renderOrderManagement(type);
+    } catch (err) { 
+        console.error("Erro ao remover:", err);
+        showToast('Erro ao remover registro. Verifique a conexão.', 'error'); 
+    }
 };
 
 window.cancelOrderBuyer = async function(orderId) {
@@ -1485,6 +1521,7 @@ window.showChat = async function(orderId) {
 
     new bootstrap.Modal(document.getElementById('chatModal')).show();
     await loadChatMessages(orderId);
+    setupPullToRefresh();
 };
 
 async function loadChatMessages(orderId) {
@@ -1528,7 +1565,7 @@ async function loadChatMessages(orderId) {
             return;
         }
 
-        container.innerHTML = chat.messages.map(msg => {
+        container.innerHTML = chat.messages.map((msg, index) => {
             if (msg.type === 'system' || msg.senderId === 'system') {
                 return `<div class="text-center my-3">
                     <span class="badge bg-light text-dark border px-3 py-2" style="font-size:0.72rem;">${msg.text}</span>
@@ -1536,28 +1573,39 @@ async function loadChatMessages(orderId) {
             }
 
             const isMe = msg.senderId === user.id;
+            const replyHtml = msg.replyTo ? `
+                <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-10'} small border-start border-4 border-info">
+                    <div class="fw-bold" style="font-size: 0.7rem;">${msg.replyTo.senderName}</div>
+                    <div class="text-truncate" style="max-height: 20px;">${msg.replyTo.text}</div>
+                </div>
+            ` : '';
+
             return `
             <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-3">
-                <div class="p-3 rounded shadow-sm ${isMe ? 'bg-primary text-white' : 'bg-light'}"
-                     style="max-width:75%;word-break:break-word;border-radius:${isMe?'18px 18px 2px 18px':'18px 18px 18px 2px'}!important;">
+                <div class="p-3 rounded shadow-sm position-relative ${isMe ? 'bg-primary text-white' : 'bg-light'}"
+                     style="min-width: 100px; max-width:75%; word-break:break-word; border-radius:${isMe?'18px 18px 2px 18px':'18px 18px 18px 2px'}!important;">
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+                        <small class="fw-bold" style="font-size: 0.65rem; opacity: 0.8;">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</small>
+                        <div class="dropdown">
+                            <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startReply(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>
+                                ${isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startEdit(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
+                            </ul>
+                        </div>
+                    </div>
+
+                    ${replyHtml}
 
                     ${msg.image ? `
                         <img src="${msg.image}" class="img-fluid rounded mb-2"
                              style="max-width:220px;cursor:pointer;"
                              onclick="window.openImageFull('${msg.image}')">
                     ` : ''}
-
-                    ${msg.file ? `
-                        <div class="d-flex align-items-center gap-2 p-2 bg-white rounded mb-2" style="border-radius:8px;">
-                            <i class="bi bi-file-earmark fs-5"></i>
-                            <a href="${msg.file.url}" target="_blank" class="small text-primary">
-                                📎 ${msg.file.name || 'Arquivo'}
-                            </a>
-                        </div>
-                    ` : ''}
-
                     <div style="white-space:pre-wrap;">${formatLinks(msg.text)}</div>
-                    <div style="font-size:0.62rem;" class="text-end mt-1 ${isMe?'text-white-50':'text-muted'}">
+                    <div style="font-size:0.62rem;" class="text-end mt-1 d-flex justify-content-end gap-1 ${isMe?'text-white-50':'text-muted'}">
+                        ${msg.edited ? '<span>(editada)</span>' : ''}
                         ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
                     </div>
                 </div>
@@ -1591,22 +1639,63 @@ function updateChatLogistics(order, user) {
     const logisticsButtons = document.getElementById('logisticsButtons');
     if (!logisticsArea || !logisticsButtons) return;
 
-    if (['accepted', 'agreement'].includes(order.status)) {
-        logisticsArea.classList.remove('d-none');
-        const isBuyer    = user.id === order.buyer_id;
-        const userAgreed = isBuyer ? order.agree_buyer : order.agree_seller;
+    const isBuyer    = user.id === order.buyer_id;
+    const isSeller   = user.id === order.seller_id;
 
-        if (!userAgreed) {
-            logisticsButtons.innerHTML = `
-                <button class="btn btn-sm btn-outline-primary" onclick="window.setLogistics('${order.id}','pickup')">🏪 Retirada no Local</button>
-                <button class="btn btn-sm btn-outline-success" onclick="window.setLogistics('${order.id}','seller_delivery')">🚚 Entrega pelo Vendedor</button>
-                <button class="btn btn-sm btn-outline-warning" onclick="window.setLogistics('${order.id}','external_app')">📱 App de Entrega</button>`;
+    let buttonsHtml = '';
+
+    if (['accepted', 'agreement'].includes(order.status)) {
+        const userAgreed = isBuyer ? order.agree_buyer : order.agree_seller;
+        const otherAgreed = isBuyer ? order.agree_seller : order.agree_buyer;
+
+        if (order.agree_buyer && order.agree_seller) {
+            if (isSeller) {
+                if (order.logistics_type === 'pickup') {
+                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')">✅ Marcar como Pronto p/ Retirada</button>`;
+                } else {
+                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')">🚚 Marcar que Saiu p/ Entrega</button>`;
+                }
+            } else {
+                buttonsHtml += `<div class="alert alert-success rounded-pill text-center small mb-2">🤝 Aguardando envio/retirada pelo vendedor</div>`;
+            }
+        } else if (!userAgreed) {
+            if (otherAgreed && order.logistics_type) {
+                const typeText = getLogisticsTypeText(order.logistics_type);
+                buttonsHtml += `
+                    <p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p>
+                    <div class="d-flex gap-2 mb-2">
+                        <button class="btn btn-success flex-grow-1 rounded-pill fw-bold" onclick="window.setLogistics('${order.id}','${order.logistics_type}')">Aceitar</button>
+                        <button class="btn btn-outline-secondary flex-grow-1 rounded-pill" onclick="window.resetLogistics('${order.id}')">Recusar</button>
+                    </div>`;
+            } else {
+                buttonsHtml += `
+                    <div class="d-grid gap-2 mb-2">
+                        <button class="btn btn-outline-primary rounded-pill" onclick="window.setLogistics('${order.id}','pickup')">🏪 Retirada no Local</button>
+                        <button class="btn btn-outline-success rounded-pill" onclick="window.setLogistics('${order.id}','seller_delivery')">🚚 Entrega pelo Vendedor</button>
+                        <button class="btn btn-outline-warning rounded-pill" onclick="window.setLogistics('${order.id}','external_app')">📱 App de Entrega</button>
+                    </div>`;
+            }
         } else {
-            logisticsButtons.innerHTML = `<div class="alert alert-info mb-0 small w-100">⏳ Aguardando a outra parte confirmar...</div>`;
+            buttonsHtml += `<div class="alert alert-info rounded-pill text-center small mb-2">⏳ Proposta enviada! Aguardando o outro lado...</div>`;
         }
-    } else {
-        logisticsArea.classList.add('d-none');
+    } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
+        if (isBuyer) {
+            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')">🎁 Confirmar Recebimento</button>`;
+        } else {
+            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>`;
+        }
     }
+
+    // Opção de Cancelar sempre presente se não finalizado
+    if (order.status !== 'finished' && order.status !== 'cancelled') {
+        buttonsHtml += `
+            <hr class="my-2">
+            <button class="btn btn-outline-danger w-100 rounded-pill" onclick="window.chatCancelOrder('${order.id}')">
+                <i class="bi bi-x-circle me-1"></i>Cancelar Pedido
+            </button>`;
+    }
+
+    logisticsButtons.innerHTML = buttonsHtml;
 
     const statusBar = document.getElementById('orderStatusBar');
     if (statusBar && order) {
@@ -1633,20 +1722,34 @@ window.sendChatMessage = async function(event) {
     const input = document.getElementById('chatMessageInput');
     const text  = input?.value?.trim();
     const user  = getSavedUser();
-    if (!text || !user || !currentChat) return;
+    if ((!text && editingMessageIndex === null) || !user || !currentChat) return;
 
     try {
         const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
         const chat       = chatResult?.[0];
         if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
 
-        chat.messages.push({
-            senderId:   user.id,
-            senderName: user.nome,
-            text,
-            timestamp:  new Date().toISOString(),
-            type:       'message'
-        });
+        if (editingMessageIndex !== null) {
+            chat.messages[editingMessageIndex].text = text;
+            chat.messages[editingMessageIndex].edited = true;
+        } else {
+            const newMessage = {
+                senderId:   user.id,
+                senderName: user.nome,
+                text,
+                timestamp:  new Date().toISOString(),
+                type:       'message'
+            };
+
+            if (currentReplyIndex !== null) {
+                const repliedMsg = chat.messages[currentReplyIndex];
+                newMessage.replyTo = {
+                    text: repliedMsg.text,
+                    senderName: repliedMsg.senderName
+                };
+            }
+            chat.messages.push(newMessage);
+        }
 
         await supabaseFetch(`chats?id=eq.${chat.id}`, {
             method: 'PATCH',
@@ -1654,6 +1757,7 @@ window.sendChatMessage = async function(event) {
         });
 
         input.value = '';
+        window.cancelReplyOrEdit();
         await loadChatMessages(currentChat);
     } catch (e) {
         showToast('Erro ao enviar mensagem.', 'error');
@@ -1736,23 +1840,24 @@ function getLogisticsTypeText(type) {
     return type;
 }
 
-window.setLogistics = async function(orderId, type) {
+window.setLogistics = async function(orderId, logisticsType) {
     const user  = getSavedUser();
-    let order   = ordersCache.find(o => o.id === orderId);
-    if (!order) {
-        const r = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
-        order   = r[0];
-    }
+    const order = ordersCache.find(o => o.id === orderId) || await supabaseFetch(`orders?id=eq.${orderId}&limit=1`).then(r => r[0]);
     if (!order) { showToast('Pedido não encontrado.', 'error'); return; }
 
     const isBuyer    = user.id === order.buyer_id;
-    const updateBody = { logistics_type: type, updated_at: new Date().toISOString() };
+    const updateBody = { logistics_type: logisticsType, updated_at: new Date().toISOString() };
 
     if (isBuyer) updateBody.agree_buyer  = true;
     else         updateBody.agree_seller = true;
 
-    const isAccepting = order.status === 'agreement';
-    updateBody.status = 'agreement';
+    const isAccepting = (isBuyer && order.agree_seller) || (!isBuyer && order.agree_buyer);
+
+    if (isAccepting) {
+        updateBody.status = (logisticsType === 'pickup' ? 'awaiting_pickup' : 'shipping');
+    } else {
+        updateBody.status = 'agreement';
+    }
 
     try {
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify(updateBody) });
@@ -1760,9 +1865,7 @@ window.setLogistics = async function(orderId, type) {
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
         const chat     = chatData[0];
         if (chat) {
-            const msgText = isAccepting 
-                ? `🤝 ${user.nome} aceitou a proposta de: ${getLogisticsTypeText(type)}.`
-                : `${user.nome} propôs a logística: ${getLogisticsTypeText(type)}.`;
+            const msgText = `${user.nome} propôs/aceitou a logística: ${getLogisticsTypeText(logisticsType)}.`;
 
             chat.messages.push({
                 senderId:  'system',
@@ -1773,8 +1876,47 @@ window.setLogistics = async function(orderId, type) {
             await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         }
         loadChatMessages(orderId);
-        showToast(isAccepting ? 'Proposta aceita!' : 'Logística proposta!', 'success');
+        showToast(isAccepting ? 'Logística definida!' : 'Proposta enviada!', 'success');
     } catch { showToast('Erro ao definir logística.', 'error'); }
+};
+
+window.chatCancelOrder = async function(orderId) {
+    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
+        });
+
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData[0];
+        if (chat) {
+            chat.messages.push({
+                senderId: 'system',
+                text: '❌ O pedido foi cancelado por uma das partes.',
+                timestamp: new Date().toISOString(),
+                type: 'system'
+            });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        showToast('Pedido cancelado!', 'info');
+        window.toggleChatActions(); // Fecha a aba
+        loadChatMessages(orderId);   // Recarrega o chat
+    } catch { showToast('Erro ao cancelar.', 'error'); }
+};
+
+window.resetLogistics = async function(orderId) {
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ 
+                agree_buyer: false, agree_seller: false, logistics_type: null,
+                updated_at: new Date().toISOString() 
+            })
+        });
+        showToast('Proposta recusada. Escolha uma nova opção.', 'info');
+        loadChatMessages(orderId);
+    } catch { showToast('Erro ao resetar logística.', 'error'); }
 };
 
 window.advanceLogisticsStatus = async function(orderId, nextStatus) {
@@ -1853,6 +1995,11 @@ window.renderSellerPanel = async function() {
                 </button>
             </div>`;
         } else {
+            // Sincroniza os produtos do vendedor com o cache global para o showDetail funcionar
+            sellerProducts.forEach(p => {
+                if (!allProductsCache.find(x => x.id === p.id)) allProductsCache.push(p);
+            });
+
             renderGrid(sellerProducts);
         }
         window.closeMobileMenu();
@@ -2017,19 +2164,85 @@ window.updateMobileNavActive = function(page) {
     }
 };
 
-/** Toggle Chat Actions (Placeholder para funcionalidade futura) */
-window.toggleChatActions = function() {
-    showToast('Opções de gerenciamento de pedido em breve!', 'info');
+window.startReply = async function(index) {
+    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+    const msg = chatResult?.[0]?.messages[index];
+    if (!msg) return;
+
+    currentReplyIndex = index;
+    editingMessageIndex = null;
+    
+    const preview = document.getElementById('chatInputPreview');
+    preview.classList.remove('d-none');
+    preview.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="small text-truncate" style="max-width: 85%;">
+                <strong class="text-primary d-block">Respondendo a ${msg.senderName}</strong>
+                <span class="text-muted">${msg.text}</span>
+            </div>
+            <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelReplyOrEdit()"></i>
+        </div>`;
+    document.getElementById('chatMessageInput').focus();
 };
 
-/** Finalizar Compra do Carrinho */
-window.finalizarCompraCarrinho = function() {
-    if (!getSavedUser()) {
-        showToast('Você precisa estar logado para finalizar!', 'warning');
-        window.showAuthScreen('login', true);
-        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).hide();
-        return;
+window.startEdit = async function(index) {
+    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+    const msg = chatResult?.[0]?.messages[index];
+    if (!msg) return;
+
+    editingMessageIndex = index;
+    currentReplyIndex = null;
+
+    const input = document.getElementById('chatMessageInput');
+    input.value = msg.text;
+    
+    const preview = document.getElementById('chatInputPreview');
+    preview.classList.remove('d-none');
+    preview.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="small"><strong class="text-warning">Editando mensagem...</strong></div>
+            <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelReplyOrEdit()"></i>
+        </div>`;
+    input.focus();
+};
+
+window.cancelReplyOrEdit = function() {
+    currentReplyIndex = null;
+    editingMessageIndex = null;
+    const preview = document.getElementById('chatInputPreview');
+    if (preview) {
+        preview.classList.add('d-none');
+        preview.innerHTML = '';
     }
+    const input = document.getElementById('chatMessageInput');
+    if (input && !currentReplyIndex) input.value = '';
+};
+
+function setupPullToRefresh() {
+    const container = document.getElementById('chatMessagesContainer');
+    let startY = 0;
+    
+    container.addEventListener('touchstart', e => startY = e.touches[0].pageY, {passive: true});
+    container.addEventListener('touchend', e => {
+        const moveY = e.changedTouches[0].pageY - startY;
+        if (container.scrollTop === 0 && moveY > 100) {
+            loadChatMessages(currentChat);
+            showToast('Atualizando...', 'info', 1000);
+        }
+    }, {passive: true});
+}
+
+/**
+ * Abre/Fecha a aba superior de processos de entrega
+ */
+window.toggleChatActions = function() {
+    const area = document.getElementById('logisticsAgreementArea');
+    if (area) {
+        area.classList.toggle('show-menu');
+    }
+};
+
+window.finalizarCompraCarrinho = function() {
     if (cart.length === 0) {
         showToast('Seu carrinho está vazio!', 'warning');
         return;
