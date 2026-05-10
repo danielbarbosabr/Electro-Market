@@ -603,12 +603,12 @@ textarea::placeholder {
     background-color: var(--primary-action);
     border: none;
     color: #fff !important;
-    transition: letter-spacing 0.2s;
+    letter-spacing: normal !important;
+    transition: filter 0.2s ease-in-out !important;
 }
 
 .btn-primary:hover {
     filter: brightness(1.2);
-    letter-spacing: 0.1rem;
 }
 
 .btn-outline-primary {
@@ -1015,14 +1015,61 @@ body.dark-theme .cart-item-img {
 }
 
 /* ============================================ */
-/* SISTEMA DE CHAT (CORRIGIDO PARA TEMA ESCURO) */
 /* ============================================ */
+/* CHAT TELA CHEIA E MENU DE OPÇÕES             */
+/* ============================================ */
+
+#chatModal .modal-dialog {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+}
+
+#chatModal .modal-content {
+    height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    display: flex;
+    flex-direction: column;
+}
+
+#chatModal .modal-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#logisticsAgreementArea {
+    position: absolute;
+    top: 70px; /* Logo abaixo do header do chat */
+    left: 0;
+    right: 0;
+    z-index: 2000;
+    background: var(--modal-bg);
+    border-bottom: 2px solid var(--border-light);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+    padding: 25px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: none; /* Escondido por padrão */
+    animation: slideDownChat 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#logisticsAgreementArea.show-menu { display: block !important; }
+
+@keyframes slideDownChat {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
 
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
-    min-height: 500px;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
 }
 
 .chat-messages {
@@ -1033,8 +1080,7 @@ body.dark-theme .cart-item-img {
     flex-direction: column;
     gap: 0.75rem;
     background: var(--bg-color);
-    border-radius: 12px;
-    max-height: 400px;
+    max-height: none;
 }
 
 body.dark-theme .chat-messages {
@@ -1045,6 +1091,8 @@ body.dark-theme .chat-messages {
     display: flex;
     max-width: 75%;
     margin-bottom: 12px;
+    position: relative;
+    group: hover;
     animation: messageSlide 0.2s ease;
 }
 
@@ -1070,9 +1118,67 @@ body.dark-theme .chat-messages {
 }
 
 .message-sent .message-bubble {
-    background: var(--primary-blue);
+    background: #005c4b !important; /* Verde WhatsApp */
     color: white;
     border-radius: 18px 18px 2px 18px !important;
+}
+
+.message-actions {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    gap: 5px;
+    padding: 0 10px;
+}
+
+.message-sent .message-actions { left: -60px; flex-direction: row-reverse; }
+.message-received .message-actions { right: -60px; }
+.chat-message:hover .message-actions { display: flex; }
+
+.reply-box {
+    background: rgba(0,0,0,0.1);
+    border-left: 4px solid var(--market-color);
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+}
+
+.reply-preview-container {
+    background: var(--card-bg);
+    border-top: 1px solid var(--border-light);
+    padding: 10px 15px;
+    border-left: 4px solid var(--market-color);
+}
+
+.message-actions {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    gap: 5px;
+    padding: 0 10px;
+}
+
+.message-sent .message-actions { left: -60px; flex-direction: row-reverse; }
+.message-received .message-actions { right: -60px; }
+.chat-message:hover .message-actions { display: flex; }
+
+.reply-box {
+    background: rgba(0,0,0,0.05);
+    border-left: 4px solid var(--market-color);
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+}
+
+.reply-preview-container {
+    background: var(--card-bg);
+    border-top: 1px solid var(--border-light);
+    padding: 10px 15px;
+    border-left: 4px solid var(--market-color);
 }
 
 .message-received .message-bubble {
@@ -1905,7 +2011,9 @@ body.sign-up-js .second-content .second-column {
         box-shadow: none !important; /* Remove a sombra da bolota */
         opacity: 1 !important;
         visibility: visible !important;
-        pointer-events: auto !important; /* Garante que o botão seja clicável */
+        pointer-events: all !important; /* Força a detecção de clique */
+        cursor: pointer !important;
+        display: flex !important;
     }
 
     .auth-close-btn i, 
@@ -1914,6 +2022,7 @@ body.sign-up-js .second-content .second-column {
         filter: none !important; 
         color: #ff0000 !important; /* Define a cor do X como vermelho */
         font-size: 2rem !important; /* Ajusta o tamanho do ícone */
+        pointer-events: none !important; /* O clique deve passar para o botão pai */
     }
     .login-icon-v3 {
         width: 100px; /* Reduzido levemente para economizar espaço vertical */
@@ -1933,4 +2042,37 @@ body.sign-up-js .second-content .second-column {
     body.sign-up-js .second-content .second-column {
         animation: none !important;
     }
+}
+
+/* Estilo para os botões de logística (para combinar com o design) */
+#logisticsButtons .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+#logisticsButtons .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* Botões padronizados para o chat e ações */
+#chatModal .btn {
+    border-radius: 2rem !important;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    animation: none !important;
+    letter-spacing: 0 !important;
+}
+
+#chatModal .btn:active {
+    transform: scale(0.96);
+}
+
+#logisticsButtons .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
 }
