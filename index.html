@@ -639,7 +639,7 @@
 
     <!-- Modal Chat -->
     <div class="modal fade" id="chatModal" tabindex="-1">
-        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
                 <div class="modal-header text-white d-flex align-items-center" style="background-color: var(--primary-blue);">
                     <img id="chatPartnerAvatar" src="" class="rounded-circle me-2" width="40" height="40" onerror="this.src='https://ui-avatars.com/api/?name=User'">
@@ -650,8 +650,13 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
-                    <div class="row g-0" style="height: 70vh;">
-                        <div class="col-12 d-flex flex-column h-100 bg-white">
+                    <div class="row g-0 h-100">
+                        <div class="col-12 d-flex flex-column h-100 bg-white chat-container">
+                            <!-- ABA DE OPÇÕES (Overlay superior) -->
+                            <div id="logisticsAgreementArea">
+                                <div id="logisticsButtons" class="logistics-buttons"></div>
+                            </div>
+
                             <!-- Resumo do Produto (fixo no topo) -->
                             <div id="chatProductSummary" class="p-2 bg-light border-bottom d-flex align-items-center gap-2">
                                 <img id="chatProdImg" src="" style="width:45px;height:45px;object-fit:cover;border-radius:8px;" 
@@ -668,9 +673,6 @@
                             <!-- Área de Mensagens -->
                             <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: var(--bg-color);"></div>
                             
-                            <!-- Área de Ações (Logística, Confirmar, Cancelar) -->
-                            <div id="chatActionsArea" class="p-3 border-top bg-light d-none"></div>
-
                             <!-- Barra de Preview (Responder/Editar) -->
                             <div id="chatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
 
