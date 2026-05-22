@@ -207,7 +207,7 @@ function renderCard(item) {
             </div>
             <div class="product-card-img-container">
                 ${thumb
-                    ? `<img src="${thumb}" alt="${item.titulo}" loading="lazy"
+                    ? `<img src="${thumb}" alt="${item.titulo}" loading="lazy" referrerpolicy="no-referrer"
                            onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:2.5rem;\\'></i>'">`
                     : `<i class="bi bi-box-seam text-secondary" style="font-size:2.5rem;"></i>`
                 }
@@ -373,7 +373,7 @@ window.showDetail = async function(pid) {
             <div class="col-md-7 border-end pe-md-4">
                 <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center" style="min-height:260px;">
                     ${mainImg
-                        ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:380px;object-fit:contain;transition:transform 0.3s;"
+                        ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:380px;object-fit:contain;transition:transform 0.3s;" referrerpolicy="no-referrer"
                                onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'"
                                onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
                         : `<i class="bi bi-box-seam text-secondary" style="font-size:4rem;"></i>`
@@ -514,13 +514,13 @@ function updateUI() {
 
         if (mobileTrigger) {
             mobileTrigger.innerHTML = hasAvatar
-                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/100'">`
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/100'">`
                 : `<i class="bi bi-person-circle fs-5 text-white"></i>`;
         }
 
         if (mobileMenuAvatar) {
             mobileMenuAvatar.innerHTML = hasAvatar
-                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/100'">`
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/100'">`
                 : user.nome ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:bold;color:var(--primary-blue);">${user.nome.charAt(0).toUpperCase()}</div>`
                 : `<i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>`;
         }
@@ -1024,16 +1024,18 @@ function safeParseImages(imgData) {
  */
 function normalizeImageUrl(url) {
     if (!url || typeof url !== 'string') return url;
-    // Já é link direto ou possui extensão?
-    if (url.includes('i.imgur.com') || /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url)) {
-        return url;
+    const trimmed = url.trim();
+
+    // Se for link do Imgur, forçamos o formato direto da CDN
+    if (trimmed.includes('imgur.com')) {
+        // Captura o ID da imagem ignorando pastas como /a/ ou /gallery/ e extensões já existentes
+        const match = trimmed.match(/imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)/);
+        if (match) {
+            // Usar .jpg é universal no Imgur para links diretos i.imgur.com/ID.jpg
+            return `https://i.imgur.com/${match[1]}.jpg`;
+        }
     }
-    // Tenta capturar o ID do Imgur em links de página ou galeria
-    const match = url.match(/imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)/);
-    if (match) {
-        return `https://i.imgur.com/${match[1]}.jpg`;
-    }
-    return url;
+    return trimmed;
 }
 
 /** Abre site externo para upload de imagens */
@@ -1415,7 +1417,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
             <div class="col-12 col-xl-10 mx-auto mb-3">
                 <div class="card p-3 shadow-sm border-0" style="border-radius:14px;">
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-center align-items-md-start">
-                        <img src="${order.product_img || ''}" class="rounded border"
+                        <img src="${order.product_img || ''}" class="rounded border" referrerpolicy="no-referrer"
                              style="width:90px;height:90px;object-fit:cover;"
                              onerror="this.src='https://placehold.co/90'">
 
@@ -1647,7 +1649,7 @@ async function loadChatMessages(orderId) {
                     ${replyHtml}
 
                     ${msg.image ? `
-                        <img src="${msg.image}" class="img-fluid rounded mb-2"
+                        <img src="${msg.image}" class="img-fluid rounded mb-2" referrerpolicy="no-referrer"
                              style="max-width:220px;cursor:pointer;"
                              onclick="window.openImageFull('${msg.image}')">
                     ` : ''}
@@ -2098,7 +2100,7 @@ window.renderAdminPanel = async function() {
                             ${users.map(u => `
                                 <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
                                     <div class="d-flex align-items-center gap-3 text-dark">
-                                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.nome)}" class="rounded-circle border" width="45" height="45" style="object-fit:cover;">
+                                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.nome)}" class="rounded-circle border" width="45" height="45" style="object-fit:cover;" referrerpolicy="no-referrer">
                                         <div>
                                             <h6 class="mb-0 fw-bold">${u.nome}</h6>
                                             <small class="text-muted">${u.email} • <span class="badge ${u.tipo==='ADMIN'?'bg-danger':'bg-primary'}">${u.tipo}</span></small>
