@@ -238,8 +238,11 @@
                             </div>
                         </div>
                         <div class="row g-2 mt-2">
-                            <div class="col-12 col-sm-6">
-                                <input type="file" id="v2CadAvatar" accept="image/*" style="width:100%;padding:8px;border:1.5px solid #ddd;border-radius:8px;font-size:.8rem;background:#f9f9f9;" title="Foto de perfil">
+                            <div class="col-12 col-sm-6 d-flex flex-column gap-1">
+                                <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirUploadExterno()" style="font-size: 0.75rem;">
+                                    <i class="bi bi-upload"></i> Subir foto no Imgur
+                                </button>
+                                <input type="url" id="v2CadAvatarLink" placeholder="Link da foto (URL)" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
                             </div>
                             <div class="col-12 col-sm-6">
                                 <select class="auth-v2-select" id="v2CadPagamento" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
@@ -524,23 +527,14 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Fotos do Produto (Arquivo ou Link)</label>
+                            <label class="form-label small fw-bold">Fotos do Produto (Links externos)</label>
+                            <button type="button" class="btn btn-sm btn-info text-white mb-2 d-block" onclick="abrirUploadExterno()">
+                                <i class="bi bi-upload"></i> Subir imagens no Imgur
+                            </button>
                             <div class="d-flex flex-column gap-2">
-                                <div class="input-group input-group-sm">
-                                    <input type="file" class="form-control" id="prodImage1" accept="image/*">
-                                    <span class="input-group-text">OU</span>
-                                    <input type="url" class="form-control" id="prodLink1" placeholder="Link da imagem 1">
-                                </div>
-                                <div class="input-group input-group-sm">
-                                    <input type="file" class="form-control" id="prodImage2" accept="image/*">
-                                    <span class="input-group-text">OU</span>
-                                    <input type="url" class="form-control" id="prodLink2" placeholder="Link da imagem 2">
-                                </div>
-                                <div class="input-group input-group-sm">
-                                    <input type="file" class="form-control" id="prodImage3" accept="image/*">
-                                    <span class="input-group-text">OU</span>
-                                    <input type="url" class="form-control" id="prodLink3" placeholder="Link da imagem 3">
-                                </div>
+                                <input type="url" class="form-control form-control-sm" id="prodLink1" placeholder="Link da imagem 1 (Ex: Imgur)">
+                                <input type="url" class="form-control form-control-sm" id="prodLink2" placeholder="Link da imagem 2">
+                                <input type="url" class="form-control form-control-sm" id="prodLink3" placeholder="Link da imagem 3">
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success w-100 fw-bold">Publicar Anúncio</button>
@@ -758,8 +752,11 @@
             <form id="profileEditForm">
                 <div class="text-center mb-4">
                     <img id="profilePreview" src="https://via.placeholder.com/100" class="rounded-circle border shadow-sm mb-2" width="100" height="100" style="object-fit: cover;">
-                    <label class="form-label d-block small fw-bold">Trocar Foto</label>
-                    <input type="file" class="form-control form-control-sm mt-1" id="editAvatar" accept="image/*">
+                    <label class="form-label d-block small fw-bold">Alterar Foto de Perfil</label>
+                    <button type="button" class="btn btn-sm btn-info text-white mb-2" onclick="abrirUploadExterno()">
+                        <i class="bi bi-upload"></i> Subir foto no Imgur
+                    </button>
+                    <input type="url" class="form-control form-control-sm" id="editAvatarLink" placeholder="Cole o link da imagem aqui">
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Nome Completo</label>
