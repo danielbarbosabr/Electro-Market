@@ -186,9 +186,10 @@ function renderCard(item) {
     const preco    = item.preco || 0;
     const pid      = item.id;
     const isLiked  = likedProducts.includes(pid);
-    const realizaEntrega = !!(item.realizaentrega);
+    const realizaEntrega = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
     const cidade   = item.cidade || 'Não informada';
-    const thumb    = Array.isArray(item.img) ? item.img[0] : item.img;
+    const imgs = safeParseImages(item.img);
+    const thumb = (imgs.length > 0 ? imgs[0] : null) || 'https://via.placeholder.com/400';
 
     const precoFormatado = preco === 0
         ? '<span class="text-success fw-bold">GRÁTIS</span>'
@@ -320,12 +321,12 @@ window.showDetail = async function(pid) {
         document.getElementById('prodDelivery').checked  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
         document.getElementById('announceForm').dataset.editingId = item.id;
 
-        // Popula links de imagens no formulário de edição
-        for (let i = 1; i <= 3; i++) {
-            const el = document.getElementById(`prodLink${i}`);
+        // Limpa e popula os campos de link de imagem no formulário de edição
+        for (let n = 1; n <= 3; n++) {
+            const el = document.getElementById(`prodLink${n}`);
             if (el) el.value = '';
         }
-        const imgs = Array.isArray(item.img) ? item.img : [item.img].filter(Boolean);
+        const imgs = safeParseImages(item.img);
         imgs.forEach((url, i) => {
             const el = document.getElementById(`prodLink${i+1}`);
             if (el) el.value = url;
@@ -346,9 +347,9 @@ window.showDetail = async function(pid) {
         }
     } catch (e) {}
 
-    const realizaEntrega  = !!(item.realizaentrega);
+    const realizaEntrega  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
     const cidadeVendedor  = item.cidade || 'sua região';
-    const images          = Array.isArray(item.img) ? item.img : [item.img].filter(Boolean);
+    const images = safeParseImages(item.img);
     const mainImg         = images[0] || '';
 
     const thumbnailsHtml = images.length > 1 ? `
@@ -487,64 +488,68 @@ function updateUI() {
         desktopIcon.className = modoEscuro ? 'bi bi-sun' : 'bi bi-moon-stars';
     }
 
-    if (logged && user.nome) {
-        const navName = document.getElementById('navUserName');
-        if (navName) navName.textContent = user.nome.split(' ')[0];
+    const navName = document.getElementById('navUserName');
+    const navAvatar = document.getElementById('navUserAvatar');
+    const navIcon = document.getElementById('navUserIcon');
+    const mobileUserName = document.getElementById('mobileUserName');
+    const mobileTrigger = document.getElementById('mobileUserTrigger');
+    const mobileMenuAvatar = document.getElementById('mobileProfileHeader');
+    const mobileWelcomeName = document.getElementById('mobileWelcomeName');
 
-        const navAvatar = document.getElementById('navUserAvatar');
-        const navIcon   = document.getElementById('navUserIcon');
+    if (logged) {
+        const firstNome = user.nome ? user.nome.split(' ')[0] : 'Usuário';
+        if (navName) navName.textContent = firstNome;
+        if (mobileUserName) mobileUserName.textContent = firstNome;
+        if (mobileWelcomeName) mobileWelcomeName.textContent = `Olá, ${firstNome}`;
+
+        const avatarLinks = safeParseImages(user.avatar);
+        const userAvatarLink = avatarLinks.length > 0 ? avatarLinks[0] : null;
+        const hasAvatar = userAvatarLink && userAvatarLink.startsWith('http');
+
         if (navAvatar && navIcon) {
-            if (user.avatar?.startsWith('http')) {
-                navAvatar.src = user.avatar;
-                navAvatar.style.display = 'block';
-                navIcon.style.display = 'none';
-            } else {
-                navAvatar.style.display = 'none';
-                navIcon.style.display = 'block';
-            }
+            navAvatar.src = hasAvatar ? userAvatarLink : '';
+            navAvatar.style.display = hasAvatar ? 'block' : 'none';
+            navIcon.style.display = hasAvatar ? 'none' : 'block';
         }
 
-        const mobileName = document.getElementById('mobileWelcomeName');
-        if (mobileName) mobileName.textContent = `Olá, ${user.nome.split(' ')[0]}`;
-
-        const mobileUserName = document.getElementById('mobileUserName');
-        if (mobileUserName) mobileUserName.textContent = user.nome.split(' ')[0];
-
-        const mobileTrigger = document.getElementById('mobileUserTrigger');
         if (mobileTrigger) {
-            mobileTrigger.innerHTML = user.avatar?.startsWith('http')
-                ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png'">`
+            mobileTrigger.innerHTML = hasAvatar
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/100'">`
                 : `<i class="bi bi-person-circle fs-5 text-white"></i>`;
         }
 
-        const mobileMenuAvatar = document.getElementById('mobileProfileHeader');
         if (mobileMenuAvatar) {
-            const avatarContent = user.avatar?.startsWith('http')
-                ? `<img src="${user.avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/149/149071.png'">`
-                : user.nome ? `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; color: var(--primary-blue);">${user.nome.charAt(0).toUpperCase()}</div>`
-                : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>
-                   </div>`;
-            mobileMenuAvatar.innerHTML = avatarContent;
+            mobileMenuAvatar.innerHTML = hasAvatar
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/100'">`
+                : user.nome ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:bold;color:var(--primary-blue);">${user.nome.charAt(0).toUpperCase()}</div>`
+                : `<i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>`;
         }
+        loadNotifications();
     } else {
-        const navAvatar = document.getElementById('navUserAvatar');
-        const navIcon   = document.getElementById('navUserIcon');
+        if (navName) navName.textContent = 'Usuário';
+        if (mobileUserName) mobileUserName.textContent = 'Usuário';
+        if (mobileWelcomeName) mobileWelcomeName.textContent = 'Olá, visitante';
+
         if (navAvatar && navIcon) {
             navAvatar.style.display = 'none';
             navIcon.style.display = 'block';
         }
-
-        const mobileTrigger = document.getElementById('mobileUserTrigger'); 
-        if (mobileTrigger) mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-3 text-white"></i>`;
-
-        const mobileMenuAvatar = document.getElementById('mobileProfileHeader');
+        if (mobileTrigger) {
+            mobileTrigger.innerHTML = `<i class="bi bi-person-circle fs-5 text-white"></i>`;
+        }
         if (mobileMenuAvatar) {
             mobileMenuAvatar.innerHTML = `<i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>`;
         }
     }
+    // Preview em tempo real do Avatar no Perfil
+    document.getElementById('editAvatarLink')?.addEventListener('input', (e) => {
+        const preview = document.getElementById('profilePreview');
+        const url = e.target.value.trim();
+        if (preview) {
+            preview.src = url.startsWith('http') ? url : 'https://via.placeholder.com/100';
+        }
+    });
 
-    if (logged) loadNotifications();
     updateCartBadge();
 }
 
@@ -748,6 +753,7 @@ window.buyItem = async function(i) {
 
     try {
         const orderId = `ord_${Date.now()}`;
+        const imgs = safeParseImages(item.img);
         const order   = {
             id:             orderId,
             seller_id:      item.vendedor_id || 'system',
@@ -756,11 +762,12 @@ window.buyItem = async function(i) {
             buyer_name:     user.nome,
             product_id:     item.id,
             product_title:  item.titulo,
-            product_img:    (Array.isArray(item.img) ? item.img[0] : item.img) || '',
+            product_img:    (imgs.length > 0 ? imgs[0] : ''),
             total:          (item.preco || 0) * (item.qtd || 1),
             quantity:       item.qtd || 1,
             status:         'pending',
-            realiza_entrega: item.realizaentrega ?? true,
+            // Tabela orders usa realiza_entrega (snake_case) no SQL fornecido
+            realiza_entrega: !!(item.realizaEntrega ?? item.realiza_entrega ?? true),
             agree_buyer:    false,
             agree_seller:   false,
             created_at:     new Date().toISOString(),
@@ -838,49 +845,65 @@ document.addEventListener('DOMContentLoaded', () => {
         const user  = getSavedUser();
         if (!user) { showToast('Faça login!', 'warning'); return; }
 
+        // Validação de campos obrigatórios e numéricos
         const btn  = e.target.querySelector('button[type="submit"]');
         const orig = btn.textContent;
-        const preco = +document.getElementById('prodPrice').value;
 
-        if (preco < 0) { showToast('O preço não pode ser menor que zero!', 'warning'); return; }
+        const titulo = document.getElementById('prodTitle').value.trim();
+        if (!titulo) { showToast('O título do anúncio é obrigatório.', 'warning'); return; }
+
+        const precoInput = document.getElementById('prodPrice').value;
+        const preco = parseFloat(precoInput);
+        if (isNaN(preco) || preco < 0) { showToast('Preço inválido! Digite um número maior ou igual a zero.', 'warning'); return; }
+
+        const quantidadeInput = document.getElementById('prodQuantity').value;
+        const quantidade = parseInt(quantidadeInput);
+        if (isNaN(quantidade) || quantidade < 1) { showToast('Quantidade inválida! Digite um número inteiro maior ou igual a um.', 'warning'); return; }
+
+        const categoria = document.getElementById('prodCategory').value.trim();
+        if (!categoria) { showToast('A categoria do produto é obrigatória.', 'warning'); return; }
 
         try {
             btn.disabled    = true;
             btn.textContent = 'Publicando...';
-
+                
+            const now = new Date().toISOString();
             const editingId = e.target.dataset.editingId;
 
             let imgsArray = [];
             for (let n = 1; n <= 3; n++) {
-                const fInput = document.getElementById(`prodImage${n}`);
                 const lInput = document.getElementById(`prodLink${n}`);
-                if (fInput && fInput.files.length > 0) {
-                    imgsArray.push(await fileToBase64(fInput.files[0]));
-                } else if (lInput && lInput.value.trim()) {
-                    imgsArray.push(lInput.value.trim());
+                if (lInput && lInput.value.trim()) {
+                    const rawUrl = lInput.value.trim();
+                    const normalized = normalizeImageUrl(rawUrl);
+                    imgsArray.push(normalized);
+                    lInput.value = normalized; // Atualiza visualmente o campo para o link normalizado
                 }
             }
 
             if (imgsArray.length === 0 && editingId) {
-                imgsArray = allProductsCache.find(p => p.id === editingId)?.img || [];
+                imgsArray = safeParseImages(allProductsCache.find(p => p.id === editingId)?.img);
             }
 
             const productData = {
-                id:           editingId || `prod_${Date.now()}`,
                 titulo:       document.getElementById('prodTitle').value,
                 descricao:    document.getElementById('prodDescription').value,
-                preco:        preco,
-                quantidade:   +document.getElementById('prodQuantity').value,
-                categoria:    document.getElementById('prodCategory').value,
-                img:          imgsArray,
+                preco:        preco, // Usar o valor validado
+                quantidade:   quantidade, // Usar o valor validado
+                categoria:    document.getElementById('prodCategory').value, // Usar o valor validado
+                img:          JSON.stringify(imgsArray),
                 loja:         user.nome,
                 vendedor_id:  user.id,
-                realizaentrega: document.getElementById('prodDelivery')?.checked ?? true
+                // Padronizando para minúsculo para bater com o Postgres/Supabase
+                realizaentrega: document.getElementById('prodDelivery')?.checked ?? true,
+                updated_at:   now
             };
 
             if (editingId) {
                 await supabaseFetch(`products?id=eq.${editingId}`, { method: 'PATCH', body: JSON.stringify(productData) });
             } else {
+                productData.id = `prod_${Date.now()}`;
+                productData.created_at = now;
                 await supabaseFetch('products', { method: 'POST', body: JSON.stringify(productData) });
             }
 
@@ -890,7 +913,9 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.reset();
         } catch (err) {
             console.error(err);
-            showToast('Erro ao publicar anúncio: verifique os campos.', 'error');
+            // Mostra o erro real retornado pelo banco (ex: coluna faltando ou tipo errado)
+            const errorMsg = err.message || (typeof err === 'string' ? err : 'Verifique os campos e a conexão.');
+            showToast(`Erro ao publicar: ${errorMsg}`, 'error');
         } finally {
             btn.disabled    = false;
             btn.textContent = orig;
@@ -903,14 +928,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const user = getSavedUser();
         if (!user) return;
 
-        const fileInput   = document.getElementById('editAvatar');
-        let base64Avatar  = user.avatar;
-        if (fileInput.files.length > 0) base64Avatar = await fileToBase64(fileInput.files[0]);
+        // Captura apenas o valor do campo de link (URL)
+        const novoAvatarRaw = document.getElementById('editAvatarLink')?.value.trim();
+        const novoAvatar = normalizeImageUrl(novoAvatarRaw);
+        if (document.getElementById('editAvatarLink')) {
+            document.getElementById('editAvatarLink').value = novoAvatar;
+        }
 
-        const updated = { ...user, nome: document.getElementById('editNome').value.trim(), avatar: base64Avatar };
+        const updated = { 
+            ...user, 
+            nome: document.getElementById('editNome').value.trim(), 
+            avatar: novoAvatar || user.avatar 
+        };
+
         await supabaseFetch(`users?id=eq.${user.id}`, { method: 'PATCH', body: JSON.stringify(updated) });
         localStorage.setItem('electroUser', JSON.stringify(updated));
-        bootstrap.Offcanvas.getInstance(document.getElementById('profileEditOffcanvas'))?.hide();
+        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas'))?.hide();
         updateUI();
         createPersistentNotification('Suas informações de perfil foram atualizadas.', 'success');
     });
@@ -959,38 +992,54 @@ document.addEventListener('DOMContentLoaded', () => {
 // UTILITÁRIOS
 // ============================================
 
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload  = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
+/**
+ * Utilitário para extrair links de imagens de forma robusta.
+ * Aceita Array, String JSON ou link direto.
+ */
+function safeParseImages(imgData) {
+    if (!imgData) return [];
+    let arr = [];
+    if (Array.isArray(imgData)) {
+        arr = imgData.filter(Boolean);
+    } else if (typeof imgData === 'string') {
+        const trimmed = imgData.trim();
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                arr = (Array.isArray(parsed) ? parsed : [parsed]).filter(Boolean);
+            } catch (e) {
+                arr = [trimmed].filter(Boolean);
+            }
+        } else {
+            arr = [trimmed].filter(Boolean);
+        }
+    }
+    // Retorna os links normalizados (Imgur direto)
+    return arr.map(normalizeImageUrl);
 }
 
 /**
- * Converte um arquivo em Base64 de baixa resolução usando Canvas
+ * Converte links do Imgur (página ou galeria) em links diretos (i.imgur.com).
+ * Ex: "https://imgur.com/abc" -> "https://i.imgur.com/abc.jpg"
  */
-function compressImage(file, maxWidth = 200) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const scale = maxWidth / img.width;
-                canvas.width = maxWidth;
-                canvas.height = img.height * scale;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                // Retorna JPG com 70% de qualidade para ser bem leve
-                resolve(canvas.toDataURL('image/jpeg', 0.7));
-            };
-        };
-    });
+function normalizeImageUrl(url) {
+    if (!url || typeof url !== 'string') return url;
+    // Já é link direto ou possui extensão?
+    if (url.includes('i.imgur.com') || /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url)) {
+        return url;
+    }
+    // Tenta capturar o ID do Imgur em links de página ou galeria
+    const match = url.match(/imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)/);
+    if (match) {
+        return `https://i.imgur.com/${match[1]}.jpg`;
+    }
+    return url;
 }
+
+/** Abre site externo para upload de imagens */
+window.abrirUploadExterno = function() {
+    window.open('https://imgur.com/upload', '_blank');
+};
 
 // ============================================
 // SISTEMA DE AUTOMAÇÃO - CPF, CEP E VALIDAÇÕES
@@ -1140,10 +1189,8 @@ window.logout            = () => {
 
 window.showProfileEdit = () => {
     const user = getSavedUser();
-    if (!user) {
-        window.showAuthScreen('login');
-        return;
-    }
+    if (!user) { window.showAuthScreen('login'); return; }
+    
     const editNome = document.getElementById('editNome');
     if (editNome) editNome.value = user.nome || '';
 
@@ -1153,6 +1200,12 @@ window.showProfileEdit = () => {
     document.getElementById('editCidade').value   = user.cidade   || '';
     document.getElementById('editEstado').value   = user.estado   || '';
     document.getElementById('editPagamento').value = user.pagamento || 'pix';
+
+    const linkInput = document.getElementById('editAvatarLink');
+    if (linkInput) {
+        const avatarLinks = safeParseImages(user.avatar);
+        linkInput.value = avatarLinks.length > 0 ? avatarLinks[0] : '';
+    }
 
     const preview = document.getElementById('profilePreview');
     if (preview) {
@@ -1210,17 +1263,12 @@ document.addEventListener('submit', async (e) => {
         const orig = btn?.textContent;
         if (btn) { btn.disabled = true; btn.textContent = 'Criando conta...'; }
 
-        const avatarInput = document.getElementById('v2CadAvatar');
-        const avatarLink  = document.getElementById('v2CadAvatarLink');
-        let base64Avatar  = '';
+        const inputAvatar = document.getElementById('v2CadAvatarLink');
+        let avatarUrl = '';
 
-        // Prioridade 1: Arquivo local (com compressão)
-        if (avatarInput?.files.length > 0) {
-            base64Avatar = await compressImage(avatarInput.files[0], 200); // 200px de largura
-        } 
-        // Prioridade 2: Link externo
-        else if (avatarLink && avatarLink.value.trim()) {
-            base64Avatar = avatarLink.value.trim();
+        if (inputAvatar && inputAvatar.value.trim()) {
+            avatarUrl = normalizeImageUrl(inputAvatar.value.trim());
+            inputAvatar.value = avatarUrl;
         }
 
         const payload = {
@@ -1233,7 +1281,7 @@ document.addEventListener('submit', async (e) => {
             endereco: `${document.getElementById('v2CadEnd').value}, ${document.getElementById('v2CadNum').value} - ${document.getElementById('v2CadBairro').value}`,
             cidade:   document.getElementById('v2CadCid').value,
             estado:   document.getElementById('v2CadUF').value,
-            avatar:   base64Avatar,
+            avatar:   avatarUrl,
             pagamento: document.getElementById('v2CadPagamento').value
         };
 
@@ -1765,61 +1813,54 @@ window.sendChatMessage = async function(event) {
 };
 
 window.sendChatImage = async function() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const user = getSavedUser();
-        if (!user || !currentChat) return;
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            try {
-                const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-                const chat       = chatResult?.[0];
-                if (!chat) return;
-                chat.messages.push({
-                    senderId: user.id, senderName: user.nome,
-                    text: '📷 Imagem', image: ev.target.result,
-                    timestamp: new Date().toISOString(), type: 'image'
-                });
-                await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-                await loadChatMessages(currentChat);
-            } catch { showToast('Erro ao enviar imagem.', 'error'); }
-        };
-        reader.readAsDataURL(file);
-    };
-    input.click();
+    const rawUrl = prompt("Dica: Use o botão 'Upload' para subir no Imgur e cole o link direto da imagem aqui:");
+    if (!rawUrl || !rawUrl.startsWith('http')) {
+        if (rawUrl) showToast("Link de imagem inválido!", "warning");
+        return;
+    }
+
+    const url = normalizeImageUrl(rawUrl);
+
+    const user = getSavedUser();
+    if (!user || !currentChat) return;
+    
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const chat       = chatResult?.[0];
+        if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
+
+        chat.messages.push({
+            senderId: user.id, senderName: user.nome,
+            text: '📷 Imagem', image: url,
+            timestamp: new Date().toISOString(), type: 'image'
+        });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadChatMessages(currentChat);
+    } catch (e) { showToast('Erro ao processar o envio do link da imagem.', 'error'); }
 };
 
 window.sendChatFile = async function() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const user = getSavedUser();
-        if (!user || !currentChat) return;
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            try {
-                const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-                const chat       = chatResult?.[0];
-                if (!chat) return;
-                chat.messages.push({
-                    senderId: user.id, senderName: user.nome,
-                    text: `📎 ${file.name}`,
-                    file: { name: file.name, url: ev.target.result, size: file.size },
-                    timestamp: new Date().toISOString(), type: 'file'
-                });
-                await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-                await loadChatMessages(currentChat);
-            } catch { showToast('Erro ao enviar arquivo.', 'error'); }
-        };
-        reader.readAsDataURL(file);
-    };
-    input.click();
+    const url = prompt("Cole o link do arquivo ou documento (Hospedado no Google Drive, Dropbox, etc):");
+    if (!url || !url.startsWith('http')) {
+        if (url) showToast("Link inválido!", "warning");
+        return;
+    }
+
+    const user = getSavedUser();
+    if (!user || !currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const chat       = chatResult?.[0];
+        if (!chat) return;
+        chat.messages.push({
+            senderId: user.id, senderName: user.nome,
+            text: `📎 Arquivo: ${url.split('/').pop()}`,
+            file: { name: 'Arquivo Externo', url: url, size: 0 },
+            timestamp: new Date().toISOString(), type: 'file'
+        });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadChatMessages(currentChat);
+    } catch { showToast('Erro ao enviar arquivo.', 'error'); }
 };
 
 window.openImageFull = function(src) {
@@ -2087,7 +2128,9 @@ window.renderAdminPanel = async function() {
                             ${products.map(p => `
                                 <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
                                     <div class="d-flex align-items-center gap-3 text-dark">
-                                        <img src="${Array.isArray(p.img) ? p.img[0] : p.img}" class="rounded" width="45" height="45" style="object-fit:cover;" onerror="this.src='https://placehold.co/45'">
+                                        <img src="${safeParseImages(p.img)[0] || 'https://placehold.co/45'}" 
+                                             class="rounded" width="45" height="45" style="object-fit:cover;" 
+                                             onerror="this.src='https://placehold.co/45'">
                                         <div style="max-width: 250px;">
                                             <h6 class="mb-0 fw-bold text-truncate">${p.titulo}</h6>
                                             <small class="text-muted">Loja: ${p.loja} • R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}</small>
