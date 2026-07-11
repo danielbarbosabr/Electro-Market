@@ -191,111 +191,178 @@
     </main>
 
     <!-- Nova Tela de Autenticação com Yeti Original -->
-    <div id="authScreen" class="auth-overlay d-none">
-        <div class="auth-wrapper" id="authWrapper">
-            <button type="button" class="btn-close auth-close-btn" onclick="window.hideAuthScreen()"></button>
+    <div id="authScreen" class="ml-auth-overlay d-none">
+        <div class="ml-auth-wrapper" id="authWrapper">
+            <button type="button" class="ml-auth-close" onclick="window.hideAuthScreen()" aria-label="Fechar">
+                <i class="bi bi-x-lg"></i>
+            </button>
 
-            <!-- ===== CADASTRO (first-content) ===== -->
-            <div class="auth-content first-content">
-                <div class="auth-column-side">
-                    <h2 class="title-primary">Bem vindo de volta!</h2>
-                    <p class="description-primary">Continue conectado connosco</p>
-                    <p class="description-primary">Por favor entre com as suas informações de login</p>
-                    <button class="btn-primary-outline mt-4" onclick="window.toggleAuthMode('login')">Entrar</button>
+            <!-- ===== LOGIN ===== -->
+            <div class="ml-auth-card ml-auth-login">
+                <div class="ml-auth-logo">
+                    <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" alt="ElectroMarket">
+                    <span>Electro<span class="market-text">Market</span></span>
                 </div>
 
-                <div class="auth-column-form" id="colFormCadastro">
-                    <h2 class="title-second">Criar uma Conta</h2>
-                    <form id="cadFormAnim" class="auth-form-v2" autocomplete="off">
-                        <div class="row g-2">
-                            <div class="col-12 col-sm-6"><input type="text" id="v2CadNome" placeholder="Nome completo" required></div>
-                            <div class="col-12 col-sm-6"><input type="text" id="v2CadCPF" placeholder="CPF" maxlength="14" required></div>
+                <h2 class="ml-auth-title">Acesse sua conta</h2>
+
+                <form id="loginFormAnimV2" class="ml-auth-form" autocomplete="off">
+                    <div class="ml-field">
+                        <input type="text" id="v2LogEmail" placeholder=" " required>
+                        <label for="v2LogEmail">E-mail ou telefone</label>
+                    </div>
+                    <div class="ml-field">
+                        <input type="password" id="v2LogPass" placeholder=" " required>
+                        <label for="v2LogPass">Senha</label>
+                        <i class="bi bi-eye ml-eye-icon" onclick="window.toggleAuthPass('v2LogPass', this)"></i>
+                    </div>
+                    <a href="#" class="ml-forgot-link" onclick="window.forgotPassword(event)">Esqueceu sua senha?</a>
+                    <button type="submit" class="ml-btn-primary mt-3">Entrar</button>
+                </form>
+
+                <div class="ml-auth-divider"><span>ou</span></div>
+
+                <button type="button" class="ml-btn-outline" onclick="window.toggleAuthMode('cadastro')">Criar conta</button>
+            </div>
+
+            <!-- ===== CADASTRO (multi-step) ===== -->
+            <div class="ml-auth-card ml-auth-cadastro">
+                <div class="ml-auth-logo">
+                    <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" alt="ElectroMarket">
+                    <span>Electro<span class="market-text">Market</span></span>
+                </div>
+
+                <h2 class="ml-auth-title">Crie sua conta grátis</h2>
+
+                <div class="ml-steps" id="mlCadSteps">
+                    <div class="ml-step-item active" data-step-indicator="1">
+                        <span class="ml-step-circle">1</span>
+                        <span class="ml-step-label">Dados de acesso</span>
+                    </div>
+                    <span class="ml-step-line"></span>
+                    <div class="ml-step-item" data-step-indicator="2">
+                        <span class="ml-step-circle">2</span>
+                        <span class="ml-step-label">Endereço e entrega</span>
+                    </div>
+                </div>
+
+                <form id="cadFormAnim" class="ml-auth-form" autocomplete="off">
+
+                    <!-- Passo 1: dados de acesso -->
+                    <div class="ml-step-panel" data-step-panel="1">
+                        <div class="ml-role-toggle">
+                            <label class="ml-role-option">
+                                <input type="radio" name="mlCadRole" value="CLIENTE" checked onchange="document.getElementById('v2CadTipo').value='CLIENTE'">
+                                <span><i class="bi bi-bag"></i> Quero comprar</span>
+                            </label>
+                            <label class="ml-role-option">
+                                <input type="radio" name="mlCadRole" value="VENDEDOR" onchange="document.getElementById('v2CadTipo').value='VENDEDOR'">
+                                <span><i class="bi bi-shop"></i> Quero vender</span>
+                            </label>
                         </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-12 col-sm-6"><input type="text" id="v2CadCEP" placeholder="CEP" maxlength="9" required></div>
-                            <div class="col-12 col-sm-6">
-                                <select class="auth-v2-select" id="v2CadTipo" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
-                                    <option value="CLIENTE">Cliente</option>
-                                    <option value="VENDEDOR">Vendedor</option>
-                                </select>
+                        <select id="v2CadTipo" class="d-none">
+                            <option value="CLIENTE" selected>Cliente</option>
+                            <option value="VENDEDOR">Vendedor</option>
+                        </select>
+
+                        <div class="ml-field">
+                            <input type="text" id="v2CadNome" placeholder=" " required>
+                            <label for="v2CadNome">Nome completo</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="ml-field">
+                                    <input type="text" id="v2CadCPF" placeholder=" " maxlength="14" required>
+                                    <label for="v2CadCPF">CPF</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="ml-field">
+                                    <input type="tel" id="v2CadTelefone" placeholder=" " maxlength="15" required>
+                                    <label for="v2CadTelefone">Telefone / WhatsApp</label>
+                                </div>
                             </div>
                         </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-12"><input type="text" id="v2CadEnd" placeholder="Rua / Logradouro" required></div>
+                        <div class="ml-field">
+                            <input type="email" id="v2CadEmail" placeholder=" " required>
+                            <label for="v2CadEmail">E-mail</label>
                         </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-4 col-sm-3"><input type="text" id="v2CadNum" placeholder="Nº" required></div>
-                            <div class="col-8 col-sm-9"><input type="text" id="v2CadBairro" placeholder="Bairro"></div>
+                        <div class="ml-field">
+                            <input type="password" id="v2CadPass" placeholder=" " required>
+                            <label for="v2CadPass">Senha</label>
+                            <i class="bi bi-eye ml-eye-icon" onclick="window.toggleAuthPass('v2CadPass', this)"></i>
                         </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-8 col-sm-9"><input type="text" id="v2CadCid" placeholder="Cidade" required></div>
-                            <div class="col-4 col-sm-3">
-                                <select class="auth-v2-select" id="v2CadUF" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
+
+                        <button type="button" class="ml-btn-primary mt-2" onclick="window.mlCadNextStep()">Continuar</button>
+                    </div>
+
+                    <!-- Passo 2: endereço e entrega -->
+                    <div class="ml-step-panel d-none" data-step-panel="2">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="ml-field">
+                                    <input type="text" id="v2CadCEP" placeholder=" " maxlength="9" required>
+                                    <label for="v2CadCEP">CEP</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="ml-field">
+                                    <input type="text" id="v2CadNum" placeholder=" " required>
+                                    <label for="v2CadNum">Número</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ml-field">
+                            <input type="text" id="v2CadEnd" placeholder=" " required>
+                            <label for="v2CadEnd">Rua / Logradouro</label>
+                        </div>
+                        <div class="ml-field">
+                            <input type="text" id="v2CadBairro" placeholder=" ">
+                            <label for="v2CadBairro">Bairro</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-8">
+                                <div class="ml-field">
+                                    <input type="text" id="v2CadCid" placeholder=" " required>
+                                    <label for="v2CadCid">Cidade</label>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <label class="ml-select-label">Estado</label>
+                                <select class="ml-select" id="v2CadUF">
                                     <option value="SP">SP</option><option value="RJ">RJ</option><option value="MG">MG</option>
                                     <option value="ES">ES</option><option value="PR">PR</option><option value="SC">SC</option>
                                     <option value="RS">RS</option><option value="DF">DF</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-12 col-sm-6 d-flex flex-column gap-1">
-                                <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirUploadExterno()" style="font-size: 0.75rem;">
-                                    <i class="bi bi-upload"></i> Subir foto no Imgur
-                                </button>
-                                <input type="url" id="v2CadAvatarLink" placeholder="Link da foto (URL)" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
+                        <label class="ml-select-label mt-1">Pagamento preferido</label>
+                        <select class="ml-select mb-2" id="v2CadPagamento">
+                            <option value="pix">PIX</option>
+                            <option value="cartao">Cartão</option>
+                            <option value="debito">Débito</option>
+                            <option value="boleto">Boleto</option>
+                        </select>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirUploadExterno()" style="font-size:0.75rem;white-space:nowrap;">
+                                <i class="bi bi-upload"></i> Subir foto
+                            </button>
+                            <div class="ml-field flex-grow-1 mb-0">
+                                <input type="url" id="v2CadAvatarLink" placeholder=" ">
+                                <label for="v2CadAvatarLink">Link da foto (opcional)</label>
                             </div>
-                            <div class="col-12 col-sm-6">
-                                <select class="auth-v2-select" id="v2CadPagamento" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.88rem;background:#f9f9f9;color:#333;">
-                                    <option value="pix">PIX</option>
-                                    <option value="cartao">Cartão</option>
-                                    <option value="debito">Débito</option>
-                                    <option value="boleto">Boleto</option>
-                                </select>
-                            </div>
                         </div>
-                        <input type="email" id="v2CadEmail" placeholder="Email" required style="margin-top:8px;">
-                        <div style="position:relative;margin-top:8px;">
-                            <input type="password" id="v2CadPass" placeholder="Senha" required>
-                            <i class="bi bi-eye" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aaa;font-size:.9rem;"
-                               onclick="window.toggleAuthPass('v2CadPass', this)"></i>
-                        </div>
-                        <button type="submit" class="btn-market-solid mt-3">CRIAR CONTA</button>
-                        <div class="text-center mt-3 d-md-none">
-                            <p class="mb-0 small text-muted">Já tem uma conta? <a href="#" class="text-primary fw-bold" onclick="window.toggleAuthMode('login')">Entrar agora</a></p>
-                        </div>
-                    </form>
-                </div>
-            </div>
 
-            <!-- ===== LOGIN (second-content) ===== -->
-            <div class="auth-content second-content">
-                <div class="auth-column-side">
-                    <h2 class="title-primary">Olá!</h2>
-                    <p class="description-primary">Entre com as suas informações</p>
-                    <p class="description-primary">E se junte a nós</p>
-                    <button class="btn-primary-outline mt-4" onclick="window.toggleAuthMode('cadastro')">Cadastrar</button>
-                </div>
-
-                <div class="auth-column-form" id="colFormLogin">
-                    <div class="login-icon-v3">
-                        <img src="https://raw.githubusercontent.com/belluzi/login-screen/2bab2b024cd0bf5ad16c2a32b95ed2d6be243e34/astronaut.svg" alt="Login">
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="button" class="ml-btn-outline flex-grow-1" onclick="window.mlCadPrevStep()">Voltar</button>
+                            <button type="submit" class="ml-btn-primary flex-grow-1">Criar conta</button>
+                        </div>
                     </div>
+                </form>
 
-                    <h2 class="title-second">Login ElectroMarket</h2>
-                    <form id="loginFormAnimV2" class="auth-form-v2" autocomplete="off">
-                        <input type="email" id="v2LogEmail" placeholder="Email" required>
-                        <div style="position:relative;margin-top:10px;">
-                            <input type="password" id="v2LogPass" placeholder="Senha" required>
-                            <i class="bi bi-eye" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aaa;font-size:.9rem;"
-                               onclick="window.toggleAuthPass('v2LogPass', this)"></i>
-                        </div>
-                        <a href="https://github.com/danielbarbosabr" target="_blank" style="display:block;text-align:right;font-size:.78rem;color:#34495e;margin-top:6px;">Esqueceu a senha?</a>
-                        <button type="submit" class="btn-market-solid mt-3">ENTRAR</button>
-                        <div class="text-center mt-3 d-md-none">
-                            <p class="mb-0 small text-muted">Ainda não tem conta? <a href="#" class="text-primary fw-bold" onclick="window.toggleAuthMode('cadastro')">Cadastre-se aqui</a></p>
-                        </div>
-                    </form>
-                </div>
+                <div class="ml-auth-divider"><span>ou</span></div>
+
+                <button type="button" class="ml-btn-outline" onclick="window.toggleAuthMode('login')">Já tenho conta</button>
             </div>
         </div>
     </div>
@@ -394,6 +461,10 @@
                             <div class="col-md-6 mb-3">
                                 <input type="number" class="form-control" id="prodQuantity" placeholder="Quantidade" required>
                             </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Preço original (opcional — preencha para criar uma oferta com desconto, igual no Mercado Livre)</label>
+                            <input type="number" class="form-control" id="prodPrecoOriginal" placeholder="Preço antes do desconto (R$)">
                         </div>
                         <div class="mb-3">
                             <select class="form-select" id="prodCategory" required>
@@ -594,7 +665,17 @@
                     <i class="bi bi-box-seam"></i> <strong>Meus Produtos</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); window.closeMobileMenu();">
-                    <i class="bi bi-tag"></i> <strong>Vender</strong>
+                    <i class="bi bi-tag"></i> <strong>Vender Produto</strong>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action role-seller d-none d-flex justify-content-between align-items-center" onclick="window.renderOrderManagement('seller_requests'); window.closeMobileMenu();">
+                    <span><i class="bi bi-bell"></i> <strong>Solicitações</strong></span>
+                    <span class="badge bg-danger rounded-pill d-none" id="pendingBadgeMobile">0</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action role-seller d-none" onclick="window.renderOrderManagement('seller_sales'); window.closeMobileMenu();">
+                    <i class="bi bi-shop"></i> <strong>Minhas Vendas</strong>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action role-admin d-none" onclick="window.renderOrderManagement('admin'); window.closeMobileMenu();">
+                    <i class="bi bi-shield-lock"></i> <strong>Painel Admin</strong>
                 </a>
 
                 <hr class="my-2 opacity-10">
@@ -751,7 +832,7 @@
         <div class="offcanvas-body">
             <form id="profileEditForm">
                 <div class="text-center mb-4">
-                    <img id="profilePreview" src="https://via.placeholder.com/100" class="rounded-circle border shadow-sm mb-2" width="100" height="100" style="object-fit: cover;" referrerpolicy="no-referrer">
+                    <img id="profilePreview" src="https://placehold.co/100" class="rounded-circle border shadow-sm mb-2" width="100" height="100" style="object-fit: cover;" referrerpolicy="no-referrer">
                     <label class="form-label d-block small fw-bold">Alterar Foto de Perfil</label>
                     <button type="button" class="btn btn-sm btn-info text-white mb-2" onclick="abrirUploadExterno()">
                         <i class="bi bi-upload"></i> Subir foto no Imgur
@@ -769,6 +850,10 @@
                 <div class="mb-3">
                     <label class="form-label small fw-bold">CPF</label>
                     <input type="text" class="form-control" id="editCPF" readonly style="background-color: #f8f9fa;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Telefone / WhatsApp</label>
+                    <input type="tel" class="form-control" id="editTelefone" maxlength="15">
                 </div>
                 <div class="mb-3">
                     <label class="form-label small fw-bold">Endereço</label>
@@ -807,19 +892,37 @@
         <div class="container">
             <!-- Navegação do App (Apenas Mobile) -->
             <div class="mobile-nav-row d-flex d-md-none justify-content-around mb-2">
-                <a href="#" class="nav-item active" onclick="loadPage('eletronicos'); updateMobileNavActive('eletronicos')">
+                <a href="#" class="nav-item active role-client" data-page="eletronicos" onclick="loadPage('eletronicos'); updateMobileNavActive('eletronicos')">
                     <i class="bi bi-house"></i><span>Início</span>
                 </a>
-                <a href="#" class="nav-item" onclick="window.renderLikedProducts(); updateMobileNavActive('renderLikedProducts')">
+
+                <!-- Opções de Cliente -->
+                <a href="#" class="nav-item role-client" data-page="renderLikedProducts" onclick="window.renderLikedProducts(); updateMobileNavActive('renderLikedProducts')">
                     <i class="bi bi-heart"></i><span>Favoritos</span>
                 </a>
-                <a href="#" class="nav-item" onclick="window.renderOrderManagement('buyer'); updateMobileNavActive('renderOrderManagement')">
+                <a href="#" class="nav-item role-client" data-page="renderOrderManagement" onclick="window.renderOrderManagement('buyer'); updateMobileNavActive('renderOrderManagement')">
                     <i class="bi bi-bag"></i><span>Compras</span>
                 </a>
-                <a href="#" class="nav-item" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" onclick="updateMobileNavActive('cartOffcanvas')">
+                <a href="#" class="nav-item role-client" data-page="cartOffcanvas" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" onclick="updateMobileNavActive('cartOffcanvas')">
                     <i class="bi bi-cart"></i><span>Carrinho</span>
                 </a>
-                <a href="#" class="nav-item" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu" onclick="updateMobileNavActive('mobileMenu')">
+
+                <!-- Opções de Vendedor -->
+                <a href="#" class="nav-item role-seller d-none" data-page="renderSellerPanel" onclick="window.renderSellerPanel(); updateMobileNavActive('renderSellerPanel')">
+                    <i class="bi bi-box-seam"></i><span>Produtos</span>
+                </a>
+                <a href="#" class="nav-item role-seller d-none" data-page="announceModal" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); updateMobileNavActive('announceModal')">
+                    <i class="bi bi-plus-circle"></i><span>Vender</span>
+                </a>
+                <a href="#" class="nav-item role-seller d-none" data-page="seller_sales" onclick="window.renderOrderManagement('seller_sales'); updateMobileNavActive('seller_sales')">
+                    <i class="bi bi-shop"></i><span>Vendas</span>
+                </a>
+                <a href="#" class="nav-item role-seller d-none" data-page="seller_requests" onclick="window.renderOrderManagement('seller_requests'); updateMobileNavActive('seller_requests')">
+                    <i class="bi bi-bell"></i><span>Pedidos</span>
+                    <span class="badge bg-danger rounded-pill dock-badge d-none" id="pendingBadgeDock">0</span>
+                </a>
+
+                <a href="#" class="nav-item" data-page="mobileMenu" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu" onclick="updateMobileNavActive('mobileMenu')">
                     <i class="bi bi-three-dots"></i><span>Mais</span>
                 </a>
             </div>
