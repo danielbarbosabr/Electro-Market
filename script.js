@@ -16,6 +16,9 @@ let editingMessageIndex = null;
 let riveInstance      = null;
 let chatsCache        = [];
 let notificationsCache = JSON.parse(localStorage.getItem('electroNotifs')) || [];
+let chatPollInterval  = null;
+let lastChatSignature = null;
+let productsFetchToken = 0;
 
 const ORDER_STATUS_MAP = {
     'pending':         { text: 'Em Aprovação',             class: 'bg-warning text-dark' },
@@ -60,6 +63,23 @@ async function createPersistentNotification(message, type = 'info', userId = nul
         } catch (e) { console.error("Erro ao salvar log:", e); }
     }
     loadNotifications();
+}
+
+/**
+ * Busca a quantidade de pedidos pendentes de aprovação do vendedor
+ * e sincroniza os badges (nav desktop, menu mobile e dock inferior).
+ */
+async function updateSellerPendingBadge(sellerId) {
+    try {
+        const pending = await supabaseFetch(`orders?select=id&seller_id=eq.${sellerId}&status=eq.pending`);
+        const count = pending?.length || 0;
+        document.querySelectorAll('#pendingBadgeNav, #pendingBadgeMobile, #pendingBadgeDock').forEach(el => {
+            el.textContent = count > 9 ? '9+' : String(count);
+            el.classList.toggle('d-none', count === 0);
+        });
+    } catch (e) {
+        console.error('Erro ao verificar pedidos pendentes:', e);
+    }
 }
 
 function showToast(message, type = 'info', duration = 3500) {
@@ -111,44 +131,60 @@ async function supabaseFetch(path, options = {}) {
 // CARREGAR PRODUTOS (com skeleton)
 // ============================================
 
-async function loadPage(query = 'eletronicos') {
+async function loadPage(query = 'eletronicos', forceRefresh = false) {
     const grid = document.getElementById('productsGrid');
-    // Skeleton loading - muito mais suave que um spinner central
-    grid.style.display = 'grid';
-    grid.classList.remove('order-view-active');
-    grid.innerHTML = Array(12).fill(0).map(() => `
-        <div class="card border-0" style="border-radius: 10px; overflow: hidden;">
-            <div class="skeleton" style="height: 160px;"></div>
-            <div style="padding: 12px;">
-                <div class="skeleton mb-2" style="height: 14px; width: 80%;"></div>
-                <div class="skeleton mb-1" style="height: 14px; width: 60%;"></div>
-                <div class="skeleton" style="height: 22px; width: 50%;"></div>
-            </div>
-        </div>`).join('');
+    const user = getSavedUser();
+    const role = user?.tipo || 'CLIENTE';
+    const hero = document.getElementById('heroSection');
+
+    // Usa o cache já carregado para buscas/filtragens (evita ida à rede a cada letra digitada).
+    // Só busca no servidor na primeira carga, quando o papel do usuário muda, quando forçado,
+    // ou ao entrar em Ofertas (preços/descontos podem ter sido alterados por outros vendedores
+    // depois que esta página já tinha carregado o cache).
+    const isOfertas = typeof query === 'string' && query.toLowerCase() === 'ofertas';
+    const needsFetch = forceRefresh || isOfertas || allProductsCache.length === 0 || loadPage._lastRole !== role;
+
+    if (needsFetch) {
+        // Skeleton loading - muito mais suave que um spinner central
+        grid.style.display = 'grid';
+        grid.classList.remove('order-view-active');
+        grid.innerHTML = Array(12).fill(0).map(() => `
+            <div class="card border-0" style="border-radius: 10px; overflow: hidden;">
+                <div class="skeleton" style="height: 160px;"></div>
+                <div style="padding: 12px;">
+                    <div class="skeleton mb-2" style="height: 14px; width: 80%;"></div>
+                    <div class="skeleton mb-1" style="height: 14px; width: 60%;"></div>
+                    <div class="skeleton" style="height: 22px; width: 50%;"></div>
+                </div>
+            </div>`).join('');
+    }
+
+    // Token de requisição: evita que uma resposta antiga (de uma busca anterior)
+    // sobrescreva o resultado de uma busca mais recente (condição de corrida).
+    const myToken = ++productsFetchToken;
 
     try {
-        const user = getSavedUser();
-        const role = user?.tipo || 'CLIENTE';
-        const hero = document.getElementById('heroSection');
         let path = 'products?select=*';
+        if (user && user.tipo === 'VENDEDOR') {
+            path += `&vendedor_id=eq.${user.id}`;
+        }
+
+        if (needsFetch) {
+            const data = await supabaseFetch(path);
+            if (myToken !== productsFetchToken) return; // resposta obsoleta, ignora
+            allProductsCache = data || [];
+            loadPage._lastRole = role;
+        }
 
         if (hero) {
             hero.classList.toggle('d-none', role === 'VENDEDOR' || query !== 'eletronicos');
         }
 
-        if (user && user.tipo === 'VENDEDOR') {
-            path += `&vendedor_id=eq.${user.id}`;
-        }
-
-        const data = await supabaseFetch(path);
-        console.log(`Fetched ${data.length} products from Supabase.`);
-        allProductsCache = data || [];
-
         let products = allProductsCache;
         if (query !== 'eletronicos' && query !== '') {
             const term = query.toLowerCase();
             if (term === 'ofertas') {
-                products = products.filter(p => (p.preco_original || 0) > p.preco);
+                products = products.filter(p => parseFloat(p.preco_original || 0) > parseFloat(p.preco || 0));
                 document.getElementById('gridTitle').textContent = 'Ofertas Imperdíveis';
             } else {
                 products = products.filter(p =>
@@ -161,18 +197,16 @@ async function loadPage(query = 'eletronicos') {
             document.getElementById('gridTitle').textContent = 'Recomendados para você';
         }
 
-        console.log(`loadPage called with query: "${query}"`);
-        console.log(`Filtered products count: ${products.length}`);
-        console.log(`Filtered products:`, products);
         renderGrid(products);
         updateStoreFilterUI();
     } catch (e) {
+        if (myToken !== productsFetchToken) return;
         console.error(e);
         grid.innerHTML = `
             <div class="col-12 text-center py-5">
                 <i class="bi bi-wifi-off fs-1 text-muted d-block mb-3"></i>
                 <h5>Erro ao carregar produtos</h5>
-                <button class="btn btn-primary mt-3" onclick="loadPage()">Tentar novamente</button>
+                <button class="btn btn-primary mt-3" onclick="loadPage(undefined, true)">Tentar novamente</button>
             </div>`;
     }
 }
@@ -189,14 +223,18 @@ function renderCard(item) {
     const realizaEntrega = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
     const cidade   = item.cidade || 'Não informada';
     const imgs = safeParseImages(item.img);
-    const thumb = (imgs.length > 0 ? imgs[0] : null) || 'https://via.placeholder.com/400';
+    const thumb = (imgs.length > 0 ? imgs[0] : null) || 'https://placehold.co/400';
 
     const precoFormatado = preco === 0
         ? '<span class="text-success fw-bold">GRÁTIS</span>'
         : `R$ ${Math.floor(preco).toLocaleString('pt-BR')}<small style="font-size:0.6em">,${((preco % 1).toFixed(2)).slice(1)}</small>`;
 
+    const temOferta   = !!(item.preco_original && parseFloat(item.preco_original) > parseFloat(preco));
+    const descontoPct = temOferta ? Math.round(100 - (preco / parseFloat(item.preco_original)) * 100) : 0;
+
     return `
         <div class="card product-card-ml" onclick="window.showDetail('${pid}')">
+            ${temOferta ? `<div class="offer-badge-ml">${descontoPct}% OFF</div>` : ''}
             <div class="overlay">
                 <button class="btn btn-action" onclick="event.stopPropagation();window.shareProduct('${pid}')" title="Compartilhar">
                     <i class="bi bi-share"></i>
@@ -215,13 +253,14 @@ function renderCard(item) {
             <div class="card-body product-card-body">
                 <h6 class="product-title-grid">${item.titulo}</h6>
                 <div class="current-price">
-                    ${item.preco_original && item.preco_original > preco
+                    ${temOferta
                         ? `<div class="text-muted text-decoration-line-through" style="font-size:0.75rem;font-weight:normal;">
-                               R$ ${item.preco_original.toLocaleString('pt-BR', {minimumFractionDigits:2})}
+                               R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}
                            </div>`
                         : ''
                     }
                     ${precoFormatado}
+                    ${temOferta ? `<span class="offer-pct-inline">${descontoPct}% OFF</span>` : ''}
                 </div>
                 <div class="${realizaEntrega ? 'text-success' : 'text-muted'} small fw-bold mt-2">
                     <i class="bi ${realizaEntrega ? 'bi-truck' : 'bi-geo-alt'}"></i>
@@ -317,6 +356,7 @@ window.showDetail = async function(pid) {
         document.getElementById('prodDescription').value = item.descricao;
         document.getElementById('prodPrice').value       = item.preco;
         document.getElementById('prodQuantity').value    = item.quantidade;
+        document.getElementById('prodPrecoOriginal').value = item.preco_original || '';
         document.getElementById('prodCategory').value    = item.categoria;
         document.getElementById('prodDelivery').checked  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
         document.getElementById('announceForm').dataset.editingId = item.id;
@@ -390,6 +430,12 @@ window.showDetail = async function(pid) {
                 <h4 class="fw-bold">${item.titulo}</h4>
 
                 <div class="my-3">
+                    ${item.preco_original && parseFloat(item.preco_original) > parseFloat(item.preco) ? `
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="text-muted text-decoration-line-through">R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                            <span class="offer-pct-inline">${Math.round(100 - (item.preco / parseFloat(item.preco_original)) * 100)}% OFF</span>
+                        </div>` : ''
+                    }
                     ${item.preco === 0
                         ? `<span class="fs-1 fw-bold text-success">GRÁTIS</span>`
                         : `<span class="fs-1 fw-bold">R$ ${Math.floor(item.preco || 0).toLocaleString('pt-BR')}</span>
@@ -468,6 +514,10 @@ function updateUI() {
     document.querySelectorAll('.role-seller').forEach(el    => el.classList.toggle('d-none', role !== 'VENDEDOR' && role !== 'ADMIN'));
     document.querySelectorAll('.role-admin').forEach(el     => el.classList.toggle('d-none', role !== 'ADMIN'));
 
+    if (role === 'VENDEDOR' || role === 'ADMIN') {
+        updateSellerPendingBadge(user.id);
+    }
+
     const heroSection = document.getElementById('heroSection');
     if (heroSection) heroSection.classList.toggle('d-none', role === 'VENDEDOR');
 
@@ -514,13 +564,13 @@ function updateUI() {
 
         if (mobileTrigger) {
             mobileTrigger.innerHTML = hasAvatar
-                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/100'">`
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/100'">`
                 : `<i class="bi bi-person-circle fs-5 text-white"></i>`;
         }
 
         if (mobileMenuAvatar) {
             mobileMenuAvatar.innerHTML = hasAvatar
-                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/100'">`
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/100'">`
                 : user.nome ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:bold;color:var(--primary-blue);">${user.nome.charAt(0).toUpperCase()}</div>`
                 : `<i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>`;
         }
@@ -546,7 +596,7 @@ function updateUI() {
         const preview = document.getElementById('profilePreview');
         const url = e.target.value.trim();
         if (preview) {
-            preview.src = url.startsWith('http') ? url : 'https://via.placeholder.com/100';
+            preview.src = url.startsWith('http') ? url : 'https://placehold.co/100';
         }
     });
 
@@ -860,6 +910,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const quantidade = parseInt(quantidadeInput);
         if (isNaN(quantidade) || quantidade < 1) { showToast('Quantidade inválida! Digite um número inteiro maior ou igual a um.', 'warning'); return; }
 
+        // Preço original (para oferta com desconto, igual Mercado Livre) - campo opcional
+        const precoOriginalInput = document.getElementById('prodPrecoOriginal').value;
+        let precoOriginal = null;
+        if (precoOriginalInput.trim() !== '') {
+            precoOriginal = parseFloat(precoOriginalInput);
+            if (isNaN(precoOriginal) || precoOriginal < 0) { showToast('Preço original inválido! Digite um número maior ou igual a zero.', 'warning'); return; }
+            if (precoOriginal <= preco) { showToast('O preço original deve ser maior que o preço com desconto para virar uma oferta.', 'warning'); return; }
+        }
+
         const categoria = document.getElementById('prodCategory').value.trim();
         if (!categoria) { showToast('A categoria do produto é obrigatória.', 'warning'); return; }
 
@@ -885,10 +944,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgsArray = safeParseImages(allProductsCache.find(p => p.id === editingId)?.img);
             }
 
+            // OFERTA AUTOMÁTICA (estilo Mercado Livre): se o vendedor está editando
+            // um anúncio já existente e simplesmente baixou o preço, sem preencher
+            // manualmente o campo "preço original", usamos o preço anterior como
+            // preço "de" automaticamente — o anúncio já nasce como oferta, sem o
+            // vendedor precisar digitar nada a mais.
+            if (editingId && precoOriginal === null) {
+                const anuncioAnterior = allProductsCache.find(p => p.id === editingId);
+                const precoAnterior = anuncioAnterior ? parseFloat(anuncioAnterior.preco) : null;
+                if (precoAnterior && preco < precoAnterior) {
+                    precoOriginal = precoAnterior;
+                }
+            }
+
             const productData = {
                 titulo:       document.getElementById('prodTitle').value,
                 descricao:    document.getElementById('prodDescription').value,
                 preco:        preco, // Usar o valor validado
+                preco_original: precoOriginal, // null se não houver oferta/desconto
                 quantidade:   quantidade, // Usar o valor validado
                 categoria:    document.getElementById('prodCategory').value, // Usar o valor validado
                 img:          JSON.stringify(imgsArray),
@@ -908,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             bootstrap.Modal.getInstance(document.getElementById('announceModal'))?.hide();
-            await loadPage();
+            await loadPage(undefined, true);
             createPersistentNotification(editingId ? 'Seu anúncio foi atualizado.' : 'Novo anúncio publicado com sucesso!', 'success');
             e.target.reset();
         } catch (err) {
@@ -935,10 +1008,15 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('editAvatarLink').value = novoAvatar;
         }
 
-        const updated = { 
-            ...user, 
-            nome: document.getElementById('editNome').value.trim(), 
-            avatar: novoAvatar || user.avatar 
+        const updated = {
+            ...user,
+            nome:      document.getElementById('editNome').value.trim(),
+            telefone:  document.getElementById('editTelefone')?.value.replace(/\D/g, '') || '',
+            endereco:  document.getElementById('editEndereco').value.trim(),
+            cidade:    document.getElementById('editCidade').value.trim(),
+            estado:    document.getElementById('editEstado').value,
+            pagamento: document.getElementById('editPagamento').value,
+            avatar:    novoAvatar || user.avatar
         };
 
         await supabaseFetch(`users?id=eq.${user.id}`, { method: 'PATCH', body: JSON.stringify(updated) });
@@ -974,6 +1052,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Tema desktop
     document.getElementById('themeToggle')?.addEventListener('click', window.toggleTema);
+
+    // Para o polling de mensagens automaticamente quando o chat é fechado (evita chamadas em segundo plano)
+    document.getElementById('chatModal')?.addEventListener('hidden.bs.modal', () => {
+        stopChatPolling();
+        currentChat = null;
+        lastChatSignature = null;
+    });
+
+    // Pausa o polling quando a aba fica em segundo plano e retoma ao voltar (economiza requisições/bateria)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopChatPolling();
+        } else if (currentChat && document.getElementById('chatModal')?.classList.contains('show')) {
+            startChatPolling(currentChat);
+        }
+    });
 
     // Init
     updateUI();
@@ -1075,6 +1169,23 @@ function formatarCEP(input) {
     return valor.replace(/\D/g, '');
 }
 
+/** Formata Telefone: (00) 00000-0000 ou (00) 0000-0000 */
+function formatarTelefone(input) {
+    let v = input.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+    if (v.length > 10) {
+        v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+    } else if (v.length > 5) {
+        v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    } else if (v.length > 2) {
+        v = v.replace(/(\d{2})(\d{0,5})/, '($1) $2');
+    } else if (v.length > 0) {
+        v = v.replace(/(\d{0,2})/, '($1');
+    }
+    if (input.value !== v) input.value = v;
+    return v.replace(/\D/g, '');
+}
+
 /** Busca endereço pelo CEP (ViaCEP) */
 async function buscarEnderecoPorCep(cep) {
     cep = cep.replace(/\D/g, '');
@@ -1127,6 +1238,13 @@ function setupAutoComplete() {
                 }
             }
         });
+    });
+
+    // Telefone Automático
+    ['v2CadTelefone', 'editTelefone'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', (e) => formatarTelefone(e.target));
     });
 
     // CEP Automático
@@ -1198,6 +1316,7 @@ window.showProfileEdit = () => {
 
     document.getElementById('editEmail').value    = user.email    || '';
     document.getElementById('editCPF').value      = user.cpf      || '';
+    document.getElementById('editTelefone').value = user.telefone || '';
     document.getElementById('editEndereco').value = user.endereco || '';
     document.getElementById('editCidade').value   = user.cidade   || '';
     document.getElementById('editEstado').value   = user.estado   || '';
@@ -1211,7 +1330,7 @@ window.showProfileEdit = () => {
 
     const preview = document.getElementById('profilePreview');
     if (preview) {
-        preview.src = user.avatar?.startsWith('http') ? user.avatar : 'https://via.placeholder.com/100';
+        preview.src = user.avatar?.startsWith('http') ? user.avatar : 'https://placehold.co/100';
     }
 
     bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas')).show();
@@ -1222,6 +1341,48 @@ window.showAuthScreen = function(mode = 'login', autoCloseMenu = true) {
   if (!overlay) return;
   overlay.classList.remove('d-none');
   window.toggleAuthMode(mode);
+  window.mlCadGoToStep(1); // sempre reinicia o cadastro no passo 1 ao abrir a tela
+
+  // Foca automaticamente o primeiro campo relevante, melhorando a usabilidade no desktop e no mobile
+  setTimeout(() => {
+      const targetId = mode === 'login' ? 'v2LogEmail' : 'v2CadNome';
+      document.getElementById(targetId)?.focus();
+  }, 350);
+};
+
+// ============================================
+// PASSO A PASSO DO CADASTRO (ESTILO MERCADO LIVRE)
+// ============================================
+
+window.mlCadGoToStep = function(step) {
+    document.querySelectorAll('[data-step-panel]').forEach(panel => {
+        panel.classList.toggle('d-none', Number(panel.dataset.stepPanel) !== step);
+    });
+    document.querySelectorAll('[data-step-indicator]').forEach(indicator => {
+        const indicatorStep = Number(indicator.dataset.stepIndicator);
+        indicator.classList.toggle('active', indicatorStep === step);
+        indicator.classList.toggle('done', indicatorStep < step);
+    });
+};
+
+window.mlCadNextStep = function() {
+    // Valida os campos obrigatórios do passo 1 antes de avançar
+    const requiredIds = ['v2CadNome', 'v2CadCPF', 'v2CadTelefone', 'v2CadEmail', 'v2CadPass'];
+    for (const id of requiredIds) {
+        const el = document.getElementById(id);
+        if (el && !el.reportValidity()) return;
+    }
+    window.mlCadGoToStep(2);
+    setTimeout(() => document.getElementById('v2CadCEP')?.focus(), 250);
+};
+
+window.mlCadPrevStep = function() {
+    window.mlCadGoToStep(1);
+};
+
+window.forgotPassword = function(event) {
+  event?.preventDefault();
+  showToast('Recuperação de senha em breve! Por enquanto, entre em contato com o suporte.', 'info');
 };
 
 window.hideAuthScreen = function() {
@@ -1279,8 +1440,10 @@ document.addEventListener('submit', async (e) => {
             nome:     document.getElementById('v2CadNome').value,
             cpf:      document.getElementById('v2CadCPF').value.replace(/\D/g, ''),
             email:    document.getElementById('v2CadEmail').value,
+            telefone: document.getElementById('v2CadTelefone').value.replace(/\D/g, ''),
             senha_hash: btoa(document.getElementById('v2CadPass').value),
             endereco: `${document.getElementById('v2CadEnd').value}, ${document.getElementById('v2CadNum').value} - ${document.getElementById('v2CadBairro').value}`,
+            cep:      document.getElementById('v2CadCEP').value.replace(/\D/g, ''),
             cidade:   document.getElementById('v2CadCid').value,
             estado:   document.getElementById('v2CadUF').value,
             avatar:   avatarUrl,
@@ -1308,7 +1471,11 @@ document.addEventListener('submit', async (e) => {
             setTimeout(() => location.reload(), 1000);
         } catch (err) {
             console.error("Erro no cadastro:", err);
-            showToast('Erro no cadastro. Email/CPF já cadastrado?', 'error');
+            // Mostra o motivo real devolvido pelo Supabase/Postgres (ex: coluna
+            // inexistente, CPF/e-mail duplicado, campo obrigatório faltando etc.)
+            // em vez de um texto genérico, para facilitar o diagnóstico.
+            const motivo = err?.message || err?.hint || err?.details || err?.error_description || 'Verifique os dados e tente novamente.';
+            showToast(`Erro no cadastro: ${motivo}`, 'error');
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = orig; }
         }
@@ -1320,11 +1487,22 @@ document.addEventListener('submit', async (e) => {
         const orig = btn?.textContent;
         if (btn) { btn.disabled = true; btn.textContent = 'Entrando...'; }
 
-        const email = document.getElementById('v2LogEmail').value;
-        const hash  = btoa(document.getElementById('v2LogPass').value);
+        const emailInput = document.getElementById('v2LogEmail');
+        const passInput  = document.getElementById('v2LogPass');
+        emailInput?.classList.remove('input-error');
+        passInput?.classList.remove('input-error');
+
+        const identifier = emailInput.value.trim();
+        const hash        = btoa(passInput.value);
+
+        // Detecta se o usuário digitou e-mail ou telefone e monta a consulta certa
+        const isEmail   = identifier.includes('@');
+        const loginField = isEmail
+            ? `email=eq.${encodeURIComponent(identifier)}`
+            : `telefone=eq.${encodeURIComponent(identifier.replace(/\D/g, ''))}`;
 
         try {
-            const users = await supabaseFetch(`users?select=*&email=eq.${email}&senha_hash=eq.${hash}&limit=1`);
+            const users = await supabaseFetch(`users?select=*&${loginField}&senha_hash=eq.${hash}&limit=1`);
             if (users?.length) {
                 localStorage.setItem('electroUser', JSON.stringify(users[0]));
                 window.hideAuthScreen();
@@ -1332,7 +1510,13 @@ document.addEventListener('submit', async (e) => {
                 await createPersistentNotification(`Novo acesso detectado em sua conta.`, 'info', users[0].id);
                 setTimeout(() => location.reload(), 400);
             } else {
-                showToast('Email ou senha incorretos.', 'error');
+                showToast('E-mail/telefone ou senha incorretos.', 'error');
+                emailInput?.classList.add('input-error');
+                passInput?.classList.add('input-error');
+                e.target.classList.add('form-shake');
+                setTimeout(() => e.target.classList.remove('form-shake'), 400);
+                passInput?.focus();
+                passInput?.select();
             }
         } catch { showToast('Erro de conexão.', 'error'); }
         finally {
@@ -1340,6 +1524,10 @@ document.addEventListener('submit', async (e) => {
         }
     }
 });
+
+// Remove o destaque de erro assim que o usuário começa a corrigir os campos de login
+document.getElementById('v2LogEmail')?.addEventListener('input', (e) => e.target.classList.remove('input-error'));
+document.getElementById('v2LogPass')?.addEventListener('input', (e) => e.target.classList.remove('input-error'));
 
 // ============================================
 // FAVORITOS E HISTÓRICO
@@ -1487,6 +1675,8 @@ window.updateOrderStatus = async function(orderId, newStatus) {
         });
         showToast(`Pedido ${newStatus === 'accepted' ? 'aceito' : 'recusado'}!`, newStatus === 'accepted' ? 'success' : 'info');
         window.renderOrderManagement(newStatus === 'accepted' ? 'seller_sales' : 'seller_requests');
+        const user = getSavedUser();
+        if (user) updateSellerPendingBadge(user.id);
     } catch { showToast('Erro ao atualizar pedido.', 'error'); }
 };
 
@@ -1524,7 +1714,7 @@ window.deleteProduct = async function(pid) {
         await supabaseFetch(`products?id=eq.${pid}`, { method: 'DELETE' });
         showToast('Produto removido!', 'success');
         bootstrap.Modal.getInstance(document.getElementById('productDetailModal'))?.hide();
-        loadPage();
+        loadPage(undefined, true);
     } catch { showToast('Erro ao excluir produto.', 'error'); }
 };
 
@@ -1555,6 +1745,7 @@ window.showChat = async function(orderId) {
     }
     if (!order) { showToast('Pedido não encontrado.', 'error'); return; }
 
+    if (currentChat !== orderId) lastChatSignature = null;
     currentChat = orderId;
 
     const otherName = user.id === order.buyer_id ? order.seller_name : order.buyer_name;
@@ -1572,11 +1763,42 @@ window.showChat = async function(orderId) {
     new bootstrap.Modal(document.getElementById('chatModal')).show();
     await loadChatMessages(orderId);
     setupPullToRefresh();
+    startChatPolling(orderId);
 };
 
-async function loadChatMessages(orderId) {
+// ============================================
+// AUTO-ATUALIZAÇÃO DE MENSAGENS (POLLING)
+// ============================================
+
+/**
+ * Inicia a atualização automática das mensagens enquanto o chat estiver aberto.
+ * Usa "silent = true" para não piscar o spinner nem interromper o scroll do usuário.
+ */
+function startChatPolling(orderId) {
+    stopChatPolling();
+    chatPollInterval = setInterval(() => {
+        // Só continua atualizando se o modal do chat ainda estiver visível
+        const modalEl = document.getElementById('chatModal');
+        if (!modalEl?.classList.contains('show') || currentChat !== orderId) {
+            stopChatPolling();
+            return;
+        }
+        loadChatMessages(orderId, true);
+    }, 4000);
+}
+
+function stopChatPolling() {
+    if (chatPollInterval) {
+        clearInterval(chatPollInterval);
+        chatPollInterval = null;
+    }
+}
+
+async function loadChatMessages(orderId, silent = false) {
     const container = document.getElementById('chatMessagesContainer');
-    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando mensagens...</p></div>';
+    if (!silent) {
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando mensagens...</p></div>';
+    }
 
     try {
         const user = getSavedUser();
@@ -1611,9 +1833,22 @@ async function loadChatMessages(orderId) {
         }
 
         if (!chat?.messages) {
-            container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
+            if (!silent) container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
             return;
         }
+
+        // Evita re-renderizar (e perder a posição do scroll/seleção) quando nada mudou
+        const signature = JSON.stringify(chat.messages);
+        if (silent && signature === lastChatSignature) {
+            updateChatLogistics(order, user);
+            return;
+        }
+        const isNewIncoming = silent && lastChatSignature !== null && chat.messages.length > (JSON.parse(lastChatSignature || '[]').length || 0);
+        lastChatSignature = signature;
+
+        // Preserva a posição de leitura: só rola pro fim automaticamente se o usuário
+        // já estava perto do fim (ou se não é uma atualização silenciosa).
+        const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
 
         container.innerHTML = chat.messages.map((msg, index) => {
             if (msg.type === 'system' || msg.senderId === 'system') {
@@ -1662,10 +1897,16 @@ async function loadChatMessages(orderId) {
             </div>`;
         }).join('');
 
-        container.scrollTop = container.scrollHeight;
+        if (wasNearBottom) {
+            container.scrollTop = container.scrollHeight;
+        } else if (isNewIncoming) {
+            showToast('Nova mensagem recebida.', 'info', 2000);
+        }
         updateChatLogistics(order, user);
 
     } catch (e) {
+        // Falha silenciosa durante o polling automático: não interrompe a experiência do usuário
+        if (silent) { console.error('Falha ao atualizar mensagens (silencioso):', e); return; }
         console.error(e);
         container.innerHTML = `
             <div class="text-center py-4 text-danger">
@@ -2195,18 +2436,7 @@ window.shareProduct = function(pid) {
 
 window.updateMobileNavActive = function(page) {
     document.querySelectorAll('.mobile-nav-row .nav-item').forEach(el => el.classList.remove('active'));
-    const map = {
-        'eletronicos':            0,
-        'renderLikedProducts':    1,
-        'renderOrderManagement':  2,
-        'cartOffcanvas':          3,
-        'mobileMenu':             4
-    };
-    const idx = map[page];
-    if (idx !== undefined) {
-        const items = document.querySelectorAll('.mobile-nav-row .nav-item');
-        if (items[idx]) items[idx].classList.add('active');
-    }
+    document.querySelectorAll(`.mobile-nav-row .nav-item[data-page="${page}"]`).forEach(el => el.classList.add('active'));
 };
 
 window.startReply = async function(index) {
