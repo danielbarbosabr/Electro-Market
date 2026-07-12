@@ -10,6 +10,7 @@ let cart              = JSON.parse(localStorage.getItem('electroCart'))    || []
 let likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || [];
 let accessHistory     = JSON.parse(localStorage.getItem('electroHistory')) || [];
 let currentChat       = null;
+let currentOrderViewType = 'buyer';
 let ordersCache       = [];
 let currentReplyIndex   = null;
 let editingMessageIndex = null;
@@ -131,11 +132,26 @@ async function supabaseFetch(path, options = {}) {
 // CARREGAR PRODUTOS (com skeleton)
 // ============================================
 
+/**
+ * Sai da tela de pedidos estilo WhatsApp (Minhas Vendas/Compras/Solicitações) e
+ * devolve a página ao estado normal de rolagem. Chamada sempre que o usuário
+ * navega pra qualquer outra área do site (produtos, meus produtos, etc.).
+ */
+window.exitWaOrdersView = function() {
+    document.getElementById('whatsappOrdersView')?.classList.add('d-none');
+    document.getElementById('productGridMain')?.classList.remove('d-none');
+    document.body.classList.remove('wa-locked');
+    if (typeof window.closeWaChat === 'function') window.closeWaChat();
+};
+
 async function loadPage(query = 'eletronicos', forceRefresh = false) {
     const grid = document.getElementById('productsGrid');
     const user = getSavedUser();
     const role = user?.tipo || 'CLIENTE';
     const hero = document.getElementById('heroSection');
+
+    window.exitWaOrdersView();
+    if (grid) grid.style.display = '';
 
     // Usa o cache já carregado para buscas/filtragens (evita ida à rede a cada letra digitada).
     // Só busca no servidor na primeira carga, quando o papel do usuário muda, quando forçado,
@@ -1243,18 +1259,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tema desktop
     document.getElementById('themeToggle')?.addEventListener('click', window.toggleTema);
 
-    // Para o polling de mensagens automaticamente quando o chat é fechado (evita chamadas em segundo plano)
-    document.getElementById('chatModal')?.addEventListener('hidden.bs.modal', () => {
-        stopChatPolling();
-        currentChat = null;
-        lastChatSignature = null;
-    });
-
     // Pausa o polling quando a aba fica em segundo plano e retoma ao voltar (economiza requisições/bateria)
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             stopChatPolling();
-        } else if (currentChat && document.getElementById('chatModal')?.classList.contains('show')) {
+        } else if (currentChat && !document.getElementById('waChatActive')?.classList.contains('d-none')) {
             startChatPolling(currentChat);
         }
     });
@@ -1737,6 +1746,7 @@ document.getElementById('v2LogPass')?.addEventListener('input', (e) => e.target.
 // ============================================
 
 window.renderLikedProducts = () => {
+    window.exitWaOrdersView();
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
     document.getElementById('gridTitle').textContent = 'Seus Favoritos';
@@ -1745,6 +1755,7 @@ window.renderLikedProducts = () => {
 };
 
 window.renderAccessHistory = () => {
+    window.exitWaOrdersView();
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
     document.getElementById('gridTitle').textContent = 'Vistos Recentemente';
@@ -1764,87 +1775,151 @@ window.renderOrderManagement = async function(type = 'buyer') {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
 
+    // "Solicitações Pendentes" não é uma conversa — é uma tela de aceitar/recusar
+    // com os dados do cliente (endereço etc.), então usa uma tela própria, sem chat.
+    if (type === 'seller_requests') {
+        return window.renderSellerRequests();
+    }
+
     const grid  = document.getElementById('productsGrid');
     const hero  = document.getElementById('heroSection');
-    const title = document.getElementById('gridTitle');
+    const gridMain = document.getElementById('productGridMain');
+    const waView = document.getElementById('whatsappOrdersView');
+    const waList = document.getElementById('waContactList');
+    const waTitle = document.getElementById('waSideTitle');
     if (hero) hero.classList.add('d-none');
+    if (gridMain) gridMain.classList.add('d-none');
+    if (grid) { grid.classList.remove('order-view-active'); grid.innerHTML = ''; grid.style.display = 'none'; }
 
-    grid.style.display = ''; // deixa a classe CSS controlar (grid), sem forçar bloco via estilo inline
-    grid.classList.add('order-view-active');
-    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Carregando pedidos...</p></div>';
+    currentOrderViewType = type;
+    if (waView) waView.classList.remove('d-none');
+    document.body.classList.add('wa-locked');
+    window.closeWaChat(); // fecha qualquer conversa aberta ao trocar de aba (Compras/Vendas/Solicitações)
+
+    waList.innerHTML = '<div class="text-center py-5 w-100"><div class="spinner-border text-success"></div></div>';
 
     try {
         let path = 'orders?select=*';
         if (type === 'buyer') {
             path += `&buyer_id=eq.${user.id}`;
-            if (title) title.textContent = 'Minhas Compras';
+            if (waTitle) waTitle.textContent = 'Minhas Compras';
         } else {
             path += `&seller_id=eq.${user.id}`;
-            if (title) title.textContent = type === 'seller_requests' ? 'Solicitações Pendentes' : 'Minhas Vendas';
+            if (waTitle) waTitle.textContent = 'Minhas Vendas';
         }
 
         let orders = await supabaseFetch(path);
         ordersCache = orders;
 
-        if (type === 'seller_requests') orders = orders.filter(o => o.status === 'pending');
-        else if (type === 'seller_sales') orders = orders.filter(o => o.status !== 'pending');
+        // Aqui só entram pedidos já aceitos (a tela de chat não faz sentido pra pendentes)
+        orders = orders.filter(o => o.status !== 'pending' || type === 'buyer');
+
+        // Mais recentes primeiro, como numa lista de conversas de verdade
+        orders = orders.slice().sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
 
         if (!orders.length) {
-            grid.innerHTML = `
-                <div class="col-12 text-center py-5" style="grid-column: 1 / -1;">
-                    <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                    <h5>Nenhum pedido encontrado.</h5>
+            waList.innerHTML = `
+                <div class="text-center py-5 px-3" style="color:#999;">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    <p class="small mb-0">Nenhum pedido encontrado.</p>
                 </div>`;
             return;
         }
 
-        grid.innerHTML = orders.map(order => {
+        waList.innerHTML = orders.map(order => {
             const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
             const isPending = order.status === 'pending';
             const isBuyer   = user.id === order.buyer_id;
-            const isSeller  = user.id === order.seller_id;
+            const partnerName = isBuyer ? order.seller_name : order.buyer_name;
+
+            let actionsHtml = '';
+            if (isPending && type === 'buyer') {
+                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">Cancelar Pedido</button>`;
+            } else if (order.status === 'cancelled' || order.status === 'finished') {
+                actionsHtml = `<button class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash me-1"></i>Remover</button>`;
+            }
 
             return `
-            <div class="order-card-grid">
-                <div class="order-card-img-wrap">
-                    <img src="${order.product_img || ''}" referrerpolicy="no-referrer"
-                         onerror="this.src='https://placehold.co/300'">
-                    <span class="badge ${st.class} order-status-badge">${st.text}</span>
+            <div class="wa-contact" data-order-id="${order.id}" onclick="${!isPending && order.status !== 'cancelled' ? `window.showChat('${order.id}')` : ''}" style="${isPending || order.status === 'cancelled' ? 'cursor:default;' : ''}">
+                <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
+                <div class="wa-contact-textbox">
+                    <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
+                    <div class="wa-contact-text">${order.product_title || 'Produto'} · R$ ${parseFloat(order.total).toLocaleString('pt-BR')}</div>
+                    ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
-                <div class="order-card-body">
-                    <h6 class="order-card-title" title="${order.product_title}">${order.product_title}</h6>
-                    <p class="order-card-meta">${isBuyer ? `Vendedor: ${order.seller_name}` : `Comprador: ${order.buyer_name}`}</p>
-                    <p class="order-card-meta">ID: #${order.id.slice(-8).toUpperCase()}</p>
-                    <p class="order-card-price">R$ ${parseFloat(order.total).toLocaleString('pt-BR')} <small>(${order.quantity} un.)</small></p>
+                <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
+            </div>`;
+        }).join('');
 
-                    <div class="order-card-actions">
-                        ${isPending && type === 'seller_requests' ? `
-                            <button class="btn btn-sm btn-success fw-bold" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
-                                <i class="bi bi-check-lg me-1"></i>Aceitar
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
-                                Recusar
-                            </button>
-                        ` : ''}
-                        ${isPending && type === 'buyer' ? `
-                            <button class="btn btn-sm btn-outline-danger" onclick="window.cancelOrderBuyer('${order.id}')">
-                                Cancelar Pedido
-                            </button>
-                        ` : ''}
+        window.closeMobileMenu();
+    } catch (e) {
+        waList.innerHTML = '<div class="text-center py-5" style="color:#999;"><h6>Erro ao carregar pedidos.</h6></div>';
+    }
+};
 
-                        ${!isPending && order.status !== 'cancelled' ? `
-                            <button class="btn btn-sm btn-primary fw-bold" onclick="window.showChat('${order.id}')">
-                                <i class="bi bi-chat-dots me-1"></i>Abrir Chat
-                            </button>
-                        ` : ''}
+/**
+ * Tela de "Solicitações Pendentes": aceitar ou recusar pedidos novos, com os
+ * dados do cliente (nome, telefone, endereço) — sem chat, porque ainda não
+ * existe uma venda confirmada pra conversar.
+ */
+window.renderSellerRequests = async function() {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
 
-                        ${isPending && isSeller && type === 'seller_sales' ? `<span class="badge bg-warning text-dark">⏳ Aguardando aprovação</span>` : ''}
+    window.exitWaOrdersView();
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    document.getElementById('gridTitle').textContent = 'Solicitações Pendentes';
 
-                        ${(order.status === 'cancelled' || order.status === 'finished') ? `
-                            <button class="btn btn-sm btn-outline-secondary" onclick="window.removeOrderFromHistory('${order.id}', '${type}')">
-                                <i class="bi bi-trash me-1"></i>Remover
-                            </button>
-                        ` : ''}
+    const grid = document.getElementById('productsGrid');
+    grid.style.display = 'flex';
+    grid.style.flexWrap = 'wrap';
+    grid.classList.remove('order-view-active');
+    grid.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-success"></div></div>';
+
+    try {
+        let orders = await supabaseFetch(`orders?select=*&seller_id=eq.${user.id}`);
+        ordersCache = orders;
+        orders = orders.filter(o => o.status === 'pending');
+
+        if (!orders.length) {
+            grid.innerHTML = `<div class="col-12 text-center py-5"><i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i><h5>Nenhuma solicitação pendente.</h5></div>`;
+            return;
+        }
+
+        // Busca os dados de contato/endereço de cada comprador
+        const buyerIds = [...new Set(orders.map(o => o.buyer_id))];
+        let buyers = [];
+        try {
+            buyers = await supabaseFetch(`users?select=id,nome,telefone,cep,endereco,cidade,estado&id=in.(${buyerIds.join(',')})`);
+        } catch (e) {}
+        const buyerMap = Object.fromEntries(buyers.map(b => [b.id, b]));
+
+        grid.innerHTML = orders.map(order => {
+            const buyer = buyerMap[order.buyer_id] || {};
+            return `
+            <div class="col-12 col-lg-6">
+                <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius:14px;">
+                    <div class="d-flex gap-3">
+                        <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/70'"
+                             style="width:70px;height:70px;object-fit:cover;border-radius:10px;flex-shrink:0;">
+                        <div class="flex-grow-1">
+                            <h6 class="fw-bold mb-1">${order.product_title || 'Produto'}</h6>
+                            <p class="mb-1 text-success fw-bold">R$ ${parseFloat(order.total).toLocaleString('pt-BR')} <small class="text-muted fw-normal">(${order.quantity} un.)</small></p>
+                            <p class="mb-0 small text-muted">ID: #${order.id.slice(-8).toUpperCase()}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <p class="small mb-1"><i class="bi bi-person-fill me-2 text-muted"></i><strong>${buyer.nome || order.buyer_name || 'Cliente'}</strong></p>
+                    ${buyer.telefone ? `<p class="small mb-1"><i class="bi bi-telephone-fill me-2 text-muted"></i>${buyer.telefone}</p>` : ''}
+                    ${buyer.endereco ? `<p class="small mb-2"><i class="bi bi-geo-alt-fill me-2 text-muted"></i>${buyer.endereco}${buyer.cep ? `, CEP ${buyer.cep}` : ''} — ${buyer.cidade || ''}/${buyer.estado || ''}</p>` : `<p class="small mb-2 text-muted"><i class="bi bi-geo-alt-fill me-2"></i>Endereço não informado</p>`}
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-success fw-bold flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                            <i class="bi bi-check-lg me-1"></i>Aceitar
+                        </button>
+                        <button class="btn btn-outline-danger flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                            Recusar
+                        </button>
                     </div>
                 </div>
             </div>`;
@@ -1852,8 +1927,16 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
         window.closeMobileMenu();
     } catch (e) {
-        grid.innerHTML = '<div class="col-12 text-center py-5" style="grid-column: 1 / -1;"><h5>Erro ao carregar pedidos.</h5></div>';
+        grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Erro ao carregar solicitações.</h5></div>';
     }
+};
+
+window.filterWaContacts = function(query) {
+    const q = query.trim().toLowerCase();
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
+        const text = el.textContent.toLowerCase();
+        el.style.display = !q || text.includes(q) ? '' : 'none';
+    });
 };
 
 window.updateOrderStatus = async function(orderId, newStatus) {
@@ -1937,10 +2020,17 @@ window.showChat = async function(orderId) {
     if (currentChat !== orderId) lastChatSignature = null;
     currentChat = orderId;
 
+    const otherId = user.id === order.buyer_id ? order.seller_id : order.buyer_id;
     const otherName = user.id === order.buyer_id ? order.seller_name : order.buyer_name;
     document.getElementById('chatPartnerNameHeader').textContent = otherName || 'Chat';
-    document.getElementById('chatPartnerAvatar').src =
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`;
+
+    const avatarEl = document.getElementById('chatPartnerAvatar');
+    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`; // placeholder enquanto busca a foto real
+    try {
+        const partnerData = await supabaseFetch(`users?select=avatar&id=eq.${otherId}&limit=1`);
+        const realAvatar = normalizeImageUrl(partnerData?.[0]?.avatar);
+        if (realAvatar) avatarEl.src = realAvatar;
+    } catch (e) {}
 
     // Popula resumo do produto
     document.getElementById('chatProdImg').src = order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20';
@@ -1949,10 +2039,36 @@ window.showChat = async function(orderId) {
     document.getElementById('chatOrderIdDisplay').textContent = `#${order.id.slice(-6).toUpperCase()}`;
     document.getElementById('chatOrderIdDisplayHeader').textContent = `#${order.id.slice(-6).toUpperCase()}`;
 
-    new bootstrap.Modal(document.getElementById('chatModal')).show();
+    // Abre o painel de chat inline (estilo WhatsApp Web), sem modal
+    document.getElementById('waEmptyState')?.classList.add('d-none');
+    const activePanel = document.getElementById('waChatActive');
+    activePanel?.classList.remove('d-none');
+    activePanel?.classList.add('d-flex');
+    document.getElementById('whatsappOrdersView')?.classList.add('wa-chat-open'); // esconde a lista no mobile
+
+    // Marca o contato ativo na lista lateral
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
+        el.classList.toggle('active-chat', el.dataset.orderId === orderId);
+    });
+
     await loadChatMessages(orderId);
     setupPullToRefresh();
     startChatPolling(orderId);
+};
+
+/**
+ * Fecha a conversa ativa e volta pro estado "selecione uma conversa"
+ * (ou, no mobile, volta pra lista de contatos).
+ */
+window.closeWaChat = function() {
+    stopChatPolling();
+    currentChat = null;
+    lastChatSignature = null;
+    document.getElementById('waChatActive')?.classList.add('d-none');
+    document.getElementById('waChatActive')?.classList.remove('d-flex');
+    document.getElementById('waEmptyState')?.classList.remove('d-none');
+    document.getElementById('whatsappOrdersView')?.classList.remove('wa-chat-open');
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
 };
 
 // ============================================
@@ -1966,9 +2082,9 @@ window.showChat = async function(orderId) {
 function startChatPolling(orderId) {
     stopChatPolling();
     chatPollInterval = setInterval(() => {
-        // Só continua atualizando se o modal do chat ainda estiver visível
-        const modalEl = document.getElementById('chatModal');
-        if (!modalEl?.classList.contains('show') || currentChat !== orderId) {
+        // Só continua atualizando se o painel de chat ainda estiver visível
+        const activePanel = document.getElementById('waChatActive');
+        if (!activePanel || activePanel.classList.contains('d-none') || currentChat !== orderId) {
             stopChatPolling();
             return;
         }
@@ -2039,6 +2155,9 @@ async function loadChatMessages(orderId, silent = false) {
         // já estava perto do fim (ou se não é uma atualização silenciosa).
         const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
 
+        const myAvatar = normalizeImageUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome||'Você')}&background=22c98e&color=fff&size=40`;
+        const partnerAvatarSrc = document.getElementById('chatPartnerAvatar')?.src || '';
+
         container.innerHTML = chat.messages.map((msg, index) => {
             if (msg.type === 'system' || msg.senderId === 'system') {
                 return `<div class="text-center my-3">
@@ -2049,6 +2168,22 @@ async function loadChatMessages(orderId, silent = false) {
             }
 
             const isMe = msg.senderId === user.id;
+            // Agrupamento estilo WhatsApp: some com o nome/margem quando a mensagem
+            // anterior é da mesma pessoa em sequência.
+            const prevMsg = chat.messages[index - 1];
+            const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system';
+
+            if (msg.deleted) {
+                return `
+                <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" style="${isGrouped ? 'margin-top:-4px;' : ''}">
+                    ${!isMe ? `<img class="msg-avatar" src="${partnerAvatarSrc}" referrerpolicy="no-referrer">` : ''}
+                    <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted">
+                        <i class="bi bi-slash-circle me-1"></i><em>Mensagem apagada</em>
+                    </div>
+                    ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer">` : ''}
+                </div>`;
+            }
+
             const cleanText = stripLegacyEmoji(msg.text);
             const replyHtml = msg.replyTo ? `
                 <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-10'} small border-start border-4 border-info">
@@ -2069,16 +2204,19 @@ async function loadChatMessages(orderId, silent = false) {
             const showTextCaption = cleanText && !(msg.image && cleanText === 'Imagem') && !(msg.type === 'file' && msg.file);
 
             return `
-            <div class="msg-row ${isMe ? 'is-me' : 'is-them'}">
+            <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" style="${isGrouped ? 'margin-top:-4px;' : ''}">
+                ${!isMe ? `<img class="msg-avatar" src="${partnerAvatarSrc}" referrerpolicy="no-referrer">` : ''}
                 <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}">
 
                     <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
-                        <span class="msg-sender">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</span>
+                        ${!isGrouped ? `<span class="msg-sender">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</span>` : '<span></span>'}
                         <div class="dropdown">
                             <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                 <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startReply(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>
+                                <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.copyMessageText(${index})"><i class="bi bi-clipboard me-2"></i>Copiar</a></li>
                                 ${isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startEdit(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
+                                ${isMe ? `<li><a class="dropdown-item py-1 small text-danger" href="javascript:void(0)" onclick="window.deleteMessage(${index})"><i class="bi bi-trash me-2"></i>Apagar</a></li>` : ''}
                             </ul>
                         </div>
                     </div>
@@ -2097,6 +2235,7 @@ async function loadChatMessages(orderId, silent = false) {
                         ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
                     </div>
                 </div>
+                ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer">` : ''}
             </div>`;
         }).join('');
 
@@ -2106,6 +2245,10 @@ async function loadChatMessages(orderId, silent = false) {
             showToast('Nova mensagem recebida.', 'info', 2000);
         }
         updateChatLogistics(order, user);
+
+        const realCount = chat.messages.filter(m => m.type !== 'system').length;
+        const headerSub = document.getElementById('chatOrderIdDisplayHeader');
+        if (headerSub) headerSub.textContent = `${realCount} mensage${realCount === 1 ? 'm' : 'ns'} · #${orderId.slice(-6).toUpperCase()}`;
 
     } catch (e) {
         // Falha silenciosa durante o polling automático: não interrompe a experiência do usuário
@@ -2176,7 +2319,7 @@ function updateChatLogistics(order, user) {
                     </div>`;
             } else {
                 buttonsHtml += `
-                    <p class="text-center small text-muted mb-2">Como vai funcionar a entrega?</p>
+                    <p class="text-center small mb-2" style="color: #666;">Como vai funcionar a entrega?</p>
                     <div class="logistics-options-row">
                         <button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')">
                             <span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span>
@@ -2201,15 +2344,6 @@ function updateChatLogistics(order, user) {
         } else {
             buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>`;
         }
-    }
-
-    // Opção de Cancelar sempre presente se não finalizado
-    if (order.status !== 'finished' && order.status !== 'cancelled') {
-        buttonsHtml += `
-            <hr class="my-2">
-            <button class="btn btn-outline-danger w-100 rounded-pill" onclick="window.chatCancelOrder('${order.id}')">
-                <i class="bi bi-x-circle me-1"></i>Cancelar Pedido
-            </button>`;
     }
 
     logisticsButtons.innerHTML = buttonsHtml;
@@ -2433,6 +2567,61 @@ window.setLogistics = async function(orderId, logisticsType) {
     } catch { showToast('Erro ao definir logística.', 'error'); }
 };
 
+/**
+ * Mostra um mini-perfil do outro lado da conversa (nome, avatar, reputação),
+ * acessível pelo menu de opções (⋮) do cabeçalho do chat.
+ */
+window.viewChatPartnerProfile = async function() {
+    const user = getSavedUser();
+    let order = ordersCache.find(o => o.id === currentChat);
+    if (!order) {
+        const r = await supabaseFetch(`orders?id=eq.${currentChat}&limit=1`);
+        order = r?.[0];
+    }
+    if (!order) return;
+
+    const isBuyer = user.id === order.buyer_id;
+    const partnerId = isBuyer ? order.seller_id : order.buyer_id;
+    const partnerName = isBuyer ? order.seller_name : order.buyer_name;
+
+    let partner = null;
+    try {
+        const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at&id=eq.${partnerId}&limit=1`);
+        partner = r?.[0];
+    } catch (e) {}
+
+    const avatar = normalizeImageUrl(partner?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}&background=random&size=100`;
+    const rating = partner?.vendedor_rating ? parseFloat(partner.vendedor_rating).toFixed(1) : '—';
+    const ratingCount = partner?.rating_count || 0;
+    const memberSince = partner?.created_at ? new Date(partner.created_at).toLocaleDateString('pt-BR', {month:'long', year:'numeric'}) : '—';
+
+    let modalEl = document.getElementById('partnerProfileModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'partnerProfileModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        document.body.appendChild(modalEl);
+    }
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-body text-center p-4">
+                    <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
+                    <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="mb-3 border" referrerpolicy="no-referrer">
+                    <h5 class="fw-bold mb-1">${partner?.nome || partnerName || 'Usuário'}</h5>
+                    <p class="text-muted small mb-3"><i class="bi bi-calendar3 me-1"></i>Na plataforma desde ${memberSince}</p>
+                    <div class="d-flex justify-content-center align-items-center gap-2">
+                        <i class="bi bi-star-fill text-warning"></i>
+                        <span class="fw-bold">${rating}</span>
+                        <span class="text-muted small">(${ratingCount} avaliações)</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(modalEl).show();
+};
+
 window.chatCancelOrder = async function(orderId) {
     if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
     try {
@@ -2555,6 +2744,7 @@ window.renderSellerPanel = async function() {
     if (!user)                                           { showToast('Faça login!', 'warning'); return; }
     if (user.tipo !== 'VENDEDOR' && user.tipo !== 'ADMIN') { showToast('Acesso restrito a vendedores!', 'warning'); return; }
 
+    window.exitWaOrdersView();
     document.getElementById('gridTitle').textContent = 'Meus Produtos';
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
@@ -2615,6 +2805,7 @@ window.renderAdminPanel = async function() {
         return;
     }
 
+    window.exitWaOrdersView();
     document.getElementById('gridTitle').textContent = 'Painel Administrativo';
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
@@ -2796,6 +2987,37 @@ window.cancelReplyOrEdit = function() {
     }
     const input = document.getElementById('chatMessageInput');
     if (input && !currentReplyIndex) input.value = '';
+};
+
+window.copyMessageText = async function(index) {
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const msg = chatResult?.[0]?.messages[index];
+        if (!msg?.text) return;
+        await navigator.clipboard.writeText(msg.text);
+        showToast('Mensagem copiada!', 'success', 1500);
+    } catch (e) {
+        showToast('Não foi possível copiar.', 'error');
+    }
+};
+
+window.deleteMessage = async function(index) {
+    if (!confirm('Apagar esta mensagem para todos?')) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat?.messages[index]) return;
+        // Apaga o conteúdo mas mantém a posição no array (soft delete), pra não
+        // quebrar referências de "respondendo a" em outras mensagens.
+        chat.messages[index].text = '';
+        chat.messages[index].image = null;
+        chat.messages[index].file = null;
+        chat.messages[index].deleted = true;
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        loadChatMessages(currentChat);
+    } catch (e) {
+        showToast('Erro ao apagar mensagem.', 'error');
+    }
 };
 
 function setupPullToRefresh() {
