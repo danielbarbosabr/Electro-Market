@@ -667,19 +667,26 @@ body.dark-theme .btn-close {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 14px;
+    background: linear-gradient(160deg, #6a5acd 0%, #4b6cb7 45%, #38b2ac 100%);
+    padding: 18px;
+    border-radius: 18px;
 }
 
 @media (max-width: 576px) {
     #productsGrid.order-view-active {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
+        padding: 10px;
+        border-radius: 12px;
     }
 }
 
 .order-card-grid {
-    background: var(--card-bg);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
+    background: rgba(20, 22, 34, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -688,18 +695,16 @@ body.dark-theme .btn-close {
 
 .order-card-grid:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 24px var(--shadow-color);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.35);
 }
 
 .order-card-img-wrap {
     position: relative;
     width: 100%;
     aspect-ratio: 1 / 1;
-    background: #fff;
+    background: rgba(255,255,255,0.06);
     overflow: hidden;
 }
-
-body.dark-theme .order-card-img-wrap { background: #2a2a2a; }
 
 .order-card-img-wrap img {
     width: 100%;
@@ -716,7 +721,7 @@ body.dark-theme .order-card-img-wrap { background: #2a2a2a; }
     padding: 4px 9px;
     border-radius: 20px;
     font-weight: 700;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
 }
 
 .order-card-body {
@@ -737,11 +742,12 @@ body.dark-theme .order-card-img-wrap { background: #2a2a2a; }
     -webkit-box-orient: vertical;
     overflow: hidden;
     min-height: 2.1em;
+    color: #fff;
 }
 
 .order-card-meta {
     font-size: 0.68rem;
-    color: var(--text-muted);
+    color: rgba(255,255,255,0.6);
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -752,13 +758,13 @@ body.dark-theme .order-card-img-wrap { background: #2a2a2a; }
     font-size: 0.85rem;
     font-weight: 800;
     margin: 4px 0 6px;
-    color: var(--text-color);
+    color: #7fe8c4;
 }
 
 .order-card-price small {
     font-weight: 500;
     font-size: 0.65rem;
-    color: var(--text-muted);
+    color: rgba(255,255,255,0.55);
 }
 
 .order-card-actions {
@@ -1188,13 +1194,7 @@ body.dark-theme .cart-item-img {
 }
 
 .chat-modal-content {
-    height: 100% !important;
-    border-radius: 0 !important;
-    border: none !important;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--bg-color);
+    display: none; /* Não usado mais — chat agora é inline em .wa-chat, ver seção WHATSAPP WEB VIEW */
 }
 
 /* ---------- Cabeçalho ---------- */
@@ -1202,9 +1202,10 @@ body.dark-theme .cart-item-img {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, var(--primary-blue) 0%, #0b3d91 100%);
-    color: #fff;
+    padding: 14px 16px;
+    background: #ebefef;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    color: #222;
     flex-shrink: 0;
 }
 
@@ -1213,7 +1214,7 @@ body.dark-theme .cart-item-img {
     height: 42px;
     border-radius: 50%;
     padding: 2px;
-    background: rgba(255,255,255,0.35);
+    background: rgba(0,0,0,0.06);
     flex-shrink: 0;
 }
 
@@ -1236,6 +1237,7 @@ body.dark-theme .cart-item-img {
 .chat-header-name {
     font-weight: 700;
     font-size: 1rem;
+    color: #1c1c1c;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1243,15 +1245,15 @@ body.dark-theme .cart-item-img {
 
 .chat-header-order-id {
     font-size: 0.68rem;
-    color: rgba(255,255,255,0.7);
-    font-weight: 500;
+    color: #049588;
+    font-weight: 600;
     letter-spacing: 0.02em;
 }
 
 .chat-header-close {
-    background: rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.05);
     border: none;
-    color: #fff;
+    color: #444;
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -1263,7 +1265,7 @@ body.dark-theme .cart-item-img {
     transition: background 0.2s ease;
 }
 
-.chat-header-close:hover { background: rgba(255,255,255,0.3); color: #fff; }
+.chat-header-close:hover { background: #049588; color: #fff; }
 
 /* ---------- Resumo do produto ---------- */
 .chat-product-summary {
@@ -1271,8 +1273,8 @@ body.dark-theme .cart-item-img {
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border-light);
+    background: #f7f7f7;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
     flex-shrink: 0;
 }
 
@@ -1282,7 +1284,7 @@ body.dark-theme .cart-item-img {
     object-fit: cover;
     border-radius: 8px;
     flex-shrink: 0;
-    border: 1px solid var(--border-light);
+    border: 1px solid rgba(0,0,0,0.08);
 }
 
 .chat-product-summary-info {
@@ -1298,79 +1300,97 @@ body.dark-theme .cart-item-img {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 220px;
-    color: var(--text-color);
+    color: #222;
 }
 
 .chat-product-summary-price {
     font-size: 0.78rem;
     font-weight: 700;
-    color: var(--market-color, #00875f);
+    color: #049588;
 }
 
 .chat-product-summary-id {
     font-size: 0.68rem;
-    color: var(--text-muted);
+    color: #888;
     flex-shrink: 0;
 }
 
 .chat-status-bar {
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border-light);
+    background: #f7f7f7;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
     padding: 8px 14px;
     flex-shrink: 0;
 }
 
 /* ---------- Área de mensagens ---------- */
 #chatMessagesContainer {
-    background: var(--bg-color) !important;
+    background: transparent !important;
+    min-height: 0;
 }
 
 .system-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-light);
-    color: var(--text-muted);
+    background: #71ddb9;
+    border: none;
+    color: #134e49;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 700;
     padding: 6px 14px;
     border-radius: 20px;
+    text-transform: uppercase;
 }
 
-.system-chip i { color: var(--primary-blue); }
+.system-chip i { color: #134e49; }
 
-.msg-row { display: flex; margin-bottom: 10px; }
+.msg-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 10px; }
 .msg-row.is-me { justify-content: flex-end; }
 .msg-row.is-them { justify-content: flex-start; }
+
+.msg-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.1);
+}
 
 .msg-bubble {
     padding: 9px 13px;
     min-width: 90px;
-    max-width: 75%;
-    border-radius: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    max-width: 72%;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
     position: relative;
 }
 
 .msg-bubble.is-me {
-    background: var(--primary-blue);
-    color: #fff;
-    border-radius: 16px 16px 3px 16px;
+    background: #caebe8; /* --chat-msg-me do projeto de referência */
+    color: #1c1c1c;
+    border-radius: 8px 8px 2px 8px;
 }
 
 .msg-bubble.is-them {
-    background: var(--card-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-light);
-    border-radius: 16px 16px 16px 3px;
+    background: #fdfdfd;
+    color: #1c1c1c;
+    border-radius: 8px 8px 8px 2px;
 }
 
 .msg-sender {
     font-size: 0.64rem;
     font-weight: 700;
-    opacity: 0.75;
+    color: #049588;
     margin-bottom: 2px;
+}
+
+.msg-bubble.msg-deleted {
+    background: transparent !important;
+    border: 1px dashed rgba(0,0,0,0.2) !important;
+    color: #888 !important;
+    font-size: 0.78rem;
+    box-shadow: none;
 }
 
 .msg-time {
@@ -1382,14 +1402,14 @@ body.dark-theme .cart-item-img {
     gap: 4px;
 }
 
-.msg-bubble.is-me .msg-time { color: rgba(255,255,255,0.7); }
-.msg-bubble.is-them .msg-time { color: var(--text-muted); }
+.msg-bubble.is-me .msg-time,
+.msg-bubble.is-them .msg-time { color: #8a9a97; }
 
 /* ---------- Barra de input ---------- */
 .chat-input-bar {
     padding: 10px 14px;
-    background: var(--card-bg);
-    border-top: 1px solid var(--border-light);
+    background: #efefef;
+    border-top: 1px solid rgba(0,0,0,0.06);
     flex-shrink: 0;
 }
 
@@ -1397,9 +1417,9 @@ body.dark-theme .cart-item-img {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    border: 1px solid var(--border-light);
-    background: var(--bg-color);
-    color: var(--text-muted);
+    border: none;
+    background: transparent;
+    color: #555;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1407,27 +1427,28 @@ body.dark-theme .cart-item-img {
     transition: all 0.2s ease;
 }
 
-.chat-icon-btn:hover { background: var(--primary-blue); color: #fff; border-color: var(--primary-blue); }
+.chat-icon-btn:hover { background: rgba(0,0,0,0.06); color: #049588; }
 
 .chat-text-input {
     flex-grow: 1;
-    border: 1px solid var(--border-light);
-    background: var(--bg-color);
-    color: var(--text-color);
+    border: none;
+    background: #fefefe;
+    color: #1c1c1c;
     border-radius: 20px;
     padding: 9px 16px;
     font-size: 0.85rem;
     outline: none;
 }
 
-.chat-text-input:focus { border-color: var(--primary-blue); }
+.chat-text-input::placeholder { color: #999; }
+.chat-text-input:focus { box-shadow: 0 0 0 2px #049588 inset; }
 
 .chat-send-btn {
     width: 38px;
     height: 38px;
     border-radius: 50%;
     border: none;
-    background: var(--primary-blue);
+    background: #049588;
     color: #fff;
     display: flex;
     align-items: center;
@@ -1436,7 +1457,7 @@ body.dark-theme .cart-item-img {
     transition: transform 0.15s ease;
 }
 
-.chat-send-btn:hover { transform: scale(1.06); }
+.chat-send-btn:hover { background: #134e49; transform: scale(1.06); }
 
 #chatModal .modal-body {
     flex: 1;
@@ -1446,14 +1467,15 @@ body.dark-theme .cart-item-img {
 }
 
 #logisticsAgreementArea {
-    background: var(--card-bg);
-    border-top: 1px solid var(--border-light);
+    background: #f7f7f7;
+    border-top: 1px solid rgba(0,0,0,0.08);
     padding: 16px 14px;
     max-height: 60vh;
     overflow-y: auto;
     display: none; /* Escondido por padrão */
     animation: slideUpChat 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
+    color: #222;
 }
 
 #logisticsAgreementArea.show-menu { display: block !important; }
@@ -1502,15 +1524,17 @@ body.dark-theme .cart-item-img {
     font-weight: 600;
     text-align: center;
     line-height: 1.2;
-    color: var(--text-color);
+    color: #222;
 }
 
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
+    min-height: 0;
     position: relative;
     overflow: hidden;
+    background: #ddd8d5; /* --chat-bg do projeto de referência */
 }
 
 .chat-messages {
@@ -1758,6 +1782,194 @@ body.dark-theme .chat-messages {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+}
+
+/* ============================================ */
+/* WHATSAPP WEB VIEW (Minhas Vendas/Compras)    */
+/* Baseado no projeto de referência enviado      */
+/* ============================================ */
+
+body.wa-locked {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: 0 !important;
+}
+
+/* Com o body virando flex-column, o cabeçalho fica com sua altura natural
+   e o painel de pedidos ocupa exatamente o resto — sem precisar medir nada
+   em JS (mais robusto que calc(100vh - Npx), que quebrava com o header
+   mudando de altura no mobile). */
+body.wa-locked .main-footer-dock {
+    display: none !important;
+}
+
+body.wa-locked > .header-main {
+    flex-shrink: 0;
+}
+
+body.wa-locked > .wa-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    margin-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.wa-main {
+    display: flex;
+    flex-direction: row;
+    height: 82vh; /* fallback só pra quando wa-locked ainda não foi aplicado */
+    min-height: 500px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+/* -------- Sidebar (lista de contatos = pedidos) -------- */
+.wa-side {
+    width: 340px;
+    min-width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-right: 1px solid rgba(0,0,0,0.08);
+}
+
+.wa-side__header {
+    height: 56px;
+    flex-shrink: 0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 2px solid var(--market-color);
+}
+
+.wa-side__header h6 {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.wa-side__search {
+    position: relative;
+    padding: 10px 14px;
+    flex-shrink: 0;
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.wa-side__search i {
+    position: absolute;
+    left: 26px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 0.85rem;
+}
+
+.wa-side__search input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: #f0f2f2;
+    border-radius: 20px;
+    padding: 8px 14px 8px 32px;
+    font-size: 0.82rem;
+}
+
+.wa-side__list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+}
+
+.wa-contact {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.wa-contact:hover { background: #f5f5f5; }
+
+.wa-contact.active-chat { background: #e9f6f4; }
+
+.wa-contact img {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.wa-contact-textbox {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.wa-contact-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #1c1c1c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wa-contact-text {
+    font-size: 0.76rem;
+    color: #777;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wa-contact-badge {
+    flex-shrink: 0;
+    font-size: 0.6rem;
+    margin-top: 3px;
+}
+
+/* -------- Painel de chat -------- */
+.wa-chat {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-height: 0;
+    background: #ddd8d5;
+}
+
+.wa-empty-state {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    gap: 10px;
+}
+
+.wa-empty-state i { font-size: 3.5rem; color: #ccc; }
+.wa-empty-state p { font-size: 0.9rem; }
+
+@media (max-width: 768px) {
+    .wa-main {
+        min-height: 400px;
+    }
+    .wa-side { width: 100%; }
+    .wa-chat { display: none; }
+    .wa-main.wa-chat-open .wa-side { display: none; }
+    .wa-main.wa-chat-open .wa-chat { display: flex; }
 }
 
 /* ============================================ */
