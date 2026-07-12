@@ -23,7 +23,7 @@ let productsFetchToken = 0;
 const ORDER_STATUS_MAP = {
     'pending':         { text: 'Em Aprovação',             class: 'bg-warning text-dark' },
     'accepted':        { text: 'Aprovado (Chat Liberado)', class: 'bg-success' },
-    'agreement':       { text: '🤝 Combinando Entrega',     class: 'bg-info' },
+    'agreement':       { text: 'Combinando Entrega',       class: 'bg-info' },
     'shipping':        { text: 'Em Rota de Entrega',       class: 'bg-primary' },
     'awaiting_pickup': { text: 'Aguardando Retirada',      class: 'bg-primary' },
     'finished':        { text: 'Finalizado',               class: 'bg-dark' },
@@ -199,6 +199,7 @@ async function loadPage(query = 'eletronicos', forceRefresh = false) {
 
         renderGrid(products);
         updateStoreFilterUI();
+        updateCategoryFilterUI();
     } catch (e) {
         if (myToken !== productsFetchToken) return;
         console.error(e);
@@ -254,19 +255,21 @@ function renderCard(item) {
                 <h6 class="product-title-grid">${item.titulo}</h6>
                 <div class="current-price">
                     ${temOferta
-                        ? `<div class="text-muted text-decoration-line-through" style="font-size:0.75rem;font-weight:normal;">
+                        ? `<div class="price-old-line text-muted text-decoration-line-through" style="font-size:0.75rem;font-weight:normal;">
                                R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}
                            </div>`
                         : ''
                     }
-                    ${precoFormatado}
-                    ${temOferta ? `<span class="offer-pct-inline">${descontoPct}% OFF</span>` : ''}
+                    <div class="price-main-line">
+                        <span class="price-main-text">${precoFormatado}</span>
+                        ${temOferta ? `<span class="offer-pct-inline">${descontoPct}% OFF</span>` : ''}
+                    </div>
                 </div>
-                <div class="${realizaEntrega ? 'text-success' : 'text-muted'} small fw-bold mt-2">
+                <div class="${realizaEntrega ? 'text-success' : 'text-muted'} delivery-line fw-bold mt-2">
                     <i class="bi ${realizaEntrega ? 'bi-truck' : 'bi-geo-alt'}"></i>
                     ${realizaEntrega ? 'Entrega disponível' : 'Retirada no local'}
                 </div>
-                <div class="text-muted mt-1" style="font-size:0.7rem;">
+                <div class="text-muted city-line mt-1">
                     <i class="bi bi-geo-alt"></i> ${cidade}
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
@@ -304,17 +307,176 @@ function updateStoreFilterUI() {
         </div>`).join('');
 }
 
+/** Preenche o filtro de categorias com base nas categorias realmente presentes nos anúncios */
+function updateCategoryFilterUI() {
+    const select = document.getElementById('filterCategory');
+    if (!select) return;
+    const current = select.value;
+    const topCats = [...new Set(
+        allProductsCache.map(p => (p.categoria || '').split(' > ')[0].trim()).filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    select.innerHTML = '<option value="">Todas as categorias</option>' +
+        topCats.map(c => `<option value="${c}">${c}</option>`).join('');
+    // Preserva a seleção anterior, se ela ainda existir na lista atualizada
+    if (topCats.includes(current)) select.value = current;
+}
+
+/** Remove acentos e normaliza caixa, para comparar nomes de cidade sem erro de digitação/acentuação */
+function normalizeStr(s) {
+    return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+const ESTADOS_BR = [
+    ['AC','Acre'], ['AL','Alagoas'], ['AP','Amapá'], ['AM','Amazonas'], ['BA','Bahia'],
+    ['CE','Ceará'], ['DF','Distrito Federal'], ['ES','Espírito Santo'], ['GO','Goiás'],
+    ['MA','Maranhão'], ['MT','Mato Grosso'], ['MS','Mato Grosso do Sul'], ['MG','Minas Gerais'],
+    ['PA','Pará'], ['PB','Paraíba'], ['PR','Paraná'], ['PE','Pernambuco'], ['PI','Piauí'],
+    ['RJ','Rio de Janeiro'], ['RN','Rio Grande do Norte'], ['RS','Rio Grande do Sul'],
+    ['RO','Rondônia'], ['RR','Roraima'], ['SC','Santa Catarina'], ['SP','São Paulo'],
+    ['SE','Sergipe'], ['TO','Tocantins']
+];
+
+let guestDetectedRegion = null; // { cidade, estado } detectado pelo IP do visitante
+
+/**
+ * Para quem não está logado, detecta a região aproximada (cidade/estado) a partir
+ * do IP do dispositivo, e mostra isso no "Receber em:" do cabeçalho — útil pra
+ * visitante já ver a própria região sem precisar criar conta.
+ */
+async function detectGuestRegion() {
+    if (getSavedUser()) return; // Usuário logado já tem cidade/estado cadastrados, não precisa disso
+
+    const label = document.getElementById('shippingLabel');
+    try {
+        const res  = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        if (!data || data.error || !data.city) throw new Error('Sem dados de localização');
+
+        guestDetectedRegion = { cidade: data.city, estado: data.region_code };
+        if (label && !getSavedUser()) label.textContent = `${data.city} - ${data.region_code}`;
+    } catch (e) {
+        console.error('Não foi possível detectar a região pelo IP:', e);
+        if (label && !getSavedUser()) label.textContent = 'Faça login';
+    }
+}
+
+/** Clique em "Receber em:" no cabeçalho: visitante filtra pela região detectada, logado edita o endereço */
+window.handleShippingInfoClick = function() {
+    if (getSavedUser()) {
+        window.showProfileEdit();
+    } else {
+        window.applyGuestRegionFilter();
+    }
+};
+
+/** Aplica a região detectada pelo IP como filtro de localização e abre o painel de filtros */
+window.applyGuestRegionFilter = async function() {
+    const offcanvasEl = document.getElementById('filterOffcanvas');
+    if (!offcanvasEl) return;
+
+    if (guestDetectedRegion?.estado) {
+        document.getElementById('filterEstado').value = guestDetectedRegion.estado;
+        await window.onFilterEstadoChange(guestDetectedRegion.cidade);
+    } else {
+        showToast('Não foi possível detectar sua região automaticamente.', 'warning');
+    }
+
+    bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
+};
+
+/**
+ * Preenche o select de Estado (UF) do filtro de localização
+ */
+function populateFilterEstados() {
+    const select = document.getElementById('filterEstado');
+    if (!select) return;
+    select.innerHTML = '<option value="">UF</option>' +
+        ESTADOS_BR.map(([sigla, nome]) => `<option value="${sigla}">${sigla} - ${nome}</option>`).join('');
+}
+
+/**
+ * Ao escolher o Estado no filtro, busca a lista oficial de cidades daquele
+ * estado (API do IBGE) e preenche o select de Cidade — assim o vendedor/cliente
+ * nunca digita errado o nome da cidade, só escolhe de uma lista pronta.
+ */
+window.onFilterEstadoChange = async function(preSelectCity) {
+    const ufSelect   = document.getElementById('filterEstado');
+    const citySelect = document.getElementById('filterCidade');
+    const uf = ufSelect?.value;
+
+    if (!uf) {
+        citySelect.innerHTML = '<option value="">Selecione o estado</option>';
+        citySelect.disabled = true;
+        applyFilters();
+        return;
+    }
+
+    citySelect.disabled = true;
+    citySelect.innerHTML = '<option value="">Carregando cidades...</option>';
+
+    try {
+        const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`);
+        const municipios = await res.json();
+        citySelect.innerHTML = '<option value="">Todas as cidades</option>' +
+            municipios.map(m => `<option value="${m.nome}">${m.nome}</option>`).join('');
+        citySelect.disabled = false;
+
+        if (preSelectCity) {
+            const match = municipios.find(m => normalizeStr(m.nome) === normalizeStr(preSelectCity));
+            if (match) citySelect.value = match.nome;
+        }
+    } catch (e) {
+        console.error('Erro ao buscar cidades do IBGE:', e);
+        citySelect.innerHTML = '<option value="">Erro ao carregar — tente novamente</option>';
+    }
+
+    applyFilters();
+};
+
+/**
+ * Permite filtrar direto pelo CEP: busca o endereço (ViaCEP) e já seleciona
+ * automaticamente o Estado e a Cidade correspondentes no filtro.
+ */
+window.applyCepFilter = async function() {
+    const input  = document.getElementById('filterCEP');
+    const status = document.getElementById('filterCepStatus');
+    const cepLimpo = (input?.value || '').replace(/\D/g, '');
+
+    if (cepLimpo.length !== 8) {
+        if (status) { status.textContent = 'Digite um CEP válido (8 dígitos).'; status.className = 'small text-danger mt-1'; }
+        return;
+    }
+
+    if (status) { status.textContent = 'Buscando...'; status.className = 'small text-muted mt-1'; }
+
+    const endereco = await buscarEnderecoPorCep(cepLimpo);
+    if (!endereco?.estado) {
+        if (status) { status.textContent = 'CEP não encontrado.'; status.className = 'small text-danger mt-1'; }
+        return;
+    }
+
+    document.getElementById('filterEstado').value = endereco.estado;
+    await window.onFilterEstadoChange(endereco.cidade);
+
+    if (status) { status.textContent = `Filtrando por ${endereco.cidade} - ${endereco.estado}`; status.className = 'small text-success mt-1'; }
+};
+
 function applyFilters() {
-    const min    = parseFloat(document.getElementById('minPrice')?.value)  || 0;
-    const max    = parseFloat(document.getElementById('maxPrice')?.value)  || Infinity;
-    const sort   = document.getElementById('sortOrder')?.value;
-    const stores = Array.from(document.querySelectorAll('.store-checkbox:checked')).map(cb => cb.value);
-    const city   = (document.getElementById('filterCity')?.value || '').toLowerCase();
+    const min      = parseFloat(document.getElementById('minPrice')?.value)  || 0;
+    const max      = parseFloat(document.getElementById('maxPrice')?.value)  || Infinity;
+    const sort     = document.getElementById('sortOrder')?.value;
+    const stores   = Array.from(document.querySelectorAll('.store-checkbox:checked')).map(cb => cb.value);
+    const cidade   = document.getElementById('filterCidade')?.value || '';
+    const categoria = document.getElementById('filterCategory')?.value || '';
+    const somenteEntrega = document.getElementById('filterDelivery')?.checked;
 
     let filtered = allProductsCache.filter(p =>
         p.preco >= min && p.preco <= max &&
         (!stores.length || stores.includes(p.loja)) &&
-        (p.cidade || '').toLowerCase().includes(city)
+        (!cidade || normalizeStr(p.cidade) === normalizeStr(cidade)) &&
+        (!categoria || (p.categoria || '').startsWith(categoria)) &&
+        (!somenteEntrega || !!(p.realizaentrega ?? p.realiza_entrega ?? p.realizaEntrega))
     );
 
     if (sort === 'priceAsc')  filtered.sort((a, b) => a.preco - b.preco);
@@ -324,12 +486,22 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    ['minPrice', 'maxPrice', 'filterCity'].forEach(id => {
+    ['minPrice', 'maxPrice', 'filterCEP'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
     const s = document.getElementById('sortOrder');
     if (s) s.value = 'default';
+    const cat = document.getElementById('filterCategory');
+    if (cat) cat.value = '';
+    const uf = document.getElementById('filterEstado');
+    if (uf) uf.value = '';
+    const cidade = document.getElementById('filterCidade');
+    if (cidade) { cidade.innerHTML = '<option value="">Selecione o estado</option>'; cidade.disabled = true; }
+    const delivery = document.getElementById('filterDelivery');
+    if (delivery) delivery.checked = false;
+    const status = document.getElementById('filterCepStatus');
+    if (status) status.textContent = '';
     document.querySelectorAll('.store-checkbox').forEach(cb => cb.checked = true);
     renderGrid(allProductsCache);
 }
@@ -356,7 +528,9 @@ window.showDetail = async function(pid) {
         document.getElementById('prodDescription').value = item.descricao;
         document.getElementById('prodPrice').value       = item.preco;
         document.getElementById('prodQuantity').value    = item.quantidade;
-        document.getElementById('prodPrecoOriginal').value = item.preco_original || '';
+        // O campo de "preço original" não é mais preenchido manualmente pelo vendedor:
+        // a oferta é detectada automaticamente ao salvar, comparando com o preço anterior.
+        document.getElementById('prodPrecoOriginal').value = '';
         document.getElementById('prodCategory').value    = item.categoria;
         document.getElementById('prodDelivery').checked  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
         document.getElementById('announceForm').dataset.editingId = item.id;
@@ -379,16 +553,23 @@ window.showDetail = async function(pid) {
     }
 
     let sellerAddress = 'A combinar com o vendedor';
+    let sellerAddressRaw = '';
+    let sellerCidade = '';
     try {
         const sellerInfo = await supabaseFetch(`users?select=endereco,cidade,estado&id=eq.${item.vendedor_id}`);
         if (sellerInfo?.length > 0) {
             const s = sellerInfo[0];
+            sellerAddressRaw = s.endereco || '';
             sellerAddress = `${s.endereco || ''}, ${s.cidade || ''} - ${s.estado || ''}`.replace(/^, /, '');
+            sellerCidade  = s.cidade || '';
         }
     } catch (e) {}
 
     const realizaEntrega  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
-    const cidadeVendedor  = item.cidade || 'sua região';
+    // Prioriza a cidade atual cadastrada pelo vendedor (mais confiável); só usa a do
+    // anúncio como reserva, e se nenhuma existir, simplesmente omite essa parte do texto.
+    const cidadeVendedor  = sellerCidade || item.cidade || '';
+    const regiaoEntrega   = [enderecoSemNumero(sellerAddressRaw), cidadeVendedor].filter(Boolean).join(' - ') || 'Consulte o vendedor';
     const images = safeParseImages(item.img);
     const mainImg         = images[0] || '';
 
@@ -429,9 +610,9 @@ window.showDetail = async function(pid) {
                 <span class="badge bg-secondary mb-2 small">${item.categoria || 'Geral'}</span>
                 <h4 class="fw-bold">${item.titulo}</h4>
 
-                <div class="my-3">
+                <div class="my-3" style="overflow-wrap:anywhere;word-break:break-word;">
                     ${item.preco_original && parseFloat(item.preco_original) > parseFloat(item.preco) ? `
-                        <div class="d-flex align-items-center gap-2 mb-1">
+                        <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                             <span class="text-muted text-decoration-line-through">R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
                             <span class="offer-pct-inline">${Math.round(100 - (item.preco / parseFloat(item.preco_original)) * 100)}% OFF</span>
                         </div>` : ''
@@ -446,7 +627,7 @@ window.showDetail = async function(pid) {
                 <div class="card bg-light border-0 p-3 mb-3" style="border-radius:10px;">
                     ${realizaEntrega ? `
                         <p class="mb-1 text-success fw-bold"><i class="bi bi-truck me-2"></i> Entrega disponível</p>
-                        <small class="text-muted">Entrega em <strong>${cidadeVendedor}</strong></small>
+                        <small class="text-muted">Entrega em <strong>${regiaoEntrega}</strong></small>
                     ` : `
                         <p class="mb-1 fw-bold" style="color:#e67e22;"><i class="bi bi-geo-alt me-2"></i> Retirada no local</p>
                         <small class="text-muted"><strong>Local:</strong> ${sellerAddress}</small>
@@ -525,7 +706,7 @@ function updateUI() {
     if (shippingLabel) {
         shippingLabel.textContent = logged
             ? (user.endereco?.substring(0, 20) + '...') || user.cidade || 'Endereço'
-            : 'Faça login';
+            : (guestDetectedRegion ? `${guestDetectedRegion.cidade} - ${guestDetectedRegion.estado}` : 'Detectando local...');
     }
 
     // Sync tema
@@ -839,7 +1020,7 @@ window.buyItem = async function(i) {
                 logistics_agreed: false,
                 messages: [{
                     senderId:  'system',
-                    text:      `🛒 Pedido #${orderId.slice(-8).toUpperCase()} criado!\n📦 ${item.titulo}\n💰 R$ ${order.total.toLocaleString('pt-BR')}\n⏳ Aguardando aprovação do vendedor...`,
+                    text:      `Pedido #${orderId.slice(-8).toUpperCase()} criado!\n${item.titulo}\nR$ ${order.total.toLocaleString('pt-BR')}\nAguardando aprovação do vendedor...`,
                     timestamp: new Date().toISOString()
                 }]
             })
@@ -889,6 +1070,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('dark-theme');
     }
 
+    populateFilterEstados();
+    detectGuestRegion();
+
     // Anunciar
     document.getElementById('announceForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -904,7 +1088,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const precoInput = document.getElementById('prodPrice').value;
         const preco = parseFloat(precoInput);
+        const PRECO_MAXIMO = 10000000; // R$ 10 milhões - teto sensato pra evitar erro de digitação (ex: zeros a mais)
         if (isNaN(preco) || preco < 0) { showToast('Preço inválido! Digite um número maior ou igual a zero.', 'warning'); return; }
+        if (preco > PRECO_MAXIMO) { showToast(`Preço muito alto! O valor máximo permitido é R$ ${PRECO_MAXIMO.toLocaleString('pt-BR')}. Confira se não digitou zeros a mais.`, 'warning'); return; }
 
         const quantidadeInput = document.getElementById('prodQuantity').value;
         const quantidade = parseInt(quantidadeInput);
@@ -916,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (precoOriginalInput.trim() !== '') {
             precoOriginal = parseFloat(precoOriginalInput);
             if (isNaN(precoOriginal) || precoOriginal < 0) { showToast('Preço original inválido! Digite um número maior ou igual a zero.', 'warning'); return; }
+            if (precoOriginal > PRECO_MAXIMO) { showToast(`Preço original muito alto! O valor máximo permitido é R$ ${PRECO_MAXIMO.toLocaleString('pt-BR')}.`, 'warning'); return; }
             if (precoOriginal <= preco) { showToast('O preço original deve ser maior que o preço com desconto para virar uma oferta.', 'warning'); return; }
         }
 
@@ -967,6 +1154,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 img:          JSON.stringify(imgsArray),
                 loja:         user.nome,
                 vendedor_id:  user.id,
+                // Localização do anúncio = cidade cadastrada do vendedor (evita ficar "Não informada"
+                // e permite que o filtro de Estado/Cidade/CEP encontre o produto corretamente).
+                cidade:       user.cidade || '',
                 // Padronizando para minúsculo para bater com o Postgres/Supabase
                 realizaentrega: document.getElementById('prodDelivery')?.checked ?? true,
                 updated_at:   now
@@ -1116,6 +1306,19 @@ function safeParseImages(imgData) {
  * Converte links do Imgur (página ou galeria) em links diretos (i.imgur.com).
  * Ex: "https://imgur.com/abc" -> "https://i.imgur.com/abc.jpg"
  */
+/**
+ * Remove o número da casa de um endereço salvo no formato "Rua, Número - Bairro",
+ * deixando só "Rua - Bairro". Usado para mostrar a região de entrega sem
+ * expor o número exato da residência do vendedor.
+ */
+function enderecoSemNumero(endereco) {
+    if (!endereco) return '';
+    const [ruaNumero, ...resto] = endereco.split(' - ');
+    const rua = (ruaNumero || '').split(',')[0].trim(); // descarta o número, mantém a rua
+    const bairro = resto.join(' - ').trim();
+    return [rua, bairro].filter(Boolean).join(' - ');
+}
+
 function normalizeImageUrl(url) {
     if (!url || typeof url !== 'string') return url;
     const trimmed = url.trim();
@@ -1566,7 +1769,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
     const title = document.getElementById('gridTitle');
     if (hero) hero.classList.add('d-none');
 
-    grid.style.display = 'block';
+    grid.style.display = ''; // deixa a classe CSS controlar (grid), sem forçar bloco via estilo inline
     grid.classList.add('order-view-active');
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Carregando pedidos...</p></div>';
 
@@ -1588,7 +1791,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
         if (!orders.length) {
             grid.innerHTML = `
-                <div class="col-12 text-center py-5">
+                <div class="col-12 text-center py-5" style="grid-column: 1 / -1;">
                     <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
                     <h5>Nenhum pedido encontrado.</h5>
                 </div>`;
@@ -1602,60 +1805,46 @@ window.renderOrderManagement = async function(type = 'buyer') {
             const isSeller  = user.id === order.seller_id;
 
             return `
-            <div class="col-12 col-xl-10 mx-auto mb-3">
-                <div class="card p-3 shadow-sm border-0" style="border-radius:14px;">
-                    <div class="d-flex flex-column flex-md-row gap-3 align-items-center align-items-md-start">
-                        <img src="${order.product_img || ''}" class="rounded border" referrerpolicy="no-referrer"
-                             style="width:90px;height:90px;object-fit:cover;"
-                             onerror="this.src='https://placehold.co/90'">
+            <div class="order-card-grid">
+                <div class="order-card-img-wrap">
+                    <img src="${order.product_img || ''}" referrerpolicy="no-referrer"
+                         onerror="this.src='https://placehold.co/300'">
+                    <span class="badge ${st.class} order-status-badge">${st.text}</span>
+                </div>
+                <div class="order-card-body">
+                    <h6 class="order-card-title" title="${order.product_title}">${order.product_title}</h6>
+                    <p class="order-card-meta">${isBuyer ? `Vendedor: ${order.seller_name}` : `Comprador: ${order.buyer_name}`}</p>
+                    <p class="order-card-meta">ID: #${order.id.slice(-8).toUpperCase()}</p>
+                    <p class="order-card-price">R$ ${parseFloat(order.total).toLocaleString('pt-BR')} <small>(${order.quantity} un.)</small></p>
 
-                        <div class="flex-grow-1 w-100">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div>
-                                    <h6 class="fw-bold mb-1">${order.product_title}</h6>
-                                    <p class="text-muted mb-0" style="font-size:0.78rem;">
-                                        ${isBuyer ? `Vendedor: ${order.seller_name}` : `Comprador: ${order.buyer_name}`}<br>
-                                        ID: #${order.id.slice(-8).toUpperCase()}
-                                    </p>
-                                </div>
-                                <span class="badge ${st.class} py-2 px-3 rounded-pill" style="font-size:0.7rem;">${st.text}</span>
-                            </div>
+                    <div class="order-card-actions">
+                        ${isPending && type === 'seller_requests' ? `
+                            <button class="btn btn-sm btn-success fw-bold" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                                <i class="bi bi-check-lg me-1"></i>Aceitar
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                                Recusar
+                            </button>
+                        ` : ''}
+                        ${isPending && type === 'buyer' ? `
+                            <button class="btn btn-sm btn-outline-danger" onclick="window.cancelOrderBuyer('${order.id}')">
+                                Cancelar Pedido
+                            </button>
+                        ` : ''}
 
-                            <p class="fw-bold mb-3" style="font-size:0.92rem;">
-                                R$ ${parseFloat(order.total).toLocaleString('pt-BR')}
-                                <span class="text-muted fw-normal" style="font-size:0.78rem;">(${order.quantity} un.)</span>
-                            </p>
+                        ${!isPending && order.status !== 'cancelled' ? `
+                            <button class="btn btn-sm btn-primary fw-bold" onclick="window.showChat('${order.id}')">
+                                <i class="bi bi-chat-dots me-1"></i>Abrir Chat
+                            </button>
+                        ` : ''}
 
-                            <div class="d-flex flex-wrap gap-2 justify-content-end">
-                                ${isPending && type === 'seller_requests' ? `
-                                    <button class="btn btn-sm btn-success px-4 fw-bold rounded-pill" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
-                                        <i class="bi bi-check-lg me-1"></i>Aceitar
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger px-4 rounded-pill" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
-                                        Recusar
-                                    </button>
-                                ` : ''}
-                                ${isPending && type === 'buyer' ? `
-                                    <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" onclick="window.cancelOrderBuyer('${order.id}')">
-                                        Cancelar Pedido
-                                    </button>
-                                ` : ''}
-                                
-                                ${!isPending && order.status !== 'cancelled' ? `
-                                    <button class="btn btn-sm btn-primary px-4 fw-bold rounded-pill" onclick="window.showChat('${order.id}')">
-                                        <i class="bi bi-chat-dots me-1"></i>Abrir Chat
-                                    </button>
-                                ` : ''}
-                                
-                                ${isPending && isSeller && type === 'seller_sales' ? `<span class="badge bg-warning text-dark mt-1">⏳ Aguardando sua aprovação</span>` : ''}
-                                
-                                ${(order.status === 'cancelled' || order.status === 'finished') ? `
-                                    <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill" onclick="window.removeOrderFromHistory('${order.id}', '${type}')">
-                                        <i class="bi bi-trash me-1"></i>Remover do Histórico
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </div>
+                        ${isPending && isSeller && type === 'seller_sales' ? `<span class="badge bg-warning text-dark">⏳ Aguardando aprovação</span>` : ''}
+
+                        ${(order.status === 'cancelled' || order.status === 'finished') ? `
+                            <button class="btn btn-sm btn-outline-secondary" onclick="window.removeOrderFromHistory('${order.id}', '${type}')">
+                                <i class="bi bi-trash me-1"></i>Remover
+                            </button>
+                        ` : ''}
                     </div>
                 </div>
             </div>`;
@@ -1663,7 +1852,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
         window.closeMobileMenu();
     } catch (e) {
-        grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Erro ao carregar pedidos.</h5></div>';
+        grid.innerHTML = '<div class="col-12 text-center py-5" style="grid-column: 1 / -1;"><h5>Erro ao carregar pedidos.</h5></div>';
     }
 };
 
@@ -1754,7 +1943,7 @@ window.showChat = async function(orderId) {
         `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`;
 
     // Popula resumo do produto
-    document.getElementById('chatProdImg').src = order.product_img || 'https://placehold.co/45?text=📦';
+    document.getElementById('chatProdImg').src = order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20';
     document.getElementById('chatProdTitle').textContent = order.product_title || 'Produto';
     document.getElementById('chatProdPrice').textContent = `R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
     document.getElementById('chatOrderIdDisplay').textContent = `#${order.id.slice(-6).toUpperCase()}`;
@@ -1822,7 +2011,7 @@ async function loadChatMessages(orderId, silent = false) {
                 participants: [order.seller_id, order.buyer_id],
                 messages:     [{
                     senderId:  'system',
-                    text:      `🛒 Pedido #${orderId.slice(-8).toUpperCase()}`,
+                text:      `Pedido #${orderId.slice(-8).toUpperCase()}`,
                     timestamp: new Date().toISOString(),
                     type:      'system'
                 }],
@@ -1853,25 +2042,38 @@ async function loadChatMessages(orderId, silent = false) {
         container.innerHTML = chat.messages.map((msg, index) => {
             if (msg.type === 'system' || msg.senderId === 'system') {
                 return `<div class="text-center my-3">
-                    <span class="badge bg-light text-dark border px-3 py-2" style="font-size:0.72rem;">${msg.text}</span>
+                    <span class="system-chip">
+                        <i class="bi bi-info-circle-fill"></i>${stripLegacyEmoji(msg.text)}
+                    </span>
                 </div>`;
             }
 
             const isMe = msg.senderId === user.id;
+            const cleanText = stripLegacyEmoji(msg.text);
             const replyHtml = msg.replyTo ? `
                 <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-10'} small border-start border-4 border-info">
                     <div class="fw-bold" style="font-size: 0.7rem;">${msg.replyTo.senderName}</div>
-                    <div class="text-truncate" style="max-height: 20px;">${msg.replyTo.text}</div>
+                    <div class="text-truncate chat-reply-preview">${stripLegacyEmoji(msg.replyTo.text)}</div>
                 </div>
             ` : '';
 
+            // Anexo de arquivo: mostra um "chip" clicável com ícone, em vez de texto cru
+            const fileChipHtml = (msg.type === 'file' && msg.file) ? `
+                <a href="${msg.file.url}" target="_blank" rel="noopener" class="chat-file-chip mb-2">
+                    <i class="bi bi-file-earmark-arrow-down-fill"></i>
+                    <span class="chat-file-name">${cleanText.replace(/^Arquivo:\s*/, '') || msg.file.name || 'Arquivo'}</span>
+                </a>
+            ` : '';
+
+            // Some a legenda redundante quando é só uma imagem ou arquivo sem comentário adicional
+            const showTextCaption = cleanText && !(msg.image && cleanText === 'Imagem') && !(msg.type === 'file' && msg.file);
+
             return `
-            <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-3">
-                <div class="p-3 rounded shadow-sm position-relative ${isMe ? 'bg-primary text-white' : 'bg-light'}"
-                     style="min-width: 100px; max-width:75%; word-break:break-word; border-radius:${isMe?'18px 18px 2px 18px':'18px 18px 18px 2px'}!important;">
-                    
+            <div class="msg-row ${isMe ? 'is-me' : 'is-them'}">
+                <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}">
+
                     <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
-                        <small class="fw-bold" style="font-size: 0.65rem; opacity: 0.8;">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</small>
+                        <span class="msg-sender">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</span>
                         <div class="dropdown">
                             <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -1888,8 +2090,9 @@ async function loadChatMessages(orderId, silent = false) {
                              style="max-width:220px;cursor:pointer;"
                              onclick="window.openImageFull('${msg.image}')">
                     ` : ''}
-                    <div style="white-space:pre-wrap;">${formatLinks(msg.text)}</div>
-                    <div style="font-size:0.62rem;" class="text-end mt-1 d-flex justify-content-end gap-1 ${isMe?'text-white-50':'text-muted'}">
+                    ${fileChipHtml}
+                    ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${formatLinks(cleanText)}</div>` : ''}
+                    <div class="msg-time">
                         ${msg.edited ? '<span>(editada)</span>' : ''}
                         ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
                     </div>
@@ -1917,11 +2120,24 @@ async function loadChatMessages(orderId, silent = false) {
     }
 }
 
+/**
+ * Remove emojis de mensagens antigas que já estão salvas no banco de dados
+ * (de antes da atualização visual do chat), para manter a exibição consistente
+ * e profissional sem precisar migrar dados existentes.
+ */
+function stripLegacyEmoji(text) {
+    if (!text) return '';
+    return text
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu, '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
+}
+
 function formatLinks(text) {
     if (!text) return '';
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.replace(urlRegex, url =>
-        `<a href="${url}" target="_blank" class="text-info text-decoration-underline small">🔗 ${url.substring(0,40)}${url.length>40?'...':''}</a>`
+        `<a href="${url}" target="_blank" class="text-info text-decoration-underline small"><i class="bi bi-link-45deg"></i>${url.substring(0,40)}${url.length>40?'...':''}</a>`
     );
 }
 
@@ -1942,12 +2158,12 @@ function updateChatLogistics(order, user) {
         if (order.agree_buyer && order.agree_seller) {
             if (isSeller) {
                 if (order.logistics_type === 'pickup') {
-                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')">✅ Marcar como Pronto p/ Retirada</button>`;
+                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')"><i class="bi bi-check2-circle me-1"></i>Marcar como Pronto p/ Retirada</button>`;
                 } else {
-                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')">🚚 Marcar que Saiu p/ Entrega</button>`;
+                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Marcar que Saiu p/ Entrega</button>`;
                 }
             } else {
-                buttonsHtml += `<div class="alert alert-success rounded-pill text-center small mb-2">🤝 Aguardando envio/retirada pelo vendedor</div>`;
+                buttonsHtml += `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-people-fill me-1"></i>Aguardando envio/retirada pelo vendedor</div>`;
             }
         } else if (!userAgreed) {
             if (otherAgreed && order.logistics_type) {
@@ -1960,18 +2176,28 @@ function updateChatLogistics(order, user) {
                     </div>`;
             } else {
                 buttonsHtml += `
-                    <div class="d-grid gap-2 mb-2">
-                        <button class="btn btn-outline-primary rounded-pill" onclick="window.setLogistics('${order.id}','pickup')">🏪 Retirada no Local</button>
-                        <button class="btn btn-outline-success rounded-pill" onclick="window.setLogistics('${order.id}','seller_delivery')">🚚 Entrega pelo Vendedor</button>
-                        <button class="btn btn-outline-warning rounded-pill" onclick="window.setLogistics('${order.id}','external_app')">📱 App de Entrega</button>
+                    <p class="text-center small text-muted mb-2">Como vai funcionar a entrega?</p>
+                    <div class="logistics-options-row">
+                        <button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')">
+                            <span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span>
+                            <span class="option-label">Retirada no Local</span>
+                        </button>
+                        <button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')">
+                            <span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span>
+                            <span class="option-label">Entrega pelo Vendedor</span>
+                        </button>
+                        <button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')">
+                            <span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span>
+                            <span class="option-label">App de Entrega</span>
+                        </button>
                     </div>`;
             }
         } else {
-            buttonsHtml += `<div class="alert alert-info rounded-pill text-center small mb-2">⏳ Proposta enviada! Aguardando o outro lado...</div>`;
+            buttonsHtml += `<div class="alert alert-info rounded-pill text-center small mb-2"><i class="bi bi-hourglass-split me-1"></i>Proposta enviada! Aguardando o outro lado...</div>`;
         }
     } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
         if (isBuyer) {
-            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')">🎁 Confirmar Recebimento</button>`;
+            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button>`;
         } else {
             buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>`;
         }
@@ -1991,14 +2217,14 @@ function updateChatLogistics(order, user) {
     const statusBar = document.getElementById('orderStatusBar');
     if (statusBar && order) {
         const statusMap = {
-            'pending':         '⏳ Aguardando Aprovação',
-            'accepted':        '✅ Aprovado - Combinar Entrega',
-            'agreement':       '🤝 Definindo Logística',
-            'shipping':        '📦 Em Transporte',
-            'awaiting_pickup': '📍 Aguardando Retirada',
-            'finished':        '🎉 Finalizado',
-            'cancelled':       '❌ Cancelado',
-            'dispute':         '⚠️ Em Disputa'
+            'pending':         '<i class="bi bi-hourglass-split me-1"></i>Aguardando Aprovação',
+            'accepted':        '<i class="bi bi-check-circle-fill me-1"></i>Aprovado - Combinar Entrega',
+            'agreement':       '<i class="bi bi-people-fill me-1"></i>Definindo Logística',
+            'shipping':        '<i class="bi bi-truck me-1"></i>Em Transporte',
+            'awaiting_pickup': '<i class="bi bi-geo-alt-fill me-1"></i>Aguardando Retirada',
+            'finished':        '<i class="bi bi-patch-check-fill me-1"></i>Finalizado',
+            'cancelled':       '<i class="bi bi-x-circle-fill me-1"></i>Cancelado',
+            'dispute':         '<i class="bi bi-exclamation-triangle-fill me-1"></i>Em Disputa'
         };
         const alertClass = order.status === 'finished' ? 'success' : order.status === 'cancelled' ? 'danger' : 'info';
         statusBar.innerHTML = `
@@ -2055,10 +2281,10 @@ window.sendChatMessage = async function(event) {
     }
 };
 
-window.sendChatImage = async function() {
-    const rawUrl = prompt("Dica: Use o botão 'Upload' para subir no Imgur e cole o link direto da imagem aqui:");
+window.sendChatImage = async function(urlParam) {
+    const rawUrl = urlParam;
     if (!rawUrl || !rawUrl.startsWith('http')) {
-        if (rawUrl) showToast("Link de imagem inválido!", "warning");
+        showToast("Link de imagem inválido!", "warning");
         return;
     }
 
@@ -2074,7 +2300,7 @@ window.sendChatImage = async function() {
 
         chat.messages.push({
             senderId: user.id, senderName: user.nome,
-            text: '📷 Imagem', image: url,
+            text: 'Imagem', image: url,
             timestamp: new Date().toISOString(), type: 'image'
         });
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
@@ -2082,10 +2308,10 @@ window.sendChatImage = async function() {
     } catch (e) { showToast('Erro ao processar o envio do link da imagem.', 'error'); }
 };
 
-window.sendChatFile = async function() {
-    const url = prompt("Cole o link do arquivo ou documento (Hospedado no Google Drive, Dropbox, etc):");
+window.sendChatFile = async function(urlParam) {
+    const url = urlParam;
     if (!url || !url.startsWith('http')) {
-        if (url) showToast("Link inválido!", "warning");
+        showToast("Link inválido!", "warning");
         return;
     }
 
@@ -2097,13 +2323,56 @@ window.sendChatFile = async function() {
         if (!chat) return;
         chat.messages.push({
             senderId: user.id, senderName: user.nome,
-            text: `📎 Arquivo: ${url.split('/').pop()}`,
+            text: `Arquivo: ${url.split('/').pop()}`,
             file: { name: 'Arquivo Externo', url: url, size: 0 },
             timestamp: new Date().toISOString(), type: 'file'
         });
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         await loadChatMessages(currentChat);
     } catch { showToast('Erro ao enviar arquivo.', 'error'); }
+};
+
+// ============================================
+// PAINEL DE ANEXO DO CHAT (substitui os prompt() feios por um painel de verdade)
+// ============================================
+
+let chatAttachType = 'image'; // 'image' | 'file'
+
+window.toggleChatAttachPanel = function() {
+    const panel = document.getElementById('chatAttachPanel');
+    if (!panel) return;
+    document.getElementById('logisticsAgreementArea')?.classList.remove('show-menu');
+    panel.classList.toggle('d-none');
+    if (!panel.classList.contains('d-none')) {
+        document.getElementById('chatAttachLinkInput')?.focus();
+    }
+};
+
+window.setChatAttachType = function(type) {
+    chatAttachType = type;
+    document.querySelectorAll('.chat-attach-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.attachType === type);
+    });
+    const input = document.getElementById('chatAttachLinkInput');
+    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem...' : 'Cole o link do arquivo...';
+};
+
+window.confirmChatAttach = async function() {
+    const input = document.getElementById('chatAttachLinkInput');
+    const url   = input?.value?.trim();
+    if (!url || !url.startsWith('http')) {
+        showToast('Cole um link válido (começando com http).', 'warning');
+        return;
+    }
+
+    if (chatAttachType === 'image') {
+        await window.sendChatImage(url);
+    } else {
+        await window.sendChatFile(url);
+    }
+
+    input.value = '';
+    document.getElementById('chatAttachPanel')?.classList.add('d-none');
 };
 
 window.openImageFull = function(src) {
@@ -2177,7 +2446,7 @@ window.chatCancelOrder = async function(orderId) {
         if (chat) {
             chat.messages.push({
                 senderId: 'system',
-                text: '❌ O pedido foi cancelado por uma das partes.',
+                text: 'O pedido foi cancelado por uma das partes.',
                 timestamp: new Date().toISOString(),
                 type: 'system'
             });
@@ -2213,7 +2482,7 @@ window.advanceLogisticsStatus = async function(orderId, nextStatus) {
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
         const chat = chatData[0];
         if (chat) {
-            const text = nextStatus === 'shipping' ? '🚚 O vendedor colocou o pedido em rota de entrega!' : '📍 O pedido está aguardando retirada no local!';
+            const text = nextStatus === 'shipping' ? 'O vendedor colocou o pedido em rota de entrega!' : 'O pedido está aguardando retirada no local!';
             chat.messages.push({ senderId: 'system', text, timestamp: new Date().toISOString(), type: 'system' });
             await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         }
@@ -2225,21 +2494,57 @@ window.advanceLogisticsStatus = async function(orderId, nextStatus) {
 window.confirmReceipt = async function(orderId) {
     if (!confirm('Confirmar que recebeu o produto? Esta ação finalizará o pedido.')) return;
     try {
+        // Busca os dados do pedido (produto e quantidade) antes de finalizar, para dar baixa no estoque
+        const orderData = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        const order = orderData?.[0];
+
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
             body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
         });
-        
+
+        // Baixa automática de estoque (igual Mercado Livre): assim que a compra é
+        // finalizada, a quantidade comprada é descontada do anúncio automaticamente.
+        if (order?.product_id) {
+            await baixarEstoqueProduto(order.product_id, order.quantity || 1);
+        }
+
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
         const chat = chatData[0];
         if (chat) {
-            chat.messages.push({ senderId: 'system', text: '🎉 O comprador confirmou o recebimento. Compra finalizada!', timestamp: new Date().toISOString(), type: 'system' });
+            chat.messages.push({ senderId: 'system', text: 'O comprador confirmou o recebimento. Compra finalizada!', timestamp: new Date().toISOString(), type: 'system' });
             await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         }
         showToast('Pedido finalizado!', 'success');
         loadChatMessages(orderId);
     } catch { showToast('Erro ao confirmar recebimento.', 'error'); }
 };
+
+/**
+ * Desconta a quantidade comprada do estoque do anúncio assim que a compra é
+ * finalizada, igual o Mercado Livre faz. Nunca deixa a quantidade ficar negativa.
+ */
+async function baixarEstoqueProduto(productId, quantidadeComprada) {
+    try {
+        const produtoData = await supabaseFetch(`products?id=eq.${productId}&limit=1`);
+        const produto = produtoData?.[0];
+        if (!produto) return;
+
+        const estoqueAtual = parseInt(produto.quantidade) || 0;
+        const novoEstoque  = Math.max(0, estoqueAtual - (parseInt(quantidadeComprada) || 1));
+
+        await supabaseFetch(`products?id=eq.${productId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ quantidade: novoEstoque, updated_at: new Date().toISOString() })
+        });
+
+        // Atualiza o cache local também, refletindo na hora sem precisar recarregar a página
+        const cached = allProductsCache.find(p => p.id === productId);
+        if (cached) cached.quantidade = novoEstoque;
+    } catch (e) {
+        console.error('Erro ao dar baixa no estoque:', e);
+    }
+}
 
 // ============================================
 // PAINEL DO VENDEDOR
@@ -2315,7 +2620,7 @@ window.renderAdminPanel = async function() {
     if (hero) hero.classList.add('d-none');
 
     const grid = document.getElementById('productsGrid');
-    grid.style.display = 'block';
+    grid.style.display = ''; // deixa a classe CSS controlar (grid), sem forçar bloco via estilo inline
     grid.classList.add('order-view-active');
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando base de dados...</p></div>';
 
@@ -2513,6 +2818,7 @@ function setupPullToRefresh() {
 window.toggleChatActions = function() {
     const area = document.getElementById('logisticsAgreementArea');
     if (area) {
+        document.getElementById('chatAttachPanel')?.classList.add('d-none');
         area.classList.toggle('show-menu');
     }
 };
