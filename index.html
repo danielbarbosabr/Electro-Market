@@ -77,10 +77,10 @@
             
             <div class="row mt-2 d-none d-md-flex">
                 <div class="col-md-2">
-                    <div class="shipping-info d-flex align-items-center text-white">
+                    <div class="shipping-info d-flex align-items-center text-white" id="shippingInfoBox" style="cursor:pointer;" onclick="window.handleShippingInfoClick()">
                         <i class="bi bi-geo-alt me-1"></i>
                         <div style="font-size: 0.72rem; line-height: 1.1;">
-                            Receber em:<br><span id="shippingLabel" style="font-size: 0.8rem; font-weight: bold;">Faça login</span>
+                            Receber em:<br><span id="shippingLabel" style="font-size: 0.8rem; font-weight: bold;">Detectando local...</span>
                         </div>
                     </div>
                 </div>
@@ -394,8 +394,38 @@
                 <button class="btn btn-primary btn-sm w-100 mt-2 fw-bold" onclick="applyFilters()">Aplicar</button>
             </div>
             <div class="filter-group mb-4">
-                <h6 class="fw-bold small text-uppercase">Cidade do Vendedor</h6>
-                <input type="text" id="filterCity" class="form-control form-control-sm mt-2" placeholder="Ex: São Paulo" oninput="applyFilters()">
+                <h6 class="fw-bold small text-uppercase">Categoria</h6>
+                <select id="filterCategory" class="form-select form-select-sm mt-2" onchange="applyFilters()">
+                    <option value="">Todas as categorias</option>
+                </select>
+            </div>
+            <div class="filter-group mb-4">
+                <h6 class="fw-bold small text-uppercase">Localização do Vendedor</h6>
+                <div class="row g-2 mt-1">
+                    <div class="col-5">
+                        <select id="filterEstado" class="form-select form-select-sm" onchange="window.onFilterEstadoChange()">
+                            <option value="">UF</option>
+                        </select>
+                    </div>
+                    <div class="col-7">
+                        <select id="filterCidade" class="form-select form-select-sm" onchange="applyFilters()" disabled>
+                            <option value="">Selecione o estado</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="text-center small text-muted my-1 mb-1">ou</p>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                    <input type="text" id="filterCEP" class="form-control" placeholder="Digite seu CEP" maxlength="9">
+                    <button class="btn btn-outline-primary" type="button" onclick="window.applyCepFilter()">Buscar</button>
+                </div>
+                <div id="filterCepStatus" class="small text-muted mt-1"></div>
+            </div>
+            <div class="filter-group mb-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="filterDelivery" onchange="applyFilters()">
+                    <label class="form-check-label small" for="filterDelivery">Somente com entrega</label>
+                </div>
             </div>
             <div class="filter-group mb-4">
                 <h6 class="fw-bold small text-uppercase">Lojas</h6>
@@ -456,16 +486,13 @@
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <input type="number" class="form-control" id="prodPrice" placeholder="Preço (R$)" required>
+                                <input type="number" class="form-control" id="prodPrice" placeholder="Preço (R$)" max="10000000" min="0" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <input type="number" class="form-control" id="prodQuantity" placeholder="Quantidade" required>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label small text-muted mb-1">Preço original (opcional — preencha para criar uma oferta com desconto, igual no Mercado Livre)</label>
-                            <input type="number" class="form-control" id="prodPrecoOriginal" placeholder="Preço antes do desconto (R$)">
-                        </div>
+                        <input type="hidden" id="prodPrecoOriginal" value="">
                         <div class="mb-3">
                             <select class="form-select" id="prodCategory" required>
                                 <option value="" selected disabled>Onde seu produto se encaixa?</option>
@@ -715,35 +742,34 @@
     <!-- Modal Chat -->
     <div class="modal fade" id="chatModal" tabindex="-1">
         <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-                <div class="modal-header text-white d-flex align-items-center" style="background-color: var(--primary-blue);">
-                    <img id="chatPartnerAvatar" src="" class="rounded-circle me-2" width="40" height="40" onerror="this.src='https://ui-avatars.com/api/?name=User'">
-                    <h5 class="modal-title mb-0">
-                        <span id="chatPartnerNameHeader">Conversa</span>
-                        <small class="text-white-50 d-block" id="chatOrderIdDisplayHeader" style="font-size: 0.7rem;"></small>
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-content border-0 shadow-lg chat-modal-content">
+                <div class="chat-header-pro">
+                    <div class="chat-header-avatar-wrap">
+                        <img id="chatPartnerAvatar" src="" onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                    </div>
+                    <div class="chat-header-info">
+                        <span id="chatPartnerNameHeader" class="chat-header-name">Conversa</span>
+                        <span id="chatOrderIdDisplayHeader" class="chat-header-order-id"></span>
+                    </div>
+                    <button type="button" class="chat-header-close" data-bs-dismiss="modal" aria-label="Fechar">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
                 <div class="modal-body p-0">
                     <div class="row g-0 h-100">
                         <div class="col-12 d-flex flex-column h-100 bg-white chat-container">
-                            <!-- ABA DE OPÇÕES (Overlay superior) -->
-                            <div id="logisticsAgreementArea">
-                                <div id="logisticsButtons" class="logistics-buttons"></div>
-                            </div>
-
                             <!-- Resumo do Produto (fixo no topo) -->
-                            <div id="chatProductSummary" class="p-2 bg-light border-bottom d-flex align-items-center gap-2">
-                                <img id="chatProdImg" src="" style="width:45px;height:45px;object-fit:cover;border-radius:8px;" referrerpolicy="no-referrer"
-                                     onerror="this.src='https://placehold.co/45?text=📦'">
-                                <div class="flex-grow-1" style="line-height: 1.2;">
-                                    <div id="chatProdTitle" class="fw-bold small text-truncate" style="max-width: 200px;">Produto</div>
-                                    <div id="chatProdPrice" class="text-success small fw-bold">R$ 0,00</div>
+                            <div id="chatProductSummary" class="chat-product-summary">
+                                <img id="chatProdImg" src="" referrerpolicy="no-referrer"
+                                     onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                                <div class="chat-product-summary-info">
+                                    <div id="chatProdTitle" class="chat-product-summary-title">Produto</div>
+                                    <div id="chatProdPrice" class="chat-product-summary-price">R$ 0,00</div>
                                 </div>
-                                <small id="chatOrderIdDisplay" class="text-muted">#000000</small>
+                                <small id="chatOrderIdDisplay" class="chat-product-summary-id">#000000</small>
                             </div>
                             <!-- Barra de Status do Pedido -->
-                            <div id="orderStatusBar" class="bg-white border-bottom p-2 shadow-sm"></div>
+                            <div id="orderStatusBar" class="chat-status-bar"></div>
 
                             <!-- Área de Mensagens -->
                             <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: var(--bg-color);"></div>
@@ -751,22 +777,50 @@
                             <!-- Barra de Preview (Responder/Editar) -->
                             <div id="chatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
 
+                            <!-- Opções do pedido (status/logística) — abre pra cima, encostada no input, estilo WhatsApp -->
+                            <div id="logisticsAgreementArea">
+                                <div id="logisticsButtons" class="logistics-buttons"></div>
+                            </div>
+
+                            <!-- Painel de Anexo (abre ao clicar no clipe, sem popups feios de prompt()) -->
+                            <div id="chatAttachPanel" class="p-3 bg-light border-top d-none">
+                                <div class="d-flex gap-2 mb-2">
+                                    <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
+                                        <i class="bi bi-image me-1"></i>Imagem
+                                    </button>
+                                    <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
+                                        <i class="bi bi-file-earmark me-1"></i>Arquivo
+                                    </button>
+                                </div>
+                                <div class="input-group input-group-sm mb-2">
+                                    <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                                    <input type="url" id="chatAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmChatAttach()">
+                                        <i class="bi bi-send me-1"></i>Enviar
+                                    </button>
+                                </div>
+                            </div>
+
                             <!-- Input de Mensagem -->
-                            <div class="p-3 border-top bg-white">
+                            <div class="chat-input-bar">
                                 <form id="chatMessageForm" onsubmit="return window.sendChatMessage(event)" class="d-flex gap-2 align-items-center">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle" 
-                                            onclick="window.sendChatFile()" title="Enviar arquivo">
+                                    <button type="button" class="chat-icon-btn"
+                                            onclick="window.toggleChatAttachPanel()" title="Anexar imagem ou arquivo">
                                         <i class="bi bi-paperclip"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-circle" 
+                                    <button type="button" class="chat-icon-btn"
                                             onclick="window.toggleChatActions()" title="Opções do pedido">
                                         <i class="bi bi-plus-circle"></i>
                                     </button>
-                                    <input type="text" id="chatMessageInput" class="form-control rounded-pill" 
+                                    <input type="text" id="chatMessageInput" class="chat-text-input"
                                            placeholder="Digite sua mensagem..." autocomplete="off">
-                                    <button type="submit" class="btn btn-primary rounded-circle" 
-                                            style="width: 40px; height: 40px;">
-                                        <i class="bi bi-send"></i>
+                                    <button type="submit" class="chat-send-btn">
+                                        <i class="bi bi-send-fill"></i>
                                     </button>
                                 </form>
                             </div>
