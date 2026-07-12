@@ -181,7 +181,7 @@
     </section>
 
     <!-- Grid de Produtos -->
-    <main class="container my-4">
+    <main class="container my-4" id="productGridMain">
         <div class="row">
             <div class="col-12">
                 <h2 class="section-title mb-4 fs-4" id="gridTitle">Recomendados para você</h2>
@@ -740,10 +740,31 @@
     </div>
 
     <!-- Modal Chat -->
-    <div class="modal fade" id="chatModal" tabindex="-1">
-        <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg chat-modal-content">
+    <!-- ÁREA DE PEDIDOS ESTILO WHATSAPP WEB (Minhas Vendas / Compras / Solicitações) -->
+    <div id="whatsappOrdersView" class="d-none wa-main">
+        <section class="wa-side">
+            <div class="wa-side__header">
+                <h6 id="waSideTitle" class="mb-0">Minhas Vendas</h6>
+            </div>
+            <div class="wa-side__search">
+                <i class="bi bi-search"></i>
+                <input type="text" id="waContactSearch" placeholder="Buscar conversa..." oninput="window.filterWaContacts(this.value)">
+            </div>
+            <div id="waContactList" class="wa-side__list"></div>
+        </section>
+
+        <section class="wa-chat">
+            <!-- Estado vazio: nenhuma conversa selecionada -->
+            <div id="waEmptyState" class="wa-empty-state">
+                <i class="bi bi-chat-square-text"></i>
+                <p>Selecione um pedido ao lado para ver a conversa</p>
+            </div>
+
+            <div id="waChatActive" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;">
                 <div class="chat-header-pro">
+                    <button type="button" class="chat-header-close d-lg-none" onclick="window.closeWaChat()" aria-label="Voltar" style="margin-right:4px;">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
                     <div class="chat-header-avatar-wrap">
                         <img id="chatPartnerAvatar" src="" onerror="this.src='https://ui-avatars.com/api/?name=User'">
                     </div>
@@ -751,84 +772,85 @@
                         <span id="chatPartnerNameHeader" class="chat-header-name">Conversa</span>
                         <span id="chatOrderIdDisplayHeader" class="chat-header-order-id"></span>
                     </div>
-                    <button type="button" class="chat-header-close" data-bs-dismiss="modal" aria-label="Fechar">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-                <div class="modal-body p-0">
-                    <div class="row g-0 h-100">
-                        <div class="col-12 d-flex flex-column h-100 bg-white chat-container">
-                            <!-- Resumo do Produto (fixo no topo) -->
-                            <div id="chatProductSummary" class="chat-product-summary">
-                                <img id="chatProdImg" src="" referrerpolicy="no-referrer"
-                                     onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
-                                <div class="chat-product-summary-info">
-                                    <div id="chatProdTitle" class="chat-product-summary-title">Produto</div>
-                                    <div id="chatProdPrice" class="chat-product-summary-price">R$ 0,00</div>
-                                </div>
-                                <small id="chatOrderIdDisplay" class="chat-product-summary-id">#000000</small>
-                            </div>
-                            <!-- Barra de Status do Pedido -->
-                            <div id="orderStatusBar" class="chat-status-bar"></div>
-
-                            <!-- Área de Mensagens -->
-                            <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: var(--bg-color);"></div>
-                            
-                            <!-- Barra de Preview (Responder/Editar) -->
-                            <div id="chatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-
-                            <!-- Opções do pedido (status/logística) — abre pra cima, encostada no input, estilo WhatsApp -->
-                            <div id="logisticsAgreementArea">
-                                <div id="logisticsButtons" class="logistics-buttons"></div>
-                            </div>
-
-                            <!-- Painel de Anexo (abre ao clicar no clipe, sem popups feios de prompt()) -->
-                            <div id="chatAttachPanel" class="p-3 bg-light border-top d-none">
-                                <div class="d-flex gap-2 mb-2">
-                                    <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
-                                        <i class="bi bi-image me-1"></i>Imagem
-                                    </button>
-                                    <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
-                                        <i class="bi bi-file-earmark me-1"></i>Arquivo
-                                    </button>
-                                </div>
-                                <div class="input-group input-group-sm mb-2">
-                                    <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                                    <input type="url" id="chatAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
-                                </div>
-                                <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
-                                        <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
-                                    </button>
-                                    <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmChatAttach()">
-                                        <i class="bi bi-send me-1"></i>Enviar
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Input de Mensagem -->
-                            <div class="chat-input-bar">
-                                <form id="chatMessageForm" onsubmit="return window.sendChatMessage(event)" class="d-flex gap-2 align-items-center">
-                                    <button type="button" class="chat-icon-btn"
-                                            onclick="window.toggleChatAttachPanel()" title="Anexar imagem ou arquivo">
-                                        <i class="bi bi-paperclip"></i>
-                                    </button>
-                                    <button type="button" class="chat-icon-btn"
-                                            onclick="window.toggleChatActions()" title="Opções do pedido">
-                                        <i class="bi bi-plus-circle"></i>
-                                    </button>
-                                    <input type="text" id="chatMessageInput" class="chat-text-input"
-                                           placeholder="Digite sua mensagem..." autocomplete="off">
-                                    <button type="submit" class="chat-send-btn">
-                                        <i class="bi bi-send-fill"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
+                    <div class="dropdown">
+                        <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções" style="margin-right:4px;">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.viewChatPartnerProfile()"><i class="bi bi-person-circle me-2"></i>Ver perfil</a></li>
+                            <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.chatCancelOrder(currentChat)"><i class="bi bi-x-circle me-2"></i>Cancelar pedido</a></li>
+                        </ul>
                     </div>
                 </div>
+
+                <!-- Resumo do Produto (fixo no topo) -->
+                <div id="chatProductSummary" class="chat-product-summary">
+                    <img id="chatProdImg" src="" referrerpolicy="no-referrer"
+                         onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                    <div class="chat-product-summary-info">
+                        <div id="chatProdTitle" class="chat-product-summary-title">Produto</div>
+                        <div id="chatProdPrice" class="chat-product-summary-price">R$ 0,00</div>
+                    </div>
+                    <small id="chatOrderIdDisplay" class="chat-product-summary-id">#000000</small>
+                </div>
+                <!-- Barra de Status do Pedido -->
+                <div id="orderStatusBar" class="chat-status-bar"></div>
+
+                <!-- Área de Mensagens -->
+                <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto;"></div>
+
+                <!-- Barra de Preview (Responder/Editar) -->
+                <div id="chatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
+
+                <!-- Opções do pedido (status/logística) — abre pra cima, encostada no input, estilo WhatsApp -->
+                <div id="logisticsAgreementArea">
+                    <div id="logisticsButtons" class="logistics-buttons"></div>
+                </div>
+
+                <!-- Painel de Anexo (abre ao clicar no clipe, sem popups feios de prompt()) -->
+                <div id="chatAttachPanel" class="p-3 bg-light border-top d-none">
+                    <div class="d-flex gap-2 mb-2">
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
+                            <i class="bi bi-image me-1"></i>Imagem
+                        </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
+                            <i class="bi bi-file-earmark me-1"></i>Arquivo
+                        </button>
+                    </div>
+                    <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                        <input type="url" id="chatAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmChatAttach()">
+                            <i class="bi bi-send me-1"></i>Enviar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input de Mensagem -->
+                <div class="chat-input-bar">
+                    <form id="chatMessageForm" onsubmit="return window.sendChatMessage(event)" class="d-flex gap-2 align-items-center">
+                        <button type="button" class="chat-icon-btn"
+                                onclick="window.toggleChatAttachPanel()" title="Anexar imagem ou arquivo">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
+                        <button type="button" class="chat-icon-btn"
+                                onclick="window.toggleChatActions()" title="Opções do pedido">
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                        <input type="text" id="chatMessageInput" class="chat-text-input"
+                               placeholder="Digite sua mensagem..." autocomplete="off">
+                        <button type="submit" class="chat-send-btn">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
+        </section>
     </div>
 
     <!-- Modal Detalhes do Pedido -->
