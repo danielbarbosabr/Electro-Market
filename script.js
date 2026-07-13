@@ -231,8 +231,86 @@ async function loadPage(query = 'eletronicos', forceRefresh = false) {
 }
 
 // ============================================
-// RENDER CARD
+// PRESENÇA ONLINE/OFFLINE
 // ============================================
+
+const PRESENCE_ONLINE_THRESHOLD_MS = 2 * 60 * 1000; // considera "online" se visto há menos de 2 min
+
+/**
+ * A cada 60s, se houver alguém logado, atualiza users.last_seen no Supabase.
+ * Requer a coluna 'last_seen' (timestamptz) na tabela users — se ela ainda
+ * não existir, falha silenciosamente (não quebra o resto do site).
+ */
+window.startPresenceHeartbeat = function() {
+    const beat = async () => {
+        const user = getSavedUser();
+        if (!user) return;
+        try {
+            await supabaseFetch(`users?id=eq.${user.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ last_seen: new Date().toISOString() })
+            });
+        } catch (e) { /* coluna ainda não existe no banco — ignora silenciosamente */ }
+    };
+    beat();
+    setInterval(beat, 60000);
+};
+
+function isRecentlyOnline(lastSeen) {
+    if (!lastSeen) return false;
+    return (Date.now() - new Date(lastSeen).getTime()) < PRESENCE_ONLINE_THRESHOLD_MS;
+}
+
+/**
+ * Efeito 3D no modal de detalhe: passar o mouse sobre a foto principal dá um
+ * leve "relevo", e clicar nas bordas laterais troca pra próxima/anterior
+ * imagem — substitui a fileira de miniaturas embaixo da foto.
+ */
+window.tiltDetailImage = function(e, container) {
+    const img = container.querySelector('#mainDetailImg');
+    if (!img) return;
+    const rect = container.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const rotateY = (x - 0.5) * 12;
+    const rotateX = (0.5 - y) * 8;
+    img.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.03,1.03,1.03)`;
+};
+
+window.resetDetailImage = function(container) {
+    const img = container.querySelector('#mainDetailImg');
+    if (img) img.style.transform = '';
+};
+
+window.cycleDetailImage = function(pid, container, dir) {
+    if (!container) return;
+    const product = allProductsCache.find(p => p.id === pid);
+    const imgs = safeParseImages(product?.img);
+    if (imgs.length < 2) return;
+
+    let idx = parseInt(container.dataset.idx || '0', 10);
+    idx = (idx + dir + imgs.length) % imgs.length;
+    container.dataset.idx = idx;
+
+    const imgEl = container.querySelector('#mainDetailImg');
+    if (imgEl) {
+        imgEl.style.opacity = '0';
+        setTimeout(() => {
+            imgEl.src = normalizeImageUrl(imgs[idx]) || imgs[idx];
+            imgEl.style.opacity = '1';
+        }, 130);
+    }
+    container.querySelectorAll('.card-img-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+};
+
+window.refreshDetailLikeBtn = function(pid) {
+    const btn = document.getElementById('detailLikeBtn');
+    if (!btn) return;
+    const liked = likedProducts.includes(pid);
+    btn.classList.toggle('text-danger', liked);
+    btn.classList.toggle('text-muted', !liked);
+    btn.innerHTML = `<i class="bi ${liked ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>Curtir`;
+};
 
 function renderCard(item) {
     if (!item?.titulo) return '';
@@ -603,17 +681,7 @@ window.showDetail = async function(pid) {
     const regiaoEntrega   = [enderecoSemNumero(sellerAddressRaw), cidadeVendedor].filter(Boolean).join(' - ') || 'Consulte o vendedor';
     const images = safeParseImages(item.img);
     const mainImg         = images[0] || '';
-
-    const thumbnailsHtml = images.length > 1 ? `
-        <div class="d-flex gap-2 mt-2 justify-content-center overflow-auto pb-2">
-            ${images.map(src => `
-                <img src="${src}" class="rounded border" width="58" height="58"
-                     style="object-fit:cover;cursor:pointer;transition:transform 0.2s;"
-                     onmouseover="this.style.transform='scale(1.1)'"
-                     onmouseout="this.style.transform='scale(1)'"
-                     onclick="document.getElementById('mainDetailImg').src='${src}'">`
-            ).join('')}
-        </div>` : '';
+    const hasMultipleImgs = images.length > 1;
 
     const sellerProducts = allProductsCache.filter(p => p.vendedor_id === item.vendedor_id);
     const totalLikes     = sellerProducts.reduce((acc, p) => acc + (parseInt(p.likes) || 0), 0) || 0;
@@ -623,15 +691,20 @@ window.showDetail = async function(pid) {
     document.getElementById('productDetailContent').innerHTML = `
         <div class="row g-0 g-md-4">
             <div class="col-md-7 border-end pe-md-4">
-                <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center" style="min-height:260px;">
+                <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center position-relative${hasMultipleImgs ? ' product-3d-img' : ''}"
+                     style="min-height:260px;" data-pid="${pid}" data-idx="0"
+                     ${hasMultipleImgs ? `onmousemove="window.tiltDetailImage(event, this)" onmouseleave="window.resetDetailImage(this)"` : ''}>
                     ${mainImg
-                        ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:380px;object-fit:contain;transition:transform 0.3s;" referrerpolicy="no-referrer"
-                               onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'"
+                        ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:380px;object-fit:contain;transition:transform 0.15s ease-out, opacity 0.15s ease;" referrerpolicy="no-referrer"
                                onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
                         : `<i class="bi bi-box-seam text-secondary" style="font-size:4rem;"></i>`
                     }
+                    ${hasMultipleImgs ? `
+                        <div class="card-img-edge card-img-edge-left" onclick="event.stopPropagation(); window.cycleDetailImage('${pid}', this.parentElement, -1)"><i class="bi bi-chevron-left"></i></div>
+                        <div class="card-img-edge card-img-edge-right" onclick="event.stopPropagation(); window.cycleDetailImage('${pid}', this.parentElement, 1)"><i class="bi bi-chevron-right"></i></div>
+                        <div class="card-img-dots">${images.map((_, i) => `<span class="card-img-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>
+                    ` : ''}
                 </div>
-                ${thumbnailsHtml}
                 <div class="d-none d-md-block mt-3">
                     <h5 class="fw-bold">Descrição</h5>
                     <p class="text-muted" style="line-height:1.7">${item.descricao || 'Sem descrição detalhada.'}</p>
@@ -693,9 +766,14 @@ window.showDetail = async function(pid) {
                         <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
                     </button>
                 `}
-                <button class="btn btn-link text-decoration-none w-100 text-muted small" onclick="window.shareProduct('${pid}')">
-                    <i class="bi bi-share me-2"></i>Compartilhar
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-link text-decoration-none flex-grow-1 text-muted small" onclick="window.shareProduct('${pid}')">
+                        <i class="bi bi-share me-2"></i>Compartilhar
+                    </button>
+                    <button id="detailLikeBtn" class="btn btn-link text-decoration-none flex-grow-1 small ${likedProducts.includes(pid) ? 'text-danger' : 'text-muted'}" onclick="window.toggleLike('${pid}'); window.refreshDetailLikeBtn('${pid}')">
+                        <i class="bi ${likedProducts.includes(pid) ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>Curtir
+                    </button>
+                </div>
             </div>
         </div>`;
 
@@ -1105,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     populateEstadoSelect('v2CadUF');
     populateEstadoSelect('editEstado');
     detectGuestRegion();
+    window.startPresenceHeartbeat();
 
     // Anunciar
     document.getElementById('announceForm')?.addEventListener('submit', async (e) => {
@@ -1238,6 +1317,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const bairro  = document.getElementById('editBairro').value.trim();
         const enderecoCompleto = [rua, numero].filter(Boolean).join(', ') + (bairro ? ` - ${bairro}` : '');
 
+        const novoTipo = document.getElementById('editTipo')?.value || user.tipo;
+
+        // Rebaixar de Vendedor pra Cliente apaga tudo que ele publicou (produtos,
+        // pedidos como vendedor e as conversas ligadas a eles) — ação destrutiva,
+        // então pede confirmação explícita antes de continuar.
+        if (user.tipo === 'VENDEDOR' && novoTipo === 'CLIENTE') {
+            const confirmado = confirm(
+                'Mudar para Cliente vai APAGAR PERMANENTEMENTE todos os seus anúncios ' +
+                'publicados, os pedidos de venda e as conversas ligadas a eles.\n\n' +
+                'Essa ação não pode ser desfeita. Deseja continuar?'
+            );
+            if (!confirmado) {
+                document.getElementById('editTipo').value = 'VENDEDOR'; // reverte a seleção
+                return;
+            }
+            const btnSubmit = document.querySelector('#profileEditForm button[type="submit"]');
+            if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Removendo anúncios...'; }
+            try {
+                await excluirDadosDeVendedor(user.id);
+            } catch (err) {
+                console.error('Erro ao remover dados de vendedor:', err);
+                showToast('Erro ao remover seus anúncios. Tente novamente.', 'error');
+                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'SALVAR ALTERAÇÕES'; }
+                return;
+            }
+            if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'SALVAR ALTERAÇÕES'; }
+        }
+
         const updated = {
             ...user,
             nome:      document.getElementById('editNome').value.trim(),
@@ -1247,6 +1354,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cidade:    document.getElementById('editCidade').value.trim(),
             estado:    document.getElementById('editEstado').value,
             pagamento: document.getElementById('editPagamento').value,
+            tipo:      novoTipo,
             avatar:    novoAvatar || user.avatar
         };
 
@@ -1255,6 +1363,13 @@ document.addEventListener('DOMContentLoaded', () => {
         bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas'))?.hide();
         updateUI();
         createPersistentNotification('Suas informações de perfil foram atualizadas.', 'success');
+
+        // Se o tipo de conta mudou, recarrega a página pra garantir que todo o
+        // menu/navegação (que depende do papel do usuário) se ajuste corretamente.
+        if (novoTipo !== user.tipo) {
+            showToast(`Sua conta agora é do tipo ${novoTipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente'}.`, 'success');
+            setTimeout(() => location.reload(), 900);
+        }
     });
 
     // Busca com debounce
@@ -1575,6 +1690,8 @@ window.showProfileEdit = () => {
     populateEstadoSelect('editEstado');
     document.getElementById('editEstado').value   = user.estado   || '';
     document.getElementById('editPagamento').value = user.pagamento || 'pix';
+    const tipoSelect = document.getElementById('editTipo');
+    if (tipoSelect) tipoSelect.value = (user.tipo === 'VENDEDOR') ? 'VENDEDOR' : 'CLIENTE';
 
     const linkInput = document.getElementById('editAvatarLink');
     if (linkInput) {
@@ -1588,6 +1705,79 @@ window.showProfileEdit = () => {
     }
 
     bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas')).show();
+};
+
+/**
+ * Apaga tudo que um vendedor publicou/vendeu: primeiro as conversas (chats),
+ * depois os pedidos onde ele era o vendedor, e por fim os próprios anúncios.
+ * A ordem importa por causa de restrições de chave estrangeira no banco.
+ * Usado ao rebaixar a conta de Vendedor pra Cliente, e também na exclusão total da conta.
+ */
+async function excluirDadosDeVendedor(userId) {
+    // 1) Pedidos em que este usuário era o vendedor
+    const ordersComoVendedor = await supabaseFetch(`orders?select=id&seller_id=eq.${userId}`);
+    const orderIds = (ordersComoVendedor || []).map(o => o.id);
+
+    // 2) Chats ligados a esses pedidos (precisam ser removidos antes dos pedidos)
+    if (orderIds.length) {
+        await supabaseFetch(`chats?order_id=in.(${orderIds.join(',')})`, { method: 'DELETE' });
+    }
+
+    // 3) Os pedidos em si
+    if (orderIds.length) {
+        await supabaseFetch(`orders?seller_id=eq.${userId}`, { method: 'DELETE' });
+    }
+
+    // 4) Os anúncios publicados
+    await supabaseFetch(`products?vendedor_id=eq.${userId}`, { method: 'DELETE' });
+}
+
+/**
+ * Exclusão total e definitiva da conta: remove anúncios/vendas (se for
+ * vendedor), pedidos feitos como comprador, conversas ligadas a eles, e por
+ * fim o próprio usuário. Pede confirmação dupla por ser irreversível.
+ */
+window.deleteAccount = async function() {
+    const user = getSavedUser();
+    if (!user) return;
+
+    const confirmado = confirm(
+        'Isso vai apagar sua conta e TUDO relacionado a ela: anúncios publicados, ' +
+        'compras, vendas e conversas. Essa ação é IRREVERSÍVEL.\n\n' +
+        'Deseja continuar?'
+    );
+    if (!confirmado) return;
+
+    const digitado = prompt('Pra confirmar, digite EXCLUIR (em maiúsculas):');
+    if (digitado !== 'EXCLUIR') {
+        showToast('Exclusão cancelada.', 'info');
+        return;
+    }
+
+    try {
+        showToast('Excluindo sua conta...', 'info');
+
+        // Anúncios, vendas e conversas de vendas (se for vendedor)
+        await excluirDadosDeVendedor(user.id);
+
+        // Pedidos feitos como comprador + conversas ligadas a eles
+        const ordersComoComprador = await supabaseFetch(`orders?select=id&buyer_id=eq.${user.id}`);
+        const buyerOrderIds = (ordersComoComprador || []).map(o => o.id);
+        if (buyerOrderIds.length) {
+            await supabaseFetch(`chats?order_id=in.(${buyerOrderIds.join(',')})`, { method: 'DELETE' });
+            await supabaseFetch(`orders?buyer_id=eq.${user.id}`, { method: 'DELETE' });
+        }
+
+        // Por fim, o próprio usuário
+        await supabaseFetch(`users?id=eq.${user.id}`, { method: 'DELETE' });
+
+        localStorage.removeItem('electroUser');
+        showToast('Conta excluída. Sentiremos sua falta!', 'success');
+        setTimeout(() => location.reload(), 1200);
+    } catch (err) {
+        console.error('Erro ao excluir conta:', err);
+        showToast('Erro ao excluir a conta. Tente novamente ou contate o suporte.', 'error');
+    }
 };
 
 /** Busca o endereço pelo CEP digitado na edição de perfil e preenche Rua/Bairro/Cidade/Estado automaticamente */
@@ -1911,6 +2101,7 @@ async function renderOrdersListSilently(type) {
                 <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
             </div>`;
         }).join('');
+        window.filterWaContacts(document.getElementById('waContactSearch')?.value || '');
     } catch (e) {
         // Falha silenciosa: não interrompe a experiência do usuário durante o polling
         console.error('Falha ao atualizar lista de pedidos (silencioso):', e);
@@ -2081,10 +2272,26 @@ window.renderSellerRequests = async function() {
 
 window.filterWaContacts = function(query) {
     const q = query.trim().toLowerCase();
+    let anyVisible = false;
     document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
         const text = el.textContent.toLowerCase();
-        el.style.display = !q || text.includes(q) ? '' : 'none';
+        const show = !q || text.includes(q);
+        el.style.display = show ? '' : 'none';
+        if (show) anyVisible = true;
     });
+    let emptyMsg = document.getElementById('waSearchEmptyMsg');
+    if (!anyVisible && q) {
+        if (!emptyMsg) {
+            emptyMsg = document.createElement('div');
+            emptyMsg.id = 'waSearchEmptyMsg';
+            emptyMsg.className = 'text-center py-4 px-3';
+            emptyMsg.style.color = '#999';
+            emptyMsg.innerHTML = '<i class="bi bi-search fs-4 d-block mb-2"></i><p class="small mb-0">Nenhuma conversa encontrada.</p>';
+            document.getElementById('waContactList')?.appendChild(emptyMsg);
+        }
+    } else if (emptyMsg) {
+        emptyMsg.remove();
+    }
 };
 
 window.updateOrderStatus = async function(orderId, newStatus) {
@@ -2189,11 +2396,14 @@ window.showChat = async function(orderId) {
     document.getElementById('chatPartnerNameHeader').textContent = otherName || 'Chat';
 
     const avatarEl = document.getElementById('chatPartnerAvatar');
+    const dotEl = document.getElementById('chatPartnerStatusDot');
     avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`; // placeholder enquanto busca a foto real
+    dotEl?.classList.remove('online', 'offline');
     try {
-        const partnerData = await supabaseFetch(`users?select=avatar&id=eq.${otherId}&limit=1`);
+        const partnerData = await supabaseFetch(`users?select=avatar,last_seen&id=eq.${otherId}&limit=1`);
         const realAvatar = normalizeImageUrl(partnerData?.[0]?.avatar);
         if (realAvatar) avatarEl.src = realAvatar;
+        if (dotEl) dotEl.classList.add(isRecentlyOnline(partnerData?.[0]?.last_seen) ? 'online' : 'offline');
     } catch (e) {}
 
     // Popula resumo do produto
@@ -2762,7 +2972,7 @@ window.viewChatPartnerProfile = async function() {
 
     let partner = null;
     try {
-        const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at&id=eq.${partnerId}&limit=1`);
+        const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at,last_seen&id=eq.${partnerId}&limit=1`);
         partner = r?.[0];
     } catch (e) {}
 
@@ -2770,6 +2980,7 @@ window.viewChatPartnerProfile = async function() {
     const rating = partner?.vendedor_rating ? parseFloat(partner.vendedor_rating).toFixed(1) : '—';
     const ratingCount = partner?.rating_count || 0;
     const memberSince = partner?.created_at ? new Date(partner.created_at).toLocaleDateString('pt-BR', {month:'long', year:'numeric'}) : '—';
+    const online = isRecentlyOnline(partner?.last_seen);
 
     let modalEl = document.getElementById('partnerProfileModal');
     if (!modalEl) {
@@ -2784,8 +2995,12 @@ window.viewChatPartnerProfile = async function() {
             <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
                 <div class="modal-body text-center p-4">
                     <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
-                    <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="mb-3 border" referrerpolicy="no-referrer">
+                    <div class="position-relative d-inline-block mb-3">
+                        <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer">
+                        <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
+                    </div>
                     <h5 class="fw-bold mb-1">${partner?.nome || partnerName || 'Usuário'}</h5>
+                    <p class="small mb-2 fw-bold ${online ? 'text-success' : 'text-muted'}">${online ? '● Online agora' : '○ Offline'}</p>
                     <p class="text-muted small mb-3"><i class="bi bi-calendar3 me-1"></i>Na plataforma desde ${memberSince}</p>
                     <div class="d-flex justify-content-center align-items-center gap-2">
                         <i class="bi bi-star-fill text-warning"></i>
