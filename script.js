@@ -415,14 +415,27 @@ function updateCategoryFilterUI() {
     const select = document.getElementById('filterCategory');
     if (!select) return;
     const current = select.value;
-    const topCats = [...new Set(
-        allProductsCache.map(p => (p.categoria || '').split(' > ')[0].trim()).filter(Boolean)
-    )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    // O primeiro nível da categoria ("Eletrônicos") é igual pra todo produto, então não serve
+    // pra filtrar nada — por isso o menu ficava praticamente vazio. Usamos o segundo nível
+    // (Games, Informática, Celulares e Tablets, etc.), guardando como valor o caminho completo
+    // até ali (ex: "Eletrônicos > Games") pra continuar batendo com o startsWith() do applyFilters.
+    const catMap = new Map(); // rótulo exibido -> valor salvo na option
+    allProductsCache.forEach(p => {
+        const parts = (p.categoria || '').split(' > ').map(s => s.trim()).filter(Boolean);
+        if (!parts.length) return;
+        const label = parts.length > 1 ? parts[1] : parts[0];
+        const value = parts.length > 1 ? `${parts[0]} > ${parts[1]}` : parts[0];
+        if (label) catMap.set(label, value);
+    });
+
+    const sortedLabels = [...catMap.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     select.innerHTML = '<option value="">Todas as categorias</option>' +
-        topCats.map(c => `<option value="${c}">${c}</option>`).join('');
+        sortedLabels.map(label => `<option value="${catMap.get(label)}">${label}</option>`).join('');
+
     // Preserva a seleção anterior, se ela ainda existir na lista atualizada
-    if (topCats.includes(current)) select.value = current;
+    if ([...catMap.values()].includes(current)) select.value = current;
 }
 
 /** Remove acentos e normaliza caixa, para comparar nomes de cidade sem erro de digitação/acentuação */
@@ -766,10 +779,10 @@ window.showDetail = async function(pid) {
                         <i class="bi bi-trash me-2"></i>Excluir Anúncio
                     </button>
                 ` : `
-                    <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}');window.buyItem(cart.length-1);bootstrap.Modal.getInstance(document.getElementById('productDetailModal')).hide();">
+                    <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true});window.buyItem(cart.length-1);">
                         <i class="bi bi-lightning me-2"></i>Comprar Agora
                     </button>
-                    <button class="btn btn-success w-100 mb-2" onclick="window.addToCart('${pid}');bootstrap.Modal.getInstance(document.getElementById('productDetailModal')).hide();">
+                    <button class="btn btn-success w-100 mb-2" onclick="window.addToCart('${pid}');">
                         <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
                     </button>
                 `}
@@ -1001,7 +1014,7 @@ function renderCart() {
     let total = 0;
     list.innerHTML = cart.map((item, i) => {
         total += (item.preco || 0) * (item.qtd || 1);
-        const thumb = Array.isArray(item.img) ? item.img[0] : item.img;
+        const thumb = safeParseImages(item.img)[0];
         return `
         <div class="cart-item border rounded p-2 mb-2">
             <div class="d-flex gap-2 align-items-center">
@@ -1032,7 +1045,8 @@ function renderCart() {
     localStorage.setItem('electroCart', JSON.stringify(cart));
 }
 
-window.addToCart = function(productId) {
+window.addToCart = function(productId, options = {}) {
+    const { openCart = true, silent = false } = options;
     const p = allProductsCache.find(x => x.id === productId);
     if (!p) return;
     const exist = cart.find(i => i.id === productId);
@@ -1043,8 +1057,22 @@ window.addToCart = function(productId) {
         cart.push({ ...p, qtd: 1 });
     }
     renderCart();
-    showToast(`"${p.titulo.substring(0,30)}..." adicionado ao carrinho!`, 'success');
-    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
+    if (!silent) showToast(`"${p.titulo.substring(0,30)}..." adicionado ao carrinho!`, 'success');
+
+    const openCartOffcanvas = () => {
+        if (openCart) bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
+    };
+
+    // Se o modal de detalhes do produto estiver aberto, fecha ele PRIMEIRO e só então
+    // abre o carrinho. Abrir o offcanvas enquanto o modal ainda está fechando faz o
+    // Bootstrap deixar um backdrop "fantasma" na tela, travando todos os cliques.
+    const detailModalEl = document.getElementById('productDetailModal');
+    if (detailModalEl && detailModalEl.classList.contains('show')) {
+        detailModalEl.addEventListener('hidden.bs.modal', openCartOffcanvas, { once: true });
+        bootstrap.Modal.getInstance(detailModalEl)?.hide();
+    } else {
+        openCartOffcanvas();
+    }
 };
 
 window.removeFromCart = function(i) {
