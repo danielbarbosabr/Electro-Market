@@ -2958,6 +2958,67 @@ body.sign-up-js .ml-auth-cadastro { display: block; }
     font-family: 'Sora', sans-serif;
 }
 
+/* ===== Mascote Yeti (yeti-login-page) — animado em CSS/JS puro, sem GSAP ===== */
+.yeti-svgContainer {
+    position: relative;
+    width: 130px;
+    height: 130px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    border: solid 2.5px #3483fa;
+    overflow: hidden;
+    pointer-events: none;
+}
+.yeti-svgContainer > div {
+    position: relative;
+    width: 100%;
+    height: 0;
+    overflow: hidden;
+    padding-bottom: 100%;
+}
+.yeti-mySVG {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+body.dark-theme .yeti-svgContainer { border-color: #4eb8dd; }
+
+/* Olhos, nariz, boca e rosto seguem o cursor durante a digitação */
+.yeti-mySVG .eyeL,
+.yeti-mySVG .eyeR,
+.yeti-mySVG .nose,
+.yeti-mySVG .mouth,
+.yeti-mySVG .face {
+    transition: transform 0.35s cubic-bezier(.25,.46,.45,.94);
+    transform: translate(0px, 0px);
+}
+
+/* Boca "abre" um pouco enquanto o usuário digita */
+.yeti-mySVG .mouth {
+    transform-origin: 100px 100px;
+}
+
+/* Braços: começam escondidos embaixo e sobem para tapar o rosto */
+.yeti-mySVG .armL,
+.yeti-mySVG .armR {
+    transition: transform 0.5s cubic-bezier(.34,1.56,.64,1);
+    transform: translate(-93px, 220px);
+}
+#yetiMascot.yeti-covering .armL,
+#yetiMascot.yeti-covering .armR {
+    transform: translate(-93px, 2px);
+}
+
+/* Quando o usuário clica no olho e revela a senha, o Yeti abaixa um pouco
+   a mão para "espiar" em vez de tapar o rosto por completo */
+#yetiMascot.yeti-peeking .armL,
+#yetiMascot.yeti-peeking .armR {
+    transform: translate(-93px, 90px);
+}
+
 .ml-auth-title {
     text-align: center;
     font-size: 1.3rem;
