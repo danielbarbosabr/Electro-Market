@@ -22,6 +22,13 @@ let ordersPollInterval = null;
 let lastChatSignature = null;
 let productsFetchToken = 0;
 
+// Formata um valor em reais; se for 0 (ou vazio), mostra "GRÁTIS"
+function formatPreco(valor, opts = {}) {
+    const v = parseFloat(valor) || 0;
+    if (v === 0) return opts.htmlGratis !== false ? '<span class="text-success fw-bold">GRÁTIS</span>' : 'GRÁTIS';
+    return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+}
+
 const ORDER_STATUS_MAP = {
     'pending':         { text: 'Em Aprovação',             class: 'bg-warning text-dark' },
     'accepted':        { text: 'Aprovado (Chat Liberado)', class: 'bg-success' },
@@ -1001,7 +1008,7 @@ function renderCart() {
                 <img src="${thumb || 'https://placehold.co/60'}" style="width:50px;height:50px;object-fit:contain;border-radius:6px;" loading="lazy">
                 <div class="flex-grow-1">
                     <div class="small fw-bold text-truncate">${item.titulo}</div>
-                    <div class="text-success fw-bold small">R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
+                    <div class="text-success fw-bold small">${(item.preco || 0) === 0 ? 'GRÁTIS' : `R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}`}</div>
                     <div class="d-flex align-items-center gap-2 mt-1">
                         <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, -1)">−</button>
                         <span class="small fw-bold">${item.qtd || 1}</span>
@@ -1020,7 +1027,7 @@ function renderCart() {
         </div>`;
     }).join('');
 
-    if (totalEl) totalEl.textContent = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+    if (totalEl) totalEl.textContent = formatPreco(total, {htmlGratis:false});
     updateCartBadge();
     localStorage.setItem('electroCart', JSON.stringify(cart));
 }
@@ -1129,7 +1136,7 @@ window.buyItem = async function(i) {
                 logistics_agreed: false,
                 messages: [{
                     senderId:  'system',
-                    text:      `Pedido #${orderId.slice(-8).toUpperCase()} criado!\n${item.titulo}\nR$ ${order.total.toLocaleString('pt-BR')}\nAguardando aprovação do vendedor...`,
+                    text:      `Pedido #${orderId.slice(-8).toUpperCase()} criado!\n${item.titulo}\n${formatPreco(order.total, {htmlGratis:false})}\nAguardando aprovação do vendedor...`,
                     timestamp: new Date().toISOString()
                 }]
             })
@@ -1842,7 +1849,7 @@ window.mlCadPrevStep = function() {
 
 window.forgotPassword = function(event) {
   event?.preventDefault();
-  showToast('Recuperação de senha em breve! Por enquanto, entre em contato com o suporte.', 'info');
+  window.open('https://github.com/danielbarbosabr', '_blank', 'noopener');
 };
 
 window.hideAuthScreen = function() {
@@ -1876,7 +1883,109 @@ window.toggleAuthPass = function(inputId, iconEl) {
       iconEl.classList.toggle('bi-eye', !isPass);
       iconEl.classList.toggle('bi-eye-slash', isPass);
   }
+  // Avisa o mascote Yeti (se existir) que a senha ficou visível/escondida,
+  // para ele "espiar" com a mão em vez de tapar o rosto por completo.
+  if (typeof window.yetiSetPeeking === 'function') {
+      window.yetiSetPeeking(inputId, isPass); // isPass=true => senha acabou de ficar visível
+  }
+  // Mantém o foco no campo para o usuário continuar digitando
+  input.focus();
 };
+
+// ============================================
+// MASCOTE YETI ANIMADO (login)
+// Inspirado em khuddus7815/yeti-login-page (Yeti Login, Darin S.)
+// 100% JavaScript + CSS puro (sem GSAP/MorphSVGPlugin, que exige licença paga
+// e não fica hospedado de graça no cdnjs — por isso a animação não rodava).
+// ============================================
+(function initYetiMascot() {
+    const yetiRoot = document.getElementById('yetiMascot');
+    const emailInput = document.getElementById('v2LogEmail');
+    const passInput = document.getElementById('v2LogPass');
+    if (!yetiRoot || !emailInput || !passInput) return;
+
+    const $ = (sel) => yetiRoot.querySelector(sel);
+    const eyeL = $('.eyeL'), eyeR = $('.eyeR'),
+          nose = $('.nose'), mouth = $('.mouth'), face = $('.face');
+
+    const EYE_MAX_X = 6, EYE_MAX_Y = 3;
+    const NOSE_MAX_X = 4, NOSE_MAX_Y = 2;
+    const MOUTH_MAX_X = 3;
+
+    function look(ratio) {
+        // ratio vai de -1 (olhando para a esquerda) a 1 (olhando para a direita)
+        const r = Math.max(-1, Math.min(1, ratio));
+        eyeL.style.transform = `translate(${(-r * EYE_MAX_X).toFixed(1)}px, ${EYE_MAX_Y}px)`;
+        eyeR.style.transform = `translate(${(-r * EYE_MAX_X).toFixed(1)}px, ${EYE_MAX_Y}px)`;
+        nose.style.transform = `translate(${(-r * NOSE_MAX_X).toFixed(1)}px, 0px)`;
+        mouth.style.transform = `translate(${(-r * MOUTH_MAX_X).toFixed(1)}px, 0px)`;
+        face.style.transform = `translate(${(-r * 2).toFixed(1)}px, 0px)`;
+    }
+
+    function resetFace() {
+        eyeL.style.transform = 'translate(0px, 0px)';
+        eyeR.style.transform = 'translate(0px, 0px)';
+        nose.style.transform = 'translate(0px, 0px)';
+        mouth.style.transform = 'translate(0px, 0px)';
+        face.style.transform = 'translate(0px, 0px)';
+    }
+
+    function onEmailActivity() {
+        const val = emailInput.value;
+        const caret = emailInput.selectionStart || 0;
+        if (val.length === 0) { resetFace(); return; }
+        // posição relativa do cursor dentro do texto (0 a 1), convertida para -1..1
+        const ratio = (caret / Math.max(val.length, 1)) * 2 - 1;
+        look(ratio);
+    }
+
+    let passwordVisible = false; // true = usuário clicou no olho e a senha está em texto puro
+
+    function applyPassState() {
+        if (passwordVisible) {
+            yetiRoot.classList.add('yeti-peeking');
+            yetiRoot.classList.remove('yeti-covering');
+        } else {
+            yetiRoot.classList.add('yeti-covering');
+            yetiRoot.classList.remove('yeti-peeking');
+        }
+    }
+    function coverEyes() {
+        applyPassState();
+    }
+    function uncoverEyes() {
+        yetiRoot.classList.remove('yeti-covering');
+        yetiRoot.classList.remove('yeti-peeking');
+    }
+
+    // Chamado pelo toggleAuthPass() quando o usuário clica no ícone do olho
+    window.yetiSetPeeking = function(inputId, isNowVisible) {
+        if (inputId !== 'v2LogPass') return;
+        passwordVisible = isNowVisible;
+        applyPassState();
+    };
+
+    emailInput.addEventListener('focus', onEmailActivity);
+    emailInput.addEventListener('input', onEmailActivity);
+    emailInput.addEventListener('keyup', onEmailActivity);
+    emailInput.addEventListener('click', onEmailActivity);
+    emailInput.addEventListener('blur', resetFace);
+    passInput.addEventListener('focus', coverEyes);
+    passInput.addEventListener('blur', () => { passwordVisible = false; uncoverEyes(); });
+
+    // Sempre que a tela de login for reaberta, garante que o Yeti volta ao estado normal
+    const authScreen = document.getElementById('authScreen');
+    if (authScreen && 'MutationObserver' in window) {
+        const observer = new MutationObserver(() => {
+            if (!authScreen.classList.contains('d-none')) {
+                passwordVisible = false;
+                uncoverEyes();
+                resetFace();
+            }
+        });
+        observer.observe(authScreen, { attributes: true, attributeFilter: ['class'] });
+    }
+})();
 
 // Formulários da tela de auth
 document.addEventListener('submit', async (e) => {
@@ -2095,7 +2204,7 @@ async function renderOrdersListSilently(type) {
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
-                    <div class="wa-contact-text">${order.product_title || 'Produto'} · R$ ${parseFloat(order.total).toLocaleString('pt-BR')}</div>
+                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${formatPreco(order.total, {htmlGratis:false})}</div>
                     ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
                 <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
@@ -2182,7 +2291,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
-                    <div class="wa-contact-text">${order.product_title || 'Produto'} · R$ ${parseFloat(order.total).toLocaleString('pt-BR')}</div>
+                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${formatPreco(order.total, {htmlGratis:false})}</div>
                     ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
                 <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
@@ -2244,7 +2353,7 @@ window.renderSellerRequests = async function() {
                              style="width:70px;height:70px;object-fit:cover;border-radius:10px;flex-shrink:0;">
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-1">${order.product_title || 'Produto'}</h6>
-                            <p class="mb-1 text-success fw-bold">R$ ${parseFloat(order.total).toLocaleString('pt-BR')} <small class="text-muted fw-normal">(${order.quantity} un.)</small></p>
+                            <p class="mb-1 text-success fw-bold">${formatPreco(order.total, {htmlGratis:false})} <small class="text-muted fw-normal">(${order.quantity} un.)</small></p>
                             <p class="mb-0 small text-muted">ID: #${order.id.slice(-8).toUpperCase()}</p>
                         </div>
                     </div>
@@ -2409,7 +2518,7 @@ window.showChat = async function(orderId) {
     // Popula resumo do produto
     document.getElementById('chatProdImg').src = order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20';
     document.getElementById('chatProdTitle').textContent = order.product_title || 'Produto';
-    document.getElementById('chatProdPrice').textContent = `R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+    document.getElementById('chatProdPrice').textContent = formatPreco(order.total, {htmlGratis:false});
     document.getElementById('chatOrderIdDisplay').textContent = `#${order.id.slice(-6).toUpperCase()}`;
     document.getElementById('chatOrderIdDisplayHeader').textContent = `#${order.id.slice(-6).toUpperCase()}`;
 
@@ -3263,7 +3372,7 @@ window.renderAdminPanel = async function() {
                                              onerror="this.src='https://placehold.co/45'">
                                         <div style="max-width: 250px;">
                                             <h6 class="mb-0 fw-bold text-truncate">${p.titulo}</h6>
-                                            <small class="text-muted">Loja: ${p.loja} • R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}</small>
+                                            <small class="text-muted">Loja: ${p.loja} • ${parseFloat(p.preco) === 0 ? 'GRÁTIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</small>
                                         </div>
                                     </div>
                                     <button class="btn btn-sm btn-outline-danger border-0" onclick="window.adminDeleteProduct('${p.id}', '${p.titulo}')" title="Remover Publicação">
