@@ -999,7 +999,8 @@ body.dark-theme .product-card-img-container {
     border-radius: 3px;
 }
 
-/* Overlay de ações (curtir/compartilhar) — sempre visível, igual Mercado Livre */
+/* Overlay de ações (curtir/compartilhar) — visível sempre no touch (mobile),
+   mas só aparece com o mouse em cima do card em dispositivos com hover (desktop) */
 .product-card-ml .overlay {
     position: absolute;
     top: 10px;
@@ -1009,6 +1010,20 @@ body.dark-theme .product-card-img-container {
     gap: 8px;
     z-index: 5;
     opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .product-card-ml .overlay {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+    }
+
+    .product-card-ml:hover .overlay,
+    .product-card-ml:focus-within .overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .product-card-ml .overlay .btn-action {
@@ -1948,6 +1963,16 @@ body.wa-locked > .wa-main {
     font-size: 1.1rem;
     color: var(--text-main);
     margin: 0;
+}
+
+.wa-side__header .btn-close {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.wa-side__header .btn-close:hover {
+    opacity: 1;
 }
 
 .wa-side__search {
