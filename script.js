@@ -18,6 +18,7 @@ let riveInstance      = null;
 let chatsCache        = [];
 let notificationsCache = JSON.parse(localStorage.getItem('electroNotifs')) || [];
 let chatPollInterval  = null;
+let ordersPollInterval = null;
 let lastChatSignature = null;
 let productsFetchToken = 0;
 
@@ -138,6 +139,7 @@ async function supabaseFetch(path, options = {}) {
  * navega pra qualquer outra área do site (produtos, meus produtos, etc.).
  */
 window.exitWaOrdersView = function() {
+    stopOrdersPolling();
     document.getElementById('whatsappOrdersView')?.classList.add('d-none');
     document.getElementById('productGridMain')?.classList.remove('d-none');
     document.body.classList.remove('wa-locked');
@@ -409,6 +411,19 @@ function populateFilterEstados() {
     if (!select) return;
     select.innerHTML = '<option value="">UF</option>' +
         ESTADOS_BR.map(([sigla, nome]) => `<option value="${sigla}">${sigla} - ${nome}</option>`).join('');
+}
+
+/**
+ * Preenche qualquer <select> de Estado (UF) com a lista completa dos 27
+ * estados + DF — usado no cadastro e na edição de perfil, que antes só
+ * tinham uma lista parcial (poucos estados) copiada manualmente no HTML.
+ */
+function populateEstadoSelect(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = ESTADOS_BR.map(([sigla, nome]) => `<option value="${sigla}">${sigla} - ${nome}</option>`).join('');
+    if (current) select.value = current;
 }
 
 /**
@@ -1087,6 +1102,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     populateFilterEstados();
+    populateEstadoSelect('v2CadUF');
+    populateEstadoSelect('editEstado');
     detectGuestRegion();
 
     // Anunciar
@@ -1214,11 +1231,19 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('editAvatarLink').value = novoAvatar;
         }
 
+        // Junta Rua/Número/Bairro de volta no mesmo formato usado no cadastro
+        // ("Rua X, 123 - Bairro Y"), já que o banco guarda tudo numa única coluna.
+        const rua     = document.getElementById('editRua').value.trim();
+        const numero  = document.getElementById('editNumero').value.trim();
+        const bairro  = document.getElementById('editBairro').value.trim();
+        const enderecoCompleto = [rua, numero].filter(Boolean).join(', ') + (bairro ? ` - ${bairro}` : '');
+
         const updated = {
             ...user,
             nome:      document.getElementById('editNome').value.trim(),
             telefone:  document.getElementById('editTelefone')?.value.replace(/\D/g, '') || '',
-            endereco:  document.getElementById('editEndereco').value.trim(),
+            cep:       document.getElementById('editCEP')?.value.replace(/\D/g, '') || '',
+            endereco:  enderecoCompleto,
             cidade:    document.getElementById('editCidade').value.trim(),
             estado:    document.getElementById('editEstado').value,
             pagamento: document.getElementById('editPagamento').value,
@@ -1529,8 +1554,25 @@ window.showProfileEdit = () => {
     document.getElementById('editEmail').value    = user.email    || '';
     document.getElementById('editCPF').value      = user.cpf      || '';
     document.getElementById('editTelefone').value = user.telefone || '';
-    document.getElementById('editEndereco').value = user.endereco || '';
+    document.getElementById('editCEP').value      = user.cep      || '';
+
+    // O endereço é salvo como uma string única ("Rua X, 123 - Bairro Y"), então
+    // aqui a gente tenta separar de volta em Rua/Número/Bairro pra edição mais
+    // organizada — se não encaixar nesse padrão (endereços antigos digitados
+    // livremente), cai tudo no campo "Rua" mesmo, sem perder informação.
+    const enderecoMatch = (user.endereco || '').match(/^(.*?),\s*([^-]*?)\s*-\s*(.*)$/);
+    if (enderecoMatch) {
+        document.getElementById('editRua').value     = enderecoMatch[1].trim();
+        document.getElementById('editNumero').value  = enderecoMatch[2].trim();
+        document.getElementById('editBairro').value  = enderecoMatch[3].trim();
+    } else {
+        document.getElementById('editRua').value    = user.endereco || '';
+        document.getElementById('editNumero').value = '';
+        document.getElementById('editBairro').value = '';
+    }
+
     document.getElementById('editCidade').value   = user.cidade   || '';
+    populateEstadoSelect('editEstado');
     document.getElementById('editEstado').value   = user.estado   || '';
     document.getElementById('editPagamento').value = user.pagamento || 'pix';
 
@@ -1546,6 +1588,22 @@ window.showProfileEdit = () => {
     }
 
     bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas')).show();
+};
+
+/** Busca o endereço pelo CEP digitado na edição de perfil e preenche Rua/Bairro/Cidade/Estado automaticamente */
+window.buscarCepPerfil = async function() {
+    const cepInput = document.getElementById('editCEP');
+    const endereco = await buscarEnderecoPorCep(cepInput.value);
+    if (!endereco) return;
+
+    document.getElementById('editRua').value    = endereco.logradouro || document.getElementById('editRua').value;
+    document.getElementById('editBairro').value = endereco.bairro     || document.getElementById('editBairro').value;
+    document.getElementById('editCidade').value = endereco.cidade    || document.getElementById('editCidade').value;
+    if (endereco.estado) {
+        populateEstadoSelect('editEstado');
+        document.getElementById('editEstado').value = endereco.estado;
+    }
+    showToast('Endereço encontrado!', 'success', 1500);
 };
 
 window.showAuthScreen = function(mode = 'login', autoCloseMenu = true) {
@@ -1771,6 +1829,94 @@ window.closeMobileMenu = () =>
 // GESTÃO DE PEDIDOS
 // ============================================
 
+// ============================================
+// AUTO-ATUALIZAÇÃO DA LISTA DE PEDIDOS (POLLING)
+// ============================================
+
+/**
+ * Enquanto a lista "Minhas Compras" / "Minhas Vendas" estiver aberta, busca
+ * pedidos atualizados periodicamente — assim, se a outra parte aceitar/recusar
+ * um pedido enquanto esta tela está aberta, ela atualiza sozinha, sem precisar
+ * sair e voltar pra essa aba manualmente.
+ */
+function startOrdersPolling(type) {
+    stopOrdersPolling();
+    ordersPollInterval = setInterval(() => {
+        const waView = document.getElementById('whatsappOrdersView');
+        // Só continua se a lista ainda estiver visível e for a mesma aba (Compras/Vendas)
+        if (!waView || waView.classList.contains('d-none') || currentOrderViewType !== type) {
+            stopOrdersPolling();
+            return;
+        }
+        // Não atualiza a lista enquanto uma conversa estiver aberta, pra não
+        // interromper o polling de mensagens (mais prioritário nesse momento)
+        if (currentChat) return;
+        renderOrdersListSilently(type);
+    }, 6000);
+}
+
+function stopOrdersPolling() {
+    if (ordersPollInterval) {
+        clearInterval(ordersPollInterval);
+        ordersPollInterval = null;
+    }
+}
+
+/** Re-busca e redesenha só a listinha lateral, sem mostrar spinner nem fechar a conversa aberta */
+async function renderOrdersListSilently(type) {
+    const user = getSavedUser();
+    if (!user) return;
+    const waList  = document.getElementById('waContactList');
+    const waTitle = document.getElementById('waSideTitle');
+    if (!waList) return;
+
+    try {
+        let path = 'orders?select=*';
+        if (type === 'buyer') path += `&buyer_id=eq.${user.id}`;
+        else path += `&seller_id=eq.${user.id}`;
+
+        let orders = await supabaseFetch(path);
+        const previousSignature = JSON.stringify(ordersCache.map(o => `${o.id}:${o.status}:${o.agree_buyer}:${o.agree_seller}`));
+        ordersCache = orders;
+
+        orders = orders.filter(o => o.status !== 'pending' || type === 'buyer');
+        orders = orders.slice().sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+
+        const newSignature = JSON.stringify(orders.map(o => `${o.id}:${o.status}:${o.agree_buyer}:${o.agree_seller}`));
+        if (newSignature === previousSignature) return; // nada mudou, evita re-render desnecessário
+
+        if (!orders.length) return; // mantém a mensagem de "nenhum pedido" já mostrada
+
+        waList.innerHTML = orders.map(order => {
+            const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
+            const isPending = order.status === 'pending';
+            const isBuyer   = user.id === order.buyer_id;
+            const partnerName = isBuyer ? order.seller_name : order.buyer_name;
+
+            let actionsHtml = '';
+            if (isPending && type === 'buyer') {
+                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">Cancelar Pedido</button>`;
+            } else if (order.status === 'cancelled' || order.status === 'finished') {
+                actionsHtml = `<button class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash me-1"></i>Remover</button>`;
+            }
+
+            return `
+            <div class="wa-contact" data-order-id="${order.id}" onclick="${!isPending && order.status !== 'cancelled' ? `window.showChat('${order.id}')` : ''}" style="${isPending || order.status === 'cancelled' ? 'cursor:default;' : ''}">
+                <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
+                <div class="wa-contact-textbox">
+                    <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
+                    <div class="wa-contact-text">${order.product_title || 'Produto'} · R$ ${parseFloat(order.total).toLocaleString('pt-BR')}</div>
+                    ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
+                </div>
+                <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        // Falha silenciosa: não interrompe a experiência do usuário durante o polling
+        console.error('Falha ao atualizar lista de pedidos (silencioso):', e);
+    }
+}
+
 window.renderOrderManagement = async function(type = 'buyer') {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
@@ -1823,6 +1969,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
                     <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                     <p class="small mb-0">Nenhum pedido encontrado.</p>
                 </div>`;
+            startOrdersPolling(type);
             return;
         }
 
@@ -1852,6 +1999,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
         }).join('');
 
         window.closeMobileMenu();
+        startOrdersPolling(type);
     } catch (e) {
         waList.innerHTML = '<div class="text-center py-5" style="color:#999;"><h6>Erro ao carregar pedidos.</h6></div>';
     }
@@ -1941,11 +2089,27 @@ window.filterWaContacts = function(query) {
 
 window.updateOrderStatus = async function(orderId, newStatus) {
     try {
+        // Busca o pedido antes de alterar, pra saber quem é o comprador e poder avisá-lo
+        const orderData = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        const order = orderData?.[0];
+
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
             body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
         });
         showToast(`Pedido ${newStatus === 'accepted' ? 'aceito' : 'recusado'}!`, newStatus === 'accepted' ? 'success' : 'info');
+
+        // CORREÇÃO: antes o comprador nunca era avisado que o pedido tinha sido
+        // aceito/recusado — só descobriria se, por conta própria, saísse da tela
+        // "Minhas Compras" e voltasse pra ela de novo. Agora ele recebe uma
+        // notificação (sino) assim que o vendedor decide.
+        if (order?.buyer_id) {
+            const msg = newStatus === 'accepted'
+                ? `Sua proposta para "${order.product_title || 'produto'}" foi aceita! Você já pode conversar com o vendedor.`
+                : `Sua proposta para "${order.product_title || 'produto'}" foi recusada pelo vendedor.`;
+            await createPersistentNotification(msg, newStatus === 'accepted' ? 'success' : 'warning', order.buyer_id);
+        }
+
         window.renderOrderManagement(newStatus === 'accepted' ? 'seller_sales' : 'seller_requests');
         const user = getSavedUser();
         if (user) updateSellerPendingBadge(user.id);
@@ -2107,10 +2271,22 @@ async function loadChatMessages(orderId, silent = false) {
 
     try {
         const user = getSavedUser();
-        let order  = ordersCache.find(o => o.id === orderId);
-        if (!order) {
+        // CORREÇÃO: antes, se o pedido já estivesse em ordersCache, ele nunca era
+        // atualizado de novo — então mudanças feitas pela OUTRA pessoa (aceitar o
+        // pedido, propor uma logística de entrega, etc.) nunca apareciam aqui,
+        // mesmo com o polling rodando. Agora sempre buscamos o pedido fresco do
+        // banco, e sincronizamos o cache local com esse dado atualizado.
+        let order = null;
+        try {
             const r = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
-            order   = r?.[0];
+            order = r?.[0] || null;
+        } catch (e) { /* se a rede falhar momentaneamente, cai no fallback abaixo */ }
+
+        if (order) {
+            const idx = ordersCache.findIndex(o => o.id === orderId);
+            if (idx >= 0) ordersCache[idx] = order; else ordersCache.push(order);
+        } else {
+            order = ordersCache.find(o => o.id === orderId) || null;
         }
 
         let chatResult = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
