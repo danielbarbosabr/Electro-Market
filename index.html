@@ -770,11 +770,45 @@
                     <span><i class="bi bi-list-ul"></i> <strong>Categorias</strong></span>
                     <i class="bi bi-chevron-down small"></i>
                 </a>
-                <div class="collapse bg-light" id="collapseCategoriesMobile">
-                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Games'); window.closeMobileMenu();">Games</a>
-                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Notebooks'); window.closeMobileMenu();">Notebooks</a>
-                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Computadores'); window.closeMobileMenu();">Computadores e Desktops</a>
-                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Celulares'); window.closeMobileMenu();">Celulares e Tablets</a>
+                <div class="collapse bg-light" id="collapseCategoriesMobile" style="max-height: 60vh; overflow-y: auto;">
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">Games</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Games > Consoles'); window.closeMobileMenu();">Consoles</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Games > PC Gamer'); window.closeMobileMenu();">PC Gamer</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Games > Jogos'); window.closeMobileMenu();">Jogos</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Games > Acessórios'); window.closeMobileMenu();">Acessórios</a>
+
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">Informática</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Informática > Notebooks'); window.closeMobileMenu();">Notebooks</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Informática > Computadores > Desktop'); window.closeMobileMenu();">Computadores Desktop</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Informática > Computadores > Mini PC'); window.closeMobileMenu();">Mini PCs</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Informática > Componentes'); window.closeMobileMenu();">Componentes (Hardware)</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Informática > Periféricos'); window.closeMobileMenu();">Periféricos</a>
+
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">Celulares e Tablets</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Celulares > Smartphones'); window.closeMobileMenu();">Smartphones</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Celulares > Tablets'); window.closeMobileMenu();">Tablets</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Celulares > Smartwatches'); window.closeMobileMenu();">Smartwatches</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Celulares > Acessórios'); window.closeMobileMenu();">Acessórios e Cabos</a>
+
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">TVs e Áudio</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('TVs e Áudio > TVs'); window.closeMobileMenu();">TVs</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('TVs e Áudio > Áudio'); window.closeMobileMenu();">Som e Áudio</a>
+
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">Eletrodomésticos</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Eletrodomésticos'); window.closeMobileMenu();">Eletrodomésticos</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Eletroportáteis'); window.closeMobileMenu();">Eletroportáteis (Air Fryer, etc)</a>
+
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">Segurança e Automação</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Segurança'); window.closeMobileMenu();">Câmeras e Alarmes</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Casa Inteligente'); window.closeMobileMenu();">Alexa e Automação</a>
+
+                    <h6 class="ps-4 pt-2 pb-1 mb-0 small fw-bold text-uppercase text-primary">Outras Categorias</h6>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Climatização'); window.closeMobileMenu();">Climatização</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Automotivo'); window.closeMobileMenu();">Automotivo</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Câmeras'); window.closeMobileMenu();">Câmeras e Drones</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Redes'); window.closeMobileMenu();">Redes e Roteadores</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Armazenamento'); window.closeMobileMenu();">Armazenamento</a>
+                    <a href="#" class="list-group-item list-group-item-action border-0 py-2 ps-5 small" onclick="loadPage('Energia'); window.closeMobileMenu();">Cabos e Energia</a>
                 </div>
 
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none" onclick="window.renderSellerPanel(); window.closeMobileMenu();">
@@ -834,6 +868,8 @@
         <section class="wa-side">
             <div class="wa-side__header">
                 <h6 id="waSideTitle" class="mb-0">Minhas Vendas</h6>
+                <button type="button" class="btn-close ms-auto" aria-label="Fechar e voltar ao início"
+                        onclick="loadPage('eletronicos'); window.updateMobileNavActive('eletronicos');"></button>
             </div>
             <div class="wa-side__search">
                 <i class="bi bi-search"></i>
