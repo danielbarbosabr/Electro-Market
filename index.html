@@ -748,7 +748,7 @@
             </div>
             <div class="wa-side__search">
                 <i class="bi bi-search"></i>
-                <input type="text" id="waContactSearch" placeholder="Buscar conversa..." oninput="window.filterWaContacts(this.value)">
+                <input type="text" id="waContactSearch" placeholder="Buscar conversa..." autocomplete="off" oninput="window.filterWaContacts(this.value)">
             </div>
             <div id="waContactList" class="wa-side__list"></div>
         </section>
@@ -767,6 +767,7 @@
                     </button>
                     <div class="chat-header-avatar-wrap">
                         <img id="chatPartnerAvatar" src="" onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                        <span id="chatPartnerStatusDot" class="presence-dot"></span>
                     </div>
                     <div class="chat-header-info">
                         <span id="chatPartnerNameHeader" class="chat-header-name">Conversa</span>
@@ -974,8 +975,18 @@
                         <option value="boleto">Boleto Bancário</option>
                     </select>
                 </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-bold">Tipo de Conta</label>
+                    <select class="form-select" id="editTipo">
+                        <option value="CLIENTE">Cliente</option>
+                        <option value="VENDEDOR">Vendedor</option>
+                    </select>
+                </div>
                 <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">SALVAR ALTERAÇÕES</button>
-                <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="logout()">SAIR DA CONTA</button>
+                <button type="button" class="btn btn-warning w-100 py-2 fw-bold mt-2 text-dark" onclick="logout()">SAIR DA CONTA</button>
+                <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.deleteAccount()">
+                    <i class="bi bi-trash3 me-1"></i>EXCLUIR MINHA CONTA
+                </button>
             </form>
         </div>
     </div>
