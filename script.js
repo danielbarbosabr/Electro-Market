@@ -313,11 +313,27 @@ window.cycleDetailImage = function(pid, container, dir) {
 window.refreshDetailLikeBtn = function(pid) {
     const btn = document.getElementById('detailLikeBtn');
     if (!btn) return;
-    const liked = likedProducts.includes(pid);
+    const liked   = likedProducts.includes(pid);
+    const product = allProductsCache.find(p => p.id == pid);
     btn.classList.toggle('text-danger', liked);
     btn.classList.toggle('text-muted', !liked);
-    btn.innerHTML = `<i class="bi ${liked ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>Curtir`;
+    btn.innerHTML = `<i class="bi ${liked ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${liked ? 'Curtido' : 'Curtir'}`;
+
+    const barEl  = document.getElementById('detailLikesBar');
+    const textEl = document.getElementById('detailLikesText');
+    if (barEl && textEl && product) {
+        const n = product.likes || 0;
+        const level = n === 0 ? 0 : Math.min(5, Math.ceil(n / 10));
+        barEl.querySelectorAll('.flex-grow-1').forEach((seg, i) => {
+            seg.style.backgroundColor = level >= (i + 1) ? colorScale[i] : '#eee';
+        });
+        textEl.innerHTML = n > 0
+            ? `<i class="bi bi-heart-fill" style="color:#ff4d6d;"></i> ${n} curtida${n === 1 ? '' : 's'}`
+            : 'Ainda sem curtidas';
+    }
 };
+
+const colorScale = ['#F23D35', '#FF8900', '#FFE600', '#ADE07E', '#00A650'];
 
 function renderCard(item) {
     if (!item?.titulo) return '';
@@ -610,6 +626,9 @@ function applyFilters() {
 
     if (sort === 'priceAsc')  filtered.sort((a, b) => a.preco - b.preco);
     if (sort === 'priceDesc') filtered.sort((a, b) => b.preco - a.preco);
+    // "Mais curtidos": ordena pela quantidade de curtidas do produto — diferente da
+    // reputação do vendedor (que é uma métrica separada, ligada às avaliações).
+    if (sort === 'likes')     filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
 
     renderGrid(filtered);
 }
@@ -684,13 +703,17 @@ window.showDetail = async function(pid) {
     let sellerAddress = 'A combinar com o vendedor';
     let sellerAddressRaw = '';
     let sellerCidade = '';
+    let sellerRatingAvg = 0;
+    let sellerRatingCount = 0;
     try {
-        const sellerInfo = await supabaseFetch(`users?select=endereco,cidade,estado&id=eq.${item.vendedor_id}`);
+        const sellerInfo = await supabaseFetch(`users?select=endereco,cidade,estado,vendedor_rating,rating_count&id=eq.${item.vendedor_id}`);
         if (sellerInfo?.length > 0) {
             const s = sellerInfo[0];
             sellerAddressRaw = s.endereco || '';
             sellerAddress = `${s.endereco || ''}, ${s.cidade || ''} - ${s.estado || ''}`.replace(/^, /, '');
             sellerCidade  = s.cidade || '';
+            sellerRatingAvg   = parseFloat(s.vendedor_rating) || 0;
+            sellerRatingCount = parseInt(s.rating_count) || 0;
         }
     } catch (e) {}
 
@@ -703,101 +726,164 @@ window.showDetail = async function(pid) {
     const mainImg         = images[0] || '';
     const hasMultipleImgs = images.length > 1;
 
-    const sellerProducts = allProductsCache.filter(p => p.vendedor_id === item.vendedor_id);
-    const totalLikes     = sellerProducts.reduce((acc, p) => acc + (parseInt(p.likes) || 0), 0) || 0;
-    const level          = totalLikes > 50 ? 5 : totalLikes > 20 ? 4 : totalLikes > 10 ? 3 : totalLikes > 2 ? 2 : 1;
+    const level          = sellerRatingCount > 0 ? Math.round(sellerRatingAvg) : 0;
     const colors         = ['#F23D35', '#FF8900', '#FFE600', '#ADE07E', '#00A650'];
+    const likesCount     = item.likes || 0;
+    // Nível de 0 a 5 pra desenhar a barra de "Interesse no produto", igual ao estilo
+    // da barra de reputação — mas essa aqui é baseada só na quantidade de curtidas do
+    // produto, sem nenhuma relação com a nota/reputação do vendedor.
+    const likesLevel      = likesCount === 0 ? 0 : Math.min(5, Math.ceil(likesCount / 10));
 
-    document.getElementById('productDetailContent').innerHTML = `
-        <div class="row g-0 g-md-4">
-            <div class="col-md-7 border-end pe-md-4">
-                <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center position-relative${hasMultipleImgs ? ' product-3d-img' : ''}"
-                     style="min-height:260px;" data-pid="${pid}" data-idx="0"
-                     ${hasMultipleImgs ? `onmousemove="window.tiltDetailImage(event, this)" onmouseleave="window.resetDetailImage(this)"` : ''}>
-                    ${mainImg
-                        ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:380px;object-fit:contain;transition:transform 0.15s ease-out, opacity 0.15s ease;" referrerpolicy="no-referrer"
-                               onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
-                        : `<i class="bi bi-box-seam text-secondary" style="font-size:4rem;"></i>`
-                    }
-                    ${hasMultipleImgs ? `
-                        <div class="card-img-edge card-img-edge-left" onclick="event.stopPropagation(); window.cycleDetailImage('${pid}', this.parentElement, -1)"><i class="bi bi-chevron-left"></i></div>
-                        <div class="card-img-edge card-img-edge-right" onclick="event.stopPropagation(); window.cycleDetailImage('${pid}', this.parentElement, 1)"><i class="bi bi-chevron-right"></i></div>
-                        <div class="card-img-dots">${images.map((_, i) => `<span class="card-img-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>
-                    ` : ''}
-                </div>
-                <div class="d-none d-md-block mt-3">
-                    <h5 class="fw-bold">Descrição</h5>
-                    <p class="text-muted" style="line-height:1.7">${item.descricao || 'Sem descrição detalhada.'}</p>
-                </div>
-            </div>
-            <div class="col-md-5 pt-3 pt-md-0">
-                <span class="badge bg-secondary mb-2 small">${item.categoria || 'Geral'}</span>
-                <h4 class="fw-bold">${item.titulo}</h4>
+    // Guarda o estado atual do grid (lista/pedidos/curtidos etc.) pra poder voltar
+    // exatamente pra onde o usuário estava, sem precisar recarregar nada da rede.
+    const grid = document.getElementById('productsGrid');
+    if (!grid.classList.contains('product-detail-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
 
-                <div class="my-3" style="overflow-wrap:anywhere;word-break:break-word;">
-                    ${item.preco_original && parseFloat(item.preco_original) > parseFloat(item.preco) ? `
-                        <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                            <span class="text-muted text-decoration-line-through">R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                            <span class="offer-pct-inline">${Math.round(100 - (item.preco / parseFloat(item.preco_original)) * 100)}% OFF</span>
-                        </div>` : ''
-                    }
-                    ${item.preco === 0
-                        ? `<span class="fs-1 fw-bold text-success">GRÁTIS</span>`
-                        : `<span class="fs-1 fw-bold">R$ ${Math.floor(item.preco || 0).toLocaleString('pt-BR')}</span>
-                           <span class="fs-5">,${((item.preco % 1).toFixed(2)).slice(1)}</span>`
-                    }
-                </div>
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
 
-                <div class="card bg-light border-0 p-3 mb-3" style="border-radius:10px;">
-                    ${realizaEntrega ? `
-                        <p class="mb-1 text-success fw-bold"><i class="bi bi-truck me-2"></i> Entrega disponível</p>
-                        <small class="text-muted">Entrega em <strong>${regiaoEntrega}</strong></small>
-                    ` : `
-                        <p class="mb-1 fw-bold" style="color:#e67e22;"><i class="bi bi-geo-alt me-2"></i> Retirada no local</p>
-                        <small class="text-muted"><strong>Local:</strong> ${sellerAddress}</small>
-                    `}
-                </div>
+    grid.className = 'product-detail-active';
+    grid.style.display = 'block';
 
-                <div class="mb-3">
-                    <p class="small mb-1 fw-bold text-muted">Reputação do vendedor</p>
-                    <div class="d-flex gap-1 mb-1" style="height:8px;">
-                        ${[1,2,3,4,5].map(i => `
-                            <div class="flex-grow-1 rounded" style="background-color:${level>=i ? colors[i-1] : '#eee'}"></div>
-                        `).join('')}
+    grid.innerHTML = `
+        <div class="detail-page">
+            <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </button>
+            <div class="row g-0 g-md-4">
+                <div class="col-md-7 border-end pe-md-4">
+                    <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center position-relative${hasMultipleImgs ? ' product-3d-img' : ''}"
+                         style="min-height:260px;" data-pid="${pid}" data-idx="0"
+                         ${hasMultipleImgs ? `onmousemove="window.tiltDetailImage(event, this)" onmouseleave="window.resetDetailImage(this)"` : ''}>
+                        ${mainImg
+                            ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:420px;object-fit:contain;transition:transform 0.15s ease-out, opacity 0.15s ease;" referrerpolicy="no-referrer"
+                                   onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
+                            : `<i class="bi bi-box-seam text-secondary" style="font-size:4rem;"></i>`
+                        }
+                        ${hasMultipleImgs ? `
+                            <div class="card-img-edge card-img-edge-left" onclick="event.stopPropagation(); window.cycleDetailImage('${pid}', this.parentElement, -1)"><i class="bi bi-chevron-left"></i></div>
+                            <div class="card-img-edge card-img-edge-right" onclick="event.stopPropagation(); window.cycleDetailImage('${pid}', this.parentElement, 1)"><i class="bi bi-chevron-right"></i></div>
+                            <div class="card-img-dots">${images.map((_, i) => `<span class="card-img-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>
+                        ` : ''}
                     </div>
-                    <small class="text-muted">${totalLikes} curtidas recebidas</small>
+                    <div class="mt-3">
+                        <h5 class="fw-bold">Descrição</h5>
+                        <p class="text-muted" style="line-height:1.7">${item.descricao || 'Sem descrição detalhada.'}</p>
+                    </div>
                 </div>
+                <div class="col-md-5 pt-3 pt-md-0">
+                    <span class="badge bg-secondary mb-2 small">${item.categoria || 'Geral'}</span>
+                    <h4 class="fw-bold">${item.titulo}</h4>
 
-                <p class="mb-1"><strong>Vendedor:</strong> ${item.loja || 'Não informado'}</p>
-                <p class="mb-3"><strong>Estoque:</strong> ${item.quantidade || 1} ${item.quantidade === 1 ? 'unidade' : 'unidades'}</p>
+                    <div class="my-3" style="overflow-wrap:anywhere;word-break:break-word;">
+                        ${item.preco_original && parseFloat(item.preco_original) > parseFloat(item.preco) ? `
+                            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                <span class="text-muted text-decoration-line-through">R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                                <span class="offer-pct-inline">${Math.round(100 - (item.preco / parseFloat(item.preco_original)) * 100)}% OFF</span>
+                            </div>` : ''
+                        }
+                        ${item.preco === 0
+                            ? `<span class="fs-1 fw-bold text-success">GRÁTIS</span>`
+                            : `<span class="fs-1 fw-bold">R$ ${Math.floor(item.preco || 0).toLocaleString('pt-BR')}</span>
+                               <span class="fs-5">,${((item.preco % 1).toFixed(2)).slice(1)}</span>`
+                        }
+                    </div>
 
-                ${isOwner ? `
-                    <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
-                        <i class="bi bi-pencil me-2"></i>Editar Anúncio
-                    </button>
-                    <button class="btn btn-danger w-100" onclick="window.deleteProduct('${item.id}')">
-                        <i class="bi bi-trash me-2"></i>Excluir Anúncio
-                    </button>
-                ` : `
-                    <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true});window.buyItem(cart.length-1);">
-                        <i class="bi bi-lightning me-2"></i>Comprar Agora
-                    </button>
-                    <button class="btn btn-success w-100 mb-2" onclick="window.addToCart('${pid}');">
-                        <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
-                    </button>
-                `}
-                <div class="d-flex gap-2">
-                    <button class="btn btn-link text-decoration-none flex-grow-1 text-muted small" onclick="window.shareProduct('${pid}')">
-                        <i class="bi bi-share me-2"></i>Compartilhar
-                    </button>
-                    <button id="detailLikeBtn" class="btn btn-link text-decoration-none flex-grow-1 small ${likedProducts.includes(pid) ? 'text-danger' : 'text-muted'}" onclick="window.toggleLike('${pid}'); window.refreshDetailLikeBtn('${pid}')">
-                        <i class="bi ${likedProducts.includes(pid) ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>Curtir
-                    </button>
+                    <div class="card bg-light border-0 p-3 mb-3" style="border-radius:10px;">
+                        ${realizaEntrega ? `
+                            <p class="mb-1 text-success fw-bold"><i class="bi bi-truck me-2"></i> Entrega disponível</p>
+                            <small class="text-muted">Entrega em <strong>${regiaoEntrega}</strong></small>
+                        ` : `
+                            <p class="mb-1 fw-bold" style="color:#e67e22;"><i class="bi bi-geo-alt me-2"></i> Retirada no local</p>
+                            <small class="text-muted"><strong>Local:</strong> ${sellerAddress}</small>
+                        `}
+                    </div>
+
+                    <div class="mb-3" id="detailLikesBar">
+                        <p class="small mb-1 fw-bold text-muted">Interesse no produto</p>
+                        <div class="d-flex gap-1 mb-1" style="height:8px;">
+                            ${[1,2,3,4,5].map(i => `
+                                <div class="flex-grow-1 rounded" style="background-color:${likesLevel>=i ? colors[i-1] : '#eee'}"></div>
+                            `).join('')}
+                        </div>
+                        <small class="text-muted" id="detailLikesText">${likesCount > 0
+                            ? `<i class="bi bi-heart-fill" style="color:#ff4d6d;"></i> ${likesCount} curtida${likesCount === 1 ? '' : 's'}`
+                            : 'Ainda sem curtidas'}</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <p class="small mb-1 fw-bold text-muted">Reputação do vendedor</p>
+                        <div class="d-flex gap-1 mb-1" style="height:8px;">
+                            ${[1,2,3,4,5].map(i => `
+                                <div class="flex-grow-1 rounded" style="background-color:${level>=i ? colors[i-1] : '#eee'}"></div>
+                            `).join('')}
+                        </div>
+                        <small class="text-muted">${sellerRatingCount > 0
+                            ? `${sellerRatingAvg.toFixed(1)} <i class="bi bi-star-fill text-warning"></i> · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}`
+                            : 'Ainda sem avaliações'}</small>
+                    </div>
+
+                    <p class="mb-1"><strong>Vendedor:</strong> ${item.loja || 'Não informado'}</p>
+                    <p class="mb-3"><strong>Estoque:</strong> ${item.quantidade || 1} ${item.quantidade === 1 ? 'unidade' : 'unidades'}</p>
+
+                    ${isOwner ? `
+                        <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
+                            <i class="bi bi-pencil me-2"></i>Editar Anúncio
+                        </button>
+                        <button class="btn btn-danger w-100" onclick="window.deleteProduct('${item.id}')">
+                            <i class="bi bi-trash me-2"></i>Excluir Anúncio
+                        </button>
+                    ` : `
+                        <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true});window.buyItem(cart.length-1);">
+                            <i class="bi bi-lightning me-2"></i>Comprar Agora
+                        </button>
+                        <button class="btn btn-success w-100 mb-2" onclick="window.addToCart('${pid}');">
+                            <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
+                        </button>
+                    `}
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-link text-decoration-none flex-grow-1 text-muted small" onclick="window.shareProduct('${pid}')">
+                            <i class="bi bi-share me-2"></i>Compartilhar
+                        </button>
+                        <button id="detailLikeBtn" class="btn btn-link text-decoration-none flex-grow-1 small ${likedProducts.includes(pid) ? 'text-danger' : 'text-muted'}" onclick="window.toggleLike('${pid}')">
+                            <i class="bi ${likedProducts.includes(pid) ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${likedProducts.includes(pid) ? 'Curtido' : 'Curtir'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>`;
 
-    new bootstrap.Modal(document.getElementById('productDetailModal')).show();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+/** Fecha a página de detalhes em tela cheia e restaura exatamente a tela anterior
+ *  (grid de produtos, curtidos, histórico etc.) sem precisar buscar nada de novo. */
+window.closeProductDetail = function() {
+    const grid  = document.getElementById('productsGrid');
+    const state = window._preDetailState;
+    if (!grid || !state) { loadPage(undefined, true); return; }
+
+    grid.className     = state.gridClass;
+    grid.style.display = state.gridDisplay;
+    grid.innerHTML      = state.html;
+
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = state.title;
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.toggle('d-none', state.heroHidden);
+
+    window._preDetailState = null;
 };
 
 window.prepareEditProduct = function(pid) {
@@ -1059,20 +1145,7 @@ window.addToCart = function(productId, options = {}) {
     renderCart();
     if (!silent) showToast(`"${p.titulo.substring(0,30)}..." adicionado ao carrinho!`, 'success');
 
-    const openCartOffcanvas = () => {
-        if (openCart) bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
-    };
-
-    // Se o modal de detalhes do produto estiver aberto, fecha ele PRIMEIRO e só então
-    // abre o carrinho. Abrir o offcanvas enquanto o modal ainda está fechando faz o
-    // Bootstrap deixar um backdrop "fantasma" na tela, travando todos os cliques.
-    const detailModalEl = document.getElementById('productDetailModal');
-    if (detailModalEl && detailModalEl.classList.contains('show')) {
-        detailModalEl.addEventListener('hidden.bs.modal', openCartOffcanvas, { once: true });
-        bootstrap.Modal.getInstance(detailModalEl)?.hide();
-    } else {
-        openCartOffcanvas();
-    }
+    if (openCart) bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
 };
 
 window.removeFromCart = function(i) {
@@ -1099,11 +1172,11 @@ window.toggleLike = async function(pid) {
     if (idx > -1) {
         likedProducts.splice(idx, 1);
         product.likes = Math.max(0, (product.likes || 0) - 1);
-        showToast('Removido dos favoritos', 'info', 2000);
+        showToast('Removido dos curtidos', 'info', 2000);
     } else {
         likedProducts.push(pid);
         product.likes = (product.likes || 0) + 1;
-        showToast('Adicionado aos favoritos!', 'success', 2000);
+        showToast('Adicionado aos seus curtidos!', 'success', 2000);
     }
 
     localStorage.setItem('electroLiked', JSON.stringify(likedProducts));
@@ -1114,7 +1187,14 @@ window.toggleLike = async function(pid) {
         });
     } catch (e) {}
 
-    renderGrid(allProductsCache);
+    // Se a página de detalhes em tela cheia estiver aberta, não sobrescreve ela com o
+    // grid de novo — só atualiza o botão/contador de curtidas ali mesmo.
+    const grid = document.getElementById('productsGrid');
+    if (grid?.classList.contains('product-detail-active')) {
+        window.refreshDetailLikeBtn(pid);
+    } else {
+        renderGrid(allProductsCache);
+    }
 };
 
 window.buyItem = async function(i) {
@@ -2134,7 +2214,7 @@ window.renderLikedProducts = () => {
     window.exitWaOrdersView();
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
-    document.getElementById('gridTitle').textContent = 'Seus Favoritos';
+    document.getElementById('gridTitle').textContent = 'Seus Curtidos';
     renderGrid(allProductsCache.filter(p => likedProducts.includes(p.id)));
     window.closeMobileMenu();
 };
@@ -2493,7 +2573,7 @@ window.deleteProduct = async function(pid) {
     try {
         await supabaseFetch(`products?id=eq.${pid}`, { method: 'DELETE' });
         showToast('Produto removido!', 'success');
-        bootstrap.Modal.getInstance(document.getElementById('productDetailModal'))?.hide();
+        window._preDetailState = null;
         loadPage(undefined, true);
     } catch { showToast('Erro ao excluir produto.', 'error'); }
 };
@@ -2867,6 +2947,10 @@ function updateChatLogistics(order, user) {
         } else {
             buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>`;
         }
+    } else if (order.status === 'finished' && isBuyer) {
+        buttonsHtml += order.buyer_reviewed
+            ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este vendedor. Obrigado!</div>`
+            : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
     }
 
     logisticsButtons.innerHTML = buttonsHtml;
@@ -3234,7 +3318,110 @@ window.confirmReceipt = async function(orderId) {
         }
         showToast('Pedido finalizado!', 'success');
         loadChatMessages(orderId);
+        window.openReviewModal(orderId);
     } catch { showToast('Erro ao confirmar recebimento.', 'error'); }
+};
+
+// ============================================
+// AVALIAÇÃO DO VENDEDOR (pós-compra)
+// ============================================
+
+let currentReviewRating = 0;
+
+/**
+ * Abre o modal de avaliação do vendedor pra um pedido finalizado. Chamado
+ * automaticamente assim que o comprador confirma o recebimento, e também
+ * pode ser reaberto depois pelo botão "Avaliar Vendedor" no chat, caso o
+ * comprador tenha pulado a avaliação na hora.
+ */
+window.openReviewModal = async function(orderId) {
+    try {
+        const orderData = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        const order = orderData?.[0];
+        if (!order || order.buyer_reviewed) return; // pedido não existe ou já foi avaliado
+
+        document.getElementById('reviewOrderId').value    = orderId;
+        document.getElementById('reviewSellerId').value   = order.seller_id;
+        document.getElementById('reviewSellerName').textContent = order.seller_name || 'o vendedor';
+        window.setReviewStars(0);
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
+    } catch (e) {
+        console.error('Erro ao abrir avaliação:', e);
+    }
+};
+
+/** Atualiza a seleção visual das estrelas (1 a 5) no modal de avaliação */
+window.setReviewStars = function(n) {
+    currentReviewRating = n;
+    document.querySelectorAll('#reviewStars .review-star').forEach(star => {
+        const val = parseInt(star.dataset.value);
+        star.classList.toggle('bi-star-fill', val <= n);
+        star.classList.toggle('bi-star', val > n);
+        star.classList.toggle('active', val <= n);
+    });
+};
+
+/**
+ * Envia a avaliação: salva o registro individual (histórico) e atualiza a
+ * média/contador do vendedor (vendedor_rating / rating_count na tabela de
+ * usuários), que é o que já é exibido no mini-perfil do chat.
+ */
+window.submitSellerReview = async function() {
+    const orderId    = document.getElementById('reviewOrderId').value;
+    const sellerId   = document.getElementById('reviewSellerId').value;
+    const user       = getSavedUser();
+
+    if (!currentReviewRating) { showToast('Escolha de 1 a 5 estrelas antes de enviar.', 'warning'); return; }
+    if (!user || !sellerId) return;
+
+    try {
+        // Salva o registro individual da avaliação (histórico, separado das curtidas de produto)
+        await supabaseFetch('avaliacoes', {
+            method: 'POST',
+            body: JSON.stringify({
+                id:         `av_${Date.now()}`,
+                order_id:   orderId,
+                seller_id:  sellerId,
+                buyer_id:   user.id,
+                buyer_name: user.nome,
+                rating:     currentReviewRating,
+                comentario: null,
+                created_at: new Date().toISOString()
+            })
+        });
+
+        // Recalcula a média do vendedor com base na avaliação nova
+        const sellerData = await supabaseFetch(`users?select=vendedor_rating,rating_count&id=eq.${sellerId}&limit=1`);
+        const seller    = sellerData?.[0] || {};
+        const prevCount = parseInt(seller.rating_count) || 0;
+        const prevAvg   = parseFloat(seller.vendedor_rating) || 0;
+        const newCount  = prevCount + 1;
+        const newAvg    = ((prevAvg * prevCount) + currentReviewRating) / newCount;
+
+        await supabaseFetch(`users?id=eq.${sellerId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ vendedor_rating: newAvg, rating_count: newCount })
+        });
+
+        // Marca o pedido como já avaliado, pra não pedir de novo
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ buyer_reviewed: true })
+        });
+        const cachedOrder = ordersCache.find(o => o.id === orderId);
+        if (cachedOrder) cachedOrder.buyer_reviewed = true;
+
+        bootstrap.Modal.getInstance(document.getElementById('reviewModal'))?.hide();
+        showToast('Obrigado por avaliar o vendedor!', 'success');
+
+        if (currentChat === orderId) {
+            updateChatLogistics(cachedOrder || { id: orderId, status: 'finished', buyer_reviewed: true }, user);
+        }
+    } catch (e) {
+        console.error('Erro ao enviar avaliação:', e);
+        showToast('Erro ao enviar avaliação. Tente novamente.', 'error');
+    }
 };
 
 /**
