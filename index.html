@@ -540,6 +540,9 @@
                 <button class="btn btn-ml-primary w-100 py-3 fw-bold" onclick="alert('Finalizando compra...')">
                     <i class="bi bi-bag-check-fill me-2"></i>FINALIZAR TUDO
                 </button>
+                <button class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.esvaziarCarrinho()">
+                    <i class="bi bi-trash3 me-2"></i>ESVAZIAR CARRINHO
+                </button>
             </div>
         </div>
     </div>
@@ -1043,23 +1046,36 @@
     </div>
 
     <!-- Offcanvas Editar Perfil -->
-    <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="profileEditOffcanvas" style="width: 400px; max-width: 90%;">
-        <div class="offcanvas-header">
-            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-person-gear me-2"></i> Meu Perfil</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-        </div>
-        <div class="offcanvas-body">
-            <form id="profileEditForm">
-                <div class="filter-group text-center mb-4 pb-3">
-                    <img id="profilePreview" src="https://placehold.co/100" class="rounded-circle border shadow-sm mb-2" width="100" height="100" style="object-fit: cover;" referrerpolicy="no-referrer">
-                    <label class="form-label d-block small fw-bold">Alterar Foto de Perfil</label>
-                    <button type="button" class="btn btn-sm btn-info text-white mb-2" onclick="abrirUploadExterno()">
-                        <i class="bi bi-upload"></i> Subir foto no Imgur
-                    </button>
-                    <input type="url" class="form-control form-control-sm" id="editAvatarLink" placeholder="Cole o link da imagem aqui">
-                </div>
-                <div class="filter-group mb-3 pb-3">
-                    <h6 class="fw-bold small text-uppercase mb-3">Dados Pessoais</h6>
+    <!-- Tela de Edição de Perfil — estilo "link in bio" (cartão central, seções em pílulas empilhadas) -->
+    <div id="profileEditScreen" class="profile-links-screen d-none">
+        <button type="button" class="profile-links-close" onclick="window.hideProfileEditScreen()" aria-label="Fechar">
+            <i class="bi bi-x-lg"></i>
+        </button>
+
+        <form id="profileEditForm" class="profile-links-card">
+            <div class="profile-links-avatar-wrap">
+                <img id="profilePreview" src="https://placehold.co/100" referrerpolicy="no-referrer">
+                <label for="profileAvatarUploadTrigger" class="profile-links-avatar-edit" title="Alterar foto">
+                    <i class="bi bi-camera-fill"></i>
+                </label>
+            </div>
+            <h5 id="profileLinksName" class="profile-links-name">Meu Perfil</h5>
+            <span id="profileLinksTypeBadge" class="profile-links-badge">Cliente</span>
+
+            <div class="profile-links-avatar-fields">
+                <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirUploadExterno()" id="profileAvatarUploadTrigger">
+                    <i class="bi bi-upload"></i> Subir foto no Imgur
+                </button>
+                <input type="url" class="form-control form-control-sm mt-2" id="editAvatarLink" placeholder="Ou cole o link da imagem aqui">
+            </div>
+
+            <!-- Seção: Dados Pessoais -->
+            <div class="profile-link-section">
+                <button type="button" class="profile-link-header" onclick="window.toggleProfileSection(this)">
+                    <span><i class="bi bi-person-fill me-2"></i>Dados Pessoais</span>
+                    <i class="bi bi-chevron-down profile-link-chevron"></i>
+                </button>
+                <div class="profile-link-body">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Nome Completo</label>
                         <input type="text" class="form-control" id="editNome" required>
@@ -1077,8 +1093,15 @@
                         <input type="tel" class="form-control" id="editTelefone" maxlength="15">
                     </div>
                 </div>
-                <div class="filter-group mb-3 pb-3">
-                    <h6 class="fw-bold small text-uppercase mb-3">Endereço</h6>
+            </div>
+
+            <!-- Seção: Endereço -->
+            <div class="profile-link-section">
+                <button type="button" class="profile-link-header" onclick="window.toggleProfileSection(this)">
+                    <span><i class="bi bi-geo-alt-fill me-2"></i>Endereço</span>
+                    <i class="bi bi-chevron-down profile-link-chevron"></i>
+                </button>
+                <div class="profile-link-body">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">CEP</label>
                         <div class="input-group">
@@ -1114,8 +1137,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="filter-group mb-4 pb-1">
-                    <h6 class="fw-bold small text-uppercase mb-3">Preferências</h6>
+            </div>
+
+            <!-- Seção: Preferências -->
+            <div class="profile-link-section">
+                <button type="button" class="profile-link-header" onclick="window.toggleProfileSection(this)">
+                    <span><i class="bi bi-sliders me-2"></i>Preferências</span>
+                    <i class="bi bi-chevron-down profile-link-chevron"></i>
+                </button>
+                <div class="profile-link-body">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Pagamento Preferido</label>
                         <select class="form-select" id="editPagamento" required>
@@ -1133,14 +1163,20 @@
                         </select>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-ml-primary w-100 py-2 fw-bold">SALVAR ALTERAÇÕES</button>
-                <button type="button" class="btn btn-warning w-100 py-2 fw-bold mt-2 text-dark" onclick="logout()">SAIR DA CONTA</button>
-                <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.deleteAccount()">
-                    EXCLUIR MINHA CONTA
-                </button>
-            </form>
-        </div>
+            </div>
+
+            <button type="submit" class="profile-link-action profile-link-action-primary">
+                <i class="bi bi-check-lg me-2"></i>SALVAR ALTERAÇÕES
+            </button>
+            <button type="button" class="profile-link-action profile-link-action-warning" onclick="logout()">
+                <i class="bi bi-box-arrow-right me-2"></i>SAIR DA CONTA
+            </button>
+            <button type="button" class="profile-link-action profile-link-action-danger" onclick="window.deleteAccount()">
+                <i class="bi bi-trash me-2"></i>EXCLUIR MINHA CONTA
+            </button>
+        </form>
     </div>
+
 
     <!-- Dock Unificado Mobile (Navegação + Ferramentas) -->
     <footer class="footer py-2 border-top fixed-bottom main-footer-dock">

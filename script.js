@@ -1144,6 +1144,16 @@ function renderCart() {
     localStorage.setItem('electroCart', JSON.stringify(cart));
 }
 
+/** Esvazia o carrinho por completo, com confirmação pra evitar clique acidental */
+window.esvaziarCarrinho = function() {
+    if (cart.length === 0) { showToast('Seu carrinho já está vazio.', 'info'); return; }
+    if (!confirm('Tem certeza que deseja remover todos os itens do carrinho?')) return;
+    cart.length = 0;
+    localStorage.setItem('electroCart', JSON.stringify(cart));
+    renderCart();
+    showToast('Carrinho esvaziado.', 'info');
+};
+
 /** Seletor de quantidade estilo Mercado Livre: botão abre uma lista com todas
  *  as quantidades disponíveis (1 até o estoque do produto) */
 window.toggleQtyDropdown = function(evt) {
@@ -1520,7 +1530,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await supabaseFetch(`users?id=eq.${user.id}`, { method: 'PATCH', body: JSON.stringify(updated) });
         localStorage.setItem('electroUser', JSON.stringify(updated));
-        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas'))?.hide();
+        window.hideProfileEditScreen();
         updateUI();
         createPersistentNotification('Suas informações de perfil foram atualizadas.', 'success');
 
@@ -1864,7 +1874,26 @@ window.showProfileEdit = () => {
         preview.src = user.avatar?.startsWith('http') ? user.avatar : 'https://placehold.co/100';
     }
 
-    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('profileEditOffcanvas')).show();
+    document.getElementById('profileLinksName').textContent = user.nome || 'Meu Perfil';
+    document.getElementById('profileLinksTypeBadge').textContent = (user.tipo === 'VENDEDOR') ? 'Vendedor' : 'Cliente';
+    document.getElementById('profileEditScreen').classList.remove('d-none');
+    document.body.style.overflow = 'hidden';
+};
+
+window.hideProfileEditScreen = function() {
+    document.getElementById('profileEditScreen').classList.add('d-none');
+    document.body.style.overflow = '';
+};
+
+/**
+ * Abre/fecha cada seção em pílula da tela de perfil (estilo link-in-bio),
+ * uma de cada vez pra manter a tela organizada.
+ */
+window.toggleProfileSection = function(headerBtn) {
+    const section = headerBtn.closest('.profile-link-section');
+    const wasOpen = section.classList.contains('open');
+    document.querySelectorAll('.profile-link-section.open').forEach(s => s.classList.remove('open'));
+    if (!wasOpen) section.classList.add('open');
 };
 
 /**
