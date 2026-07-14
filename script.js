@@ -662,6 +662,8 @@ window.showDetail = async function(pid) {
     const item = allProductsCache.find(x => x.id == pid || x.id === pid);
     if (!item) return;
 
+    window._detailQty = 1; // reseta o seletor de quantidade a cada novo produto aberto
+
     const user    = getSavedUser();
     const isOwner = user && (item.vendedor_id == user.id);
 
@@ -844,10 +846,21 @@ window.showDetail = async function(pid) {
                             <i class="bi bi-trash me-2"></i>Excluir Anúncio
                         </button>
                     ` : `
-                        <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true});window.buyItem(cart.length-1);">
-                            <i class="bi bi-lightning me-2"></i>Comprar Agora
+                        <div class="ml-qty-picker mb-3" id="mlQtyPicker">
+                            <button type="button" class="ml-qty-picker-btn" onclick="window.toggleQtyDropdown(event)">
+                                <span>Quantidade: <strong id="detailQtyValue">1</strong> <span class="ml-qty-picker-avail">(${item.quantidade || 1} disponíve${item.quantidade === 1 ? 'l' : 'is'})</span></span>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="ml-qty-dropdown" id="qtyDropdownList">
+                                ${Array.from({ length: Math.max(1, item.quantidade || 1) }, (_, i) => i + 1).map(n => `
+                                    <div class="ml-qty-option" onclick="window.selectDetailQty(${n})">${n}</div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true, qty:window._detailQty || 1});window.buyItem(cart.length-1);">
+                            <i class="bi bi-lightning me-2"></i>Solicitar Compra
                         </button>
-                        <button class="btn btn-success w-100 mb-2" onclick="window.addToCart('${pid}');">
+                        <button class="btn btn-ml-secondary w-100 mb-2" onclick="window.addToCart('${pid}', {qty:window._detailQty || 1});">
                             <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
                         </button>
                     `}
@@ -1119,8 +1132,8 @@ function renderCart() {
                 <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="removeFromCart(${i})">
                     <i class="bi bi-trash"></i>
                 </button>
-                <button class="btn btn-sm btn-success flex-grow-1" onclick="buyItem(${i})">
-                    Comprar
+                <button class="btn btn-sm btn-ml-primary flex-grow-1" onclick="buyItem(${i})">
+                    Solicitar Compra
                 </button>
             </div>
         </div>`;
@@ -1131,16 +1144,47 @@ function renderCart() {
     localStorage.setItem('electroCart', JSON.stringify(cart));
 }
 
+/** Seletor de quantidade estilo Mercado Livre: botão abre uma lista com todas
+ *  as quantidades disponíveis (1 até o estoque do produto) */
+window.toggleQtyDropdown = function(evt) {
+    if (evt) evt.stopPropagation();
+    const list = document.getElementById('qtyDropdownList');
+    if (!list) return;
+    const isOpen = list.classList.contains('show');
+    list.classList.toggle('show', !isOpen);
+    document.getElementById('mlQtyPicker')?.classList.toggle('open', !isOpen);
+};
+
+window.selectDetailQty = function(n) {
+    window._detailQty = n;
+    const valueEl = document.getElementById('detailQtyValue');
+    if (valueEl) valueEl.textContent = n;
+    document.getElementById('qtyDropdownList')?.classList.remove('show');
+    document.getElementById('mlQtyPicker')?.classList.remove('open');
+};
+
+// Fecha o dropdown de quantidade ao clicar fora dele
+document.addEventListener('click', (evt) => {
+    const picker = document.getElementById('mlQtyPicker');
+    if (picker && !picker.contains(evt.target)) {
+        document.getElementById('qtyDropdownList')?.classList.remove('show');
+        picker.classList.remove('open');
+    }
+});
+
 window.addToCart = function(productId, options = {}) {
-    const { openCart = true, silent = false } = options;
+    const { openCart = true, silent = false, qty = 1 } = options;
     const p = allProductsCache.find(x => x.id === productId);
     if (!p) return;
+    const stock  = Math.max(1, parseInt(p.quantidade) || 1);
+    const addQty = Math.max(1, qty);
     const exist = cart.find(i => i.id === productId);
     if (exist) {
-        if (exist.qtd >= 2) return showToast('Limite de 2 unidades por produto!', 'warning');
-        exist.qtd++;
+        if (exist.qtd + addQty > stock) return showToast(`Limite de ${stock} unidade${stock === 1 ? '' : 's'} em estoque!`, 'warning');
+        exist.qtd += addQty;
     } else {
-        cart.push({ ...p, qtd: 1 });
+        if (addQty > stock) return showToast(`Limite de ${stock} unidade${stock === 1 ? '' : 's'} em estoque!`, 'warning');
+        cart.push({ ...p, qtd: addQty });
     }
     renderCart();
     if (!silent) showToast(`"${p.titulo.substring(0,30)}..." adicionado ao carrinho!`, 'success');
@@ -1156,9 +1200,10 @@ window.removeFromCart = function(i) {
 window.updateCartQty = function(i, delta) {
     const item = cart[i];
     if (!item) return;
+    const stock  = Math.max(1, parseInt(item.quantidade) || 1);
     const newQty = (item.qtd || 1) + delta;
-    if (newQty > 2) {
-        showToast('Máximo de 2 unidades permitido!', 'warning');
+    if (newQty > stock) {
+        showToast(`Máximo de ${stock} unidade${stock === 1 ? '' : 's'} em estoque!`, 'warning');
         return;
     }
     newQty < 1 ? window.removeFromCart(i) : (item.qtd = newQty, renderCart());
@@ -1203,7 +1248,7 @@ window.buyItem = async function(i) {
     if (!user) { showToast('Faça login para comprar!', 'warning'); return; }
 
     const btn          = document.querySelector(`button[onclick="buyItem(${i})"]`);
-    const originalText = btn?.textContent || 'Comprar';
+    const originalText = btn?.textContent || 'Solicitar Compra';
     if (btn) { btn.disabled = true; btn.textContent = 'Processando...'; }
 
     try {
@@ -2947,10 +2992,16 @@ function updateChatLogistics(order, user) {
         } else {
             buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>`;
         }
-    } else if (order.status === 'finished' && isBuyer) {
-        buttonsHtml += order.buyer_reviewed
-            ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este vendedor. Obrigado!</div>`
-            : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
+    } else if (order.status === 'finished') {
+        if (isBuyer) {
+            buttonsHtml += order.buyer_reviewed
+                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este vendedor. Obrigado!</div>`
+                : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}', 'buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
+        } else {
+            buttonsHtml += order.seller_reviewed
+                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este comprador. Obrigado!</div>`
+                : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}', 'seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
+        }
     }
 
     logisticsButtons.innerHTML = buttonsHtml;
@@ -3318,7 +3369,7 @@ window.confirmReceipt = async function(orderId) {
         }
         showToast('Pedido finalizado!', 'success');
         loadChatMessages(orderId);
-        window.openReviewModal(orderId);
+        window.openReviewModal(orderId, 'buyer_rates_seller');
     } catch { showToast('Erro ao confirmar recebimento.', 'error'); }
 };
 
@@ -3334,15 +3385,30 @@ let currentReviewRating = 0;
  * pode ser reaberto depois pelo botão "Avaliar Vendedor" no chat, caso o
  * comprador tenha pulado a avaliação na hora.
  */
-window.openReviewModal = async function(orderId) {
+/**
+ * Abre o modal de avaliação pra um pedido finalizado. `mode` define quem avalia
+ * quem: 'buyer_rates_seller' (padrão, comprador avalia o vendedor) ou
+ * 'seller_rates_buyer' (vendedor avalia o comprador). Chamado automaticamente
+ * assim que o comprador confirma o recebimento, e também pode ser reaberto
+ * depois pelo botão "Avaliar Vendedor"/"Avaliar Comprador" na tela de pedidos,
+ * caso a avaliação tenha sido pulada na hora.
+ */
+window.openReviewModal = async function(orderId, mode = 'buyer_rates_seller') {
     try {
         const orderData = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
         const order = orderData?.[0];
-        if (!order || order.buyer_reviewed) return; // pedido não existe ou já foi avaliado
+        if (!order) return;
+
+        const isSellerRatingBuyer = mode === 'seller_rates_buyer';
+        if (isSellerRatingBuyer ? order.seller_reviewed : order.buyer_reviewed) return; // já avaliado
 
         document.getElementById('reviewOrderId').value    = orderId;
-        document.getElementById('reviewSellerId').value   = order.seller_id;
-        document.getElementById('reviewSellerName').textContent = order.seller_name || 'o vendedor';
+        document.getElementById('reviewMode').value        = mode;
+        document.getElementById('reviewTargetId').value    = isSellerRatingBuyer ? order.buyer_id : order.seller_id;
+        document.getElementById('reviewTargetName').textContent =
+            isSellerRatingBuyer ? (order.buyer_name || 'o comprador') : (order.seller_name || 'o vendedor');
+        document.getElementById('reviewModalTitle').textContent =
+            isSellerRatingBuyer ? 'Avalie o comprador' : 'Avalie o vendedor';
         window.setReviewStars(0);
 
         bootstrap.Modal.getOrCreateInstance(document.getElementById('reviewModal')).show();
@@ -3364,65 +3430,83 @@ window.setReviewStars = function(n) {
 
 /**
  * Envia a avaliação: salva o registro individual (histórico) e atualiza a
- * média/contador do vendedor (vendedor_rating / rating_count na tabela de
- * usuários), que é o que já é exibido no mini-perfil do chat.
+ * média/contador de quem está sendo avaliado. Funciona nos dois sentidos —
+ * comprador avaliando vendedor (vendedor_rating / rating_count) e vendedor
+ * avaliando comprador (comprador_rating / comprador_rating_count), ambos na
+ * tabela de usuários.
+ *
+ * IMPORTANTE: pra avaliação de comprador funcionar, a tabela `users` no
+ * Supabase precisa ter as colunas `comprador_rating` (numeric) e
+ * `comprador_rating_count` (int), e a tabela `orders` precisa da coluna
+ * `seller_reviewed` (boolean), do mesmo jeito que já existem `vendedor_rating`,
+ * `rating_count` e `buyer_reviewed`.
  */
-window.submitSellerReview = async function() {
-    const orderId    = document.getElementById('reviewOrderId').value;
-    const sellerId   = document.getElementById('reviewSellerId').value;
-    const user       = getSavedUser();
+window.submitReview = async function() {
+    const orderId  = document.getElementById('reviewOrderId').value;
+    const targetId = document.getElementById('reviewTargetId').value;
+    const mode     = document.getElementById('reviewMode').value || 'buyer_rates_seller';
+    const user     = getSavedUser();
+    const isSellerRatingBuyer = mode === 'seller_rates_buyer';
 
     if (!currentReviewRating) { showToast('Escolha de 1 a 5 estrelas antes de enviar.', 'warning'); return; }
-    if (!user || !sellerId) return;
+    if (!user || !targetId) return;
 
     try {
         // Salva o registro individual da avaliação (histórico, separado das curtidas de produto)
         await supabaseFetch('avaliacoes', {
             method: 'POST',
             body: JSON.stringify({
-                id:         `av_${Date.now()}`,
-                order_id:   orderId,
-                seller_id:  sellerId,
-                buyer_id:   user.id,
-                buyer_name: user.nome,
-                rating:     currentReviewRating,
-                comentario: null,
-                created_at: new Date().toISOString()
+                id:             `av_${Date.now()}`,
+                order_id:       orderId,
+                tipo:           mode,
+                avaliador_id:   user.id,
+                avaliador_nome: user.nome,
+                avaliado_id:    targetId,
+                rating:         currentReviewRating,
+                comentario:     null,
+                created_at:     new Date().toISOString()
             })
         });
 
-        // Recalcula a média do vendedor com base na avaliação nova
-        const sellerData = await supabaseFetch(`users?select=vendedor_rating,rating_count&id=eq.${sellerId}&limit=1`);
-        const seller    = sellerData?.[0] || {};
-        const prevCount = parseInt(seller.rating_count) || 0;
-        const prevAvg   = parseFloat(seller.vendedor_rating) || 0;
+        // Recalcula a média de quem está sendo avaliado com base na avaliação nova
+        const ratingField = isSellerRatingBuyer ? 'comprador_rating'       : 'vendedor_rating';
+        const countField   = isSellerRatingBuyer ? 'comprador_rating_count' : 'rating_count';
+
+        const targetData = await supabaseFetch(`users?select=${ratingField},${countField}&id=eq.${targetId}&limit=1`);
+        const target    = targetData?.[0] || {};
+        const prevCount = parseInt(target[countField]) || 0;
+        const prevAvg   = parseFloat(target[ratingField]) || 0;
         const newCount  = prevCount + 1;
         const newAvg    = ((prevAvg * prevCount) + currentReviewRating) / newCount;
 
-        await supabaseFetch(`users?id=eq.${sellerId}`, {
+        await supabaseFetch(`users?id=eq.${targetId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ vendedor_rating: newAvg, rating_count: newCount })
+            body: JSON.stringify({ [ratingField]: newAvg, [countField]: newCount })
         });
 
-        // Marca o pedido como já avaliado, pra não pedir de novo
+        // Marca o pedido como já avaliado (nesse sentido), pra não pedir de novo
+        const reviewedField = isSellerRatingBuyer ? 'seller_reviewed' : 'buyer_reviewed';
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ buyer_reviewed: true })
+            body: JSON.stringify({ [reviewedField]: true })
         });
         const cachedOrder = ordersCache.find(o => o.id === orderId);
-        if (cachedOrder) cachedOrder.buyer_reviewed = true;
+        if (cachedOrder) cachedOrder[reviewedField] = true;
 
         bootstrap.Modal.getInstance(document.getElementById('reviewModal'))?.hide();
-        showToast('Obrigado por avaliar o vendedor!', 'success');
+        showToast(isSellerRatingBuyer ? 'Obrigado por avaliar o comprador!' : 'Obrigado por avaliar o vendedor!', 'success');
 
         if (currentChat === orderId) {
-            updateChatLogistics(cachedOrder || { id: orderId, status: 'finished', buyer_reviewed: true }, user);
+            updateChatLogistics(cachedOrder || { id: orderId, status: 'finished', [reviewedField]: true }, user);
         }
     } catch (e) {
         console.error('Erro ao enviar avaliação:', e);
         showToast('Erro ao enviar avaliação. Tente novamente.', 'error');
     }
 };
+
+// Mantido por compatibilidade, caso algo ainda chame o nome antigo da função
+window.submitSellerReview = window.submitReview;
 
 /**
  * Desconta a quantidade comprada do estoque do anúncio assim que a compra é
@@ -3767,5 +3851,5 @@ window.finalizarCompraCarrinho = function() {
     }
     showToast('Processando seu pedido... Por favor, aguarde.', 'info');
     // Aqui chamaria a lógica de compra em lote ou apenas avisa que deve comprar item a item
-    alert('Funcionalidade de Checkout Global em desenvolvimento. Por enquanto, utilize o botão "Comprar" em cada item.');
+    alert('Funcionalidade de Checkout Global em desenvolvimento. Por enquanto, utilize o botão "Solicitar Compra" em cada item.');
 };
