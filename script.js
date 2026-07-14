@@ -10,6 +10,7 @@ let cart              = JSON.parse(localStorage.getItem('electroCart'))    || []
 let likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || [];
 let accessHistory     = JSON.parse(localStorage.getItem('electroHistory')) || [];
 let currentChat       = null;
+let adminOrdersCache  = [];
 let currentOrderViewType = 'buyer';
 let ordersCache       = [];
 let currentReplyIndex   = null;
@@ -3644,19 +3645,23 @@ window.renderAdminPanel = async function() {
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando base de dados...</p></div>';
 
     try {
-        // Busca todos os usuários e produtos para gestão
-        const [users, products] = await Promise.all([
+        // Busca todos os usuários, produtos, pedidos e conversas para gestão total
+        const [users, products, orders, chats] = await Promise.all([
             supabaseFetch('users?select=*&order=nome.asc'),
-            supabaseFetch('products?select=*&order=created_at.desc')
+            supabaseFetch('products?select=*&order=created_at.desc'),
+            supabaseFetch('orders?select=*&order=created_at.desc'),
+            supabaseFetch('chats?select=*')
         ]);
+        adminOrdersCache = orders;
 
         grid.innerHTML = `
             <div class="container-fluid py-2">
                 <nav class="mb-4 d-flex justify-content-center">
-                    <div class="nav nav-pills border-0 bg-light p-1 rounded-pill shadow-sm" id="nav-tab" role="tablist">
+                    <div class="nav nav-pills border-0 bg-light p-1 rounded-pill shadow-sm flex-wrap" id="nav-tab" role="tablist">
                         <button class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-users" type="button">Usuários (${users.length})</button>
                         <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-cats" type="button">Categorias</button>
                         <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-prods" type="button">Publicações (${products.length})</button>
+                        <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-chats" type="button">Chats (${chats.length})</button>
                     </div>
                 </nav>
                 <div class="tab-content" id="nav-tabContent">
@@ -3710,6 +3715,31 @@ window.renderAdminPanel = async function() {
                             `).join('')}
                         </div>
                     </div>
+                    <div class="tab-pane fade" id="admin-chats">
+                        <div class="list-group shadow-sm mt-2">
+                            ${chats.length === 0 ? `<p class="text-muted text-center py-4">Nenhuma conversa no sistema ainda.</p>` : chats.map(c => {
+                                const order = orders.find(o => o.id === c.order_id) || {};
+                                const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
+                                const lastMsg = (c.messages || [])[c.messages.length - 1];
+                                return `
+                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white flex-wrap gap-2">
+                                    <div class="text-dark" style="max-width: 320px;">
+                                        <h6 class="mb-0 fw-bold text-truncate">${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</h6>
+                                        <small class="text-muted d-block">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} mensagens</small>
+                                        ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate">"${(lastMsg.text || '[mídia]').slice(0,60)}"</small>` : ''}
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-ml-secondary" onclick="window.adminViewChat('${c.order_id}')">
+                                            <i class="bi bi-eye me-1"></i>Ver Conversa
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="window.adminDeleteChat('${c.order_id}')" title="Apagar conversa e pedido">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
                 </div>
             </div>`;
         window.closeMobileMenu();
@@ -3735,6 +3765,72 @@ window.adminDeleteProduct = async function(pid, title) {
         showToast('Publicação removida pelo administrador.', 'success');
         window.renderAdminPanel(); // Atualiza a lista
     } catch (e) { showToast('Erro ao remover produto.', 'error'); }
+};
+
+/**
+ * Visão total do administrador: abre qualquer conversa do site em modo
+ * leitura, sem precisar ser comprador/vendedor daquele pedido.
+ */
+window.adminViewChat = async function(orderId) {
+    try {
+        const [chatResult, order] = await Promise.all([
+            supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`),
+            Promise.resolve(adminOrdersCache.find(o => o.id === orderId))
+        ]);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+
+        const msgsHtml = (chat.messages || []).map(m => {
+            if (m.type === 'system' || m.senderId === 'system') {
+                return `<div class="text-center my-2"><span class="badge bg-light text-dark border">${m.text}</span></div>`;
+            }
+            const isBuyer = m.senderId === order?.buyer_id;
+            return `
+                <div class="d-flex ${isBuyer ? 'justify-content-start' : 'justify-content-end'} mb-2">
+                    <div class="p-2 px-3 rounded-3 ${isBuyer ? 'bg-light' : 'bg-primary text-white'}" style="max-width:75%;">
+                        <small class="d-block fw-bold" style="font-size:0.65rem; opacity:0.75;">${m.senderName || (isBuyer ? order?.buyer_name : order?.seller_name) || '?'}</small>
+                        ${m.deleted ? `<em class="small">Mensagem apagada</em>` : (m.text ? m.text.replace(/</g,'&lt;') : (m.image ? '[imagem]' : '[arquivo]'))}
+                        <small class="d-block text-end" style="font-size:0.6rem; opacity:0.7;">${new Date(m.timestamp).toLocaleString('pt-BR')}</small>
+                    </div>
+                </div>`;
+        }).join('') || '<p class="text-muted text-center">Sem mensagens.</p>';
+
+        let modalEl = document.getElementById('adminChatViewerModal');
+        if (!modalEl) {
+            modalEl = document.createElement('div');
+            modalEl.id = 'adminChatViewerModal';
+            modalEl.className = 'modal fade';
+            modalEl.tabIndex = -1;
+            document.body.appendChild(modalEl);
+        }
+        modalEl.innerHTML = `
+            <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                <div class="modal-content" style="border-radius:16px;">
+                    <div class="modal-header">
+                        <h6 class="modal-title fw-bold"><i class="bi bi-eye me-2"></i>${order?.product_title || 'Conversa'} — modo administrador</h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="background: var(--bg-color);">${msgsHtml}</div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-danger btn-sm" onclick="window.adminDeleteChat('${orderId}'); bootstrap.Modal.getInstance(document.getElementById('adminChatViewerModal'))?.hide();">
+                            <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        new bootstrap.Modal(modalEl).show();
+    } catch (e) { showToast('Erro ao carregar a conversa.', 'error'); }
+};
+
+/** Apaga a conversa E o pedido associado (ação total de administrador) */
+window.adminDeleteChat = async function(orderId) {
+    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    try {
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
+        await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
+        showToast('Conversa e pedido removidos pelo administrador.', 'success');
+        window.renderAdminPanel();
+    } catch (e) { showToast('Erro ao remover a conversa.', 'error'); }
 };
 
 // ============================================
