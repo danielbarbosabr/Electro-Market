@@ -681,6 +681,60 @@ body.dark-theme .btn-close {
     }
 }
 
+/* ============================================ */
+/* PÁGINA DE DETALHES DO PRODUTO EM TELA CHEIA   */
+/* (substitui o antigo modal - reaproveita a     */
+/* #productsGrid como área de conteúdo, igual ao */
+/* padrão usado em Curtidos/Pedidos)             */
+/* ============================================ */
+#productsGrid.product-detail-active {
+    display: block;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+.detail-page {
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    padding: 20px;
+    animation: detailFadeIn 0.25s ease;
+}
+
+@keyframes detailFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.detail-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 6px 10px;
+    margin-bottom: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.detail-back-btn:hover {
+    background: var(--border-light);
+}
+
+@media (max-width: 767px) {
+    .detail-page {
+        border: none;
+        border-radius: 0;
+        padding: 10px;
+    }
+}
+
 .order-card-grid {
     background: rgba(20, 22, 34, 0.55);
     backdrop-filter: blur(10px);
@@ -1973,6 +2027,21 @@ body.wa-locked > .wa-main {
 
 .wa-side__header .btn-close:hover {
     opacity: 1;
+}
+
+/* Estrelas do modal de Avaliar Vendedor */
+.review-star {
+    color: #dcdcdc;
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.review-star:hover {
+    transform: scale(1.15);
+}
+
+.review-star.active {
+    color: #ffc107;
 }
 
 .wa-side__search {
