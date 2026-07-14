@@ -458,9 +458,9 @@
 
     <!-- Offcanvas Filtros -->
     <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="filterOffcanvas">
-        <div class="offcanvas-header text-white">
-            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-filter-left me-1"></i> Filtros de Busca</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-filter-left me-2" style="color: var(--market-color);"></i> Filtros de Busca</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body">
             <div class="filter-group mb-4">
@@ -525,10 +525,10 @@
     </div>
 
     <!-- Offcanvas Carrinho -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="cartOffcanvas">
-        <div class="offcanvas-header border-bottom">
-            <h5 class="offcanvas-title fw-bold"><i class="bi bi-cart-check me-2 text-success"></i>Meu Carrinho</h5>
-            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas"></button>
+    <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="cartOffcanvas">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-cart-check me-2" style="color: var(--market-color);"></i>Meu Carrinho</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column">
             <div id="cartItemsList" class="flex-grow-1 overflow-auto pe-2"></div>
@@ -537,22 +537,24 @@
                     <h5 class="mb-0 fw-bold">Total:</h5>
                     <h5 class="mb-0 fw-bold text-success" id="cartTotalValue">R$ 0,00</h5>
                 </div>
-                <button class="btn btn-success w-100 py-3 fw-bold rounded-3 shadow-sm" onclick="alert('Finalizando compra...')">FINALIZAR TUDO</button>
+                <button class="btn btn-ml-primary w-100 py-3 fw-bold" onclick="alert('Finalizando compra...')">
+                    <i class="bi bi-bag-check-fill me-2"></i>FINALIZAR TUDO
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Avaliar Vendedor -->
+    <!-- Modal Avaliar Vendedor/Comprador -->
     <div class="modal fade" id="reviewModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0" style="border-radius:16px;">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">Avalie o vendedor</h5>
+                    <h5 class="modal-title fw-bold" id="reviewModalTitle">Avalie o vendedor</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center pt-2">
                     <p class="text-muted small mb-1">Como foi sua experiência com</p>
-                    <p class="fw-bold mb-3" id="reviewSellerName">o vendedor</p>
+                    <p class="fw-bold mb-3" id="reviewTargetName">o vendedor</p>
                     <div id="reviewStars" class="d-flex justify-content-center gap-2 mb-3" style="font-size:2.2rem;">
                         <i class="bi bi-star review-star" data-value="1" onclick="window.setReviewStars(1)"></i>
                         <i class="bi bi-star review-star" data-value="2" onclick="window.setReviewStars(2)"></i>
@@ -561,10 +563,11 @@
                         <i class="bi bi-star review-star" data-value="5" onclick="window.setReviewStars(5)"></i>
                     </div>
                     <input type="hidden" id="reviewOrderId">
-                    <input type="hidden" id="reviewSellerId">
+                    <input type="hidden" id="reviewTargetId">
+                    <input type="hidden" id="reviewMode">
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-outline-secondary flex-grow-1" data-bs-dismiss="modal">Agora não</button>
-                        <button type="button" class="btn btn-success flex-grow-1 fw-bold" onclick="window.submitSellerReview()">Enviar Avaliação</button>
+                        <button type="button" class="btn btn-success flex-grow-1 fw-bold" onclick="window.submitReview()">Enviar Avaliação</button>
                     </div>
                 </div>
             </div>
@@ -1040,14 +1043,14 @@
     </div>
 
     <!-- Offcanvas Editar Perfil -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="profileEditOffcanvas" style="width: 400px; max-width: 90%;">
-        <div class="offcanvas-header text-white" style="background-color: var(--primary-blue);">
-            <h5 class="offcanvas-title fw-bold"><i class="bi bi-person-gear me-2"></i> Meu Perfil</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="profileEditOffcanvas" style="width: 400px; max-width: 90%;">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-person-gear me-2"></i> Meu Perfil</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body">
             <form id="profileEditForm">
-                <div class="text-center mb-4">
+                <div class="filter-group text-center mb-4 pb-3">
                     <img id="profilePreview" src="https://placehold.co/100" class="rounded-circle border shadow-sm mb-2" width="100" height="100" style="object-fit: cover;" referrerpolicy="no-referrer">
                     <label class="form-label d-block small fw-bold">Alterar Foto de Perfil</label>
                     <button type="button" class="btn btn-sm btn-info text-white mb-2" onclick="abrirUploadExterno()">
@@ -1055,73 +1058,82 @@
                     </button>
                     <input type="url" class="form-control form-control-sm" id="editAvatarLink" placeholder="Cole o link da imagem aqui">
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">Nome Completo</label>
-                    <input type="text" class="form-control" id="editNome" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">E-mail</label>
-                    <input type="email" class="form-control" id="editEmail" required readonly style="background-color: #f8f9fa;">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">CPF</label>
-                    <input type="text" class="form-control" id="editCPF" readonly style="background-color: #f8f9fa;">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">Telefone / WhatsApp</label>
-                    <input type="tel" class="form-control" id="editTelefone" maxlength="15">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">CEP</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="editCEP" maxlength="9" placeholder="00000-000">
-                        <button type="button" class="btn btn-outline-secondary" onclick="window.buscarCepPerfil()" title="Buscar endereço pelo CEP">
-                            <i class="bi bi-search"></i>
-                        </button>
+                <div class="filter-group mb-3 pb-3">
+                    <h6 class="fw-bold small text-uppercase mb-3">Dados Pessoais</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nome Completo</label>
+                        <input type="text" class="form-control" id="editNome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">E-mail</label>
+                        <input type="email" class="form-control" id="editEmail" required readonly style="background-color: var(--hover-bg);">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">CPF</label>
+                        <input type="text" class="form-control" id="editCPF" readonly style="background-color: var(--hover-bg);">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label small fw-bold">Telefone / WhatsApp</label>
+                        <input type="tel" class="form-control" id="editTelefone" maxlength="15">
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">Rua / Logradouro</label>
-                    <input type="text" class="form-control" id="editRua" required>
+                <div class="filter-group mb-3 pb-3">
+                    <h6 class="fw-bold small text-uppercase mb-3">Endereço</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">CEP</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="editCEP" maxlength="9" placeholder="00000-000">
+                            <button type="button" class="btn btn-outline-secondary" onclick="window.buscarCepPerfil()" title="Buscar endereço pelo CEP">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Rua / Logradouro</label>
+                        <input type="text" class="form-control" id="editRua" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-4 mb-3">
+                            <label class="form-label small fw-bold">Número</label>
+                            <input type="text" class="form-control" id="editNumero">
+                        </div>
+                        <div class="col-8 mb-3">
+                            <label class="form-label small fw-bold">Bairro</label>
+                            <input type="text" class="form-control" id="editBairro">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-0">
+                            <label class="form-label small fw-bold">Cidade</label>
+                            <input type="text" class="form-control" id="editCidade" required>
+                        </div>
+                        <div class="col-6 mb-0">
+                            <label class="form-label small fw-bold">Estado</label>
+                            <select class="form-select" id="editEstado" required>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="row">
-                    <div class="col-4 mb-3">
-                        <label class="form-label small fw-bold">Número</label>
-                        <input type="text" class="form-control" id="editNumero">
+                <div class="filter-group mb-4 pb-1">
+                    <h6 class="fw-bold small text-uppercase mb-3">Preferências</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Pagamento Preferido</label>
+                        <select class="form-select" id="editPagamento" required>
+                            <option value="pix">PIX</option>
+                            <option value="cartao">Cartão de Crédito</option>
+                            <option value="debito">Cartão de Débito</option>
+                            <option value="boleto">Boleto Bancário</option>
+                        </select>
                     </div>
-                    <div class="col-8 mb-3">
-                        <label class="form-label small fw-bold">Bairro</label>
-                        <input type="text" class="form-control" id="editBairro">
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label class="form-label small fw-bold">Cidade</label>
-                        <input type="text" class="form-control" id="editCidade" required>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label small fw-bold">Estado</label>
-                        <select class="form-select" id="editEstado" required>
+                    <div class="mb-0">
+                        <label class="form-label small fw-bold">Tipo de Conta</label>
+                        <select class="form-select" id="editTipo">
+                            <option value="CLIENTE">Cliente</option>
+                            <option value="VENDEDOR">Vendedor</option>
                         </select>
                     </div>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label small fw-bold">Pagamento Preferido</label>
-                    <select class="form-select" id="editPagamento" required>
-                        <option value="pix">PIX</option>
-                        <option value="cartao">Cartão de Crédito</option>
-                        <option value="debito">Cartão de Débito</option>
-                        <option value="boleto">Boleto Bancário</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label small fw-bold">Tipo de Conta</label>
-                    <select class="form-select" id="editTipo">
-                        <option value="CLIENTE">Cliente</option>
-                        <option value="VENDEDOR">Vendedor</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">SALVAR ALTERAÇÕES</button>
+                <button type="submit" class="btn btn-ml-primary w-100 py-2 fw-bold">SALVAR ALTERAÇÕES</button>
                 <button type="button" class="btn btn-warning w-100 py-2 fw-bold mt-2 text-dark" onclick="logout()">SAIR DA CONTA</button>
                 <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.deleteAccount()">
                     EXCLUIR MINHA CONTA
