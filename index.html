@@ -468,7 +468,7 @@
                 <select id="sortOrder" class="form-select form-select-sm mt-2" onchange="applyFilters()">
                     <option value="default">Destaques</option>
                     <option value="recent">Mais recentes</option>
-                    <option value="rating">Mais avaliados</option>
+                    <option value="likes">Mais curtidos</option>
                     <option value="priceAsc">Menor Preço</option>
                     <option value="priceDesc">Maior Preço</option>
                 </select>
@@ -542,16 +542,30 @@
         </div>
     </div>
 
-    <!-- Modal Detalhes do Produto -->
-    <div class="modal fade" id="productDetailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content border-0">
-                <div class="modal-header text-white" style="background-color: var(--header-bg);">
-                    <h5 class="modal-title fw-bold">Detalhes do Produto</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <!-- Modal Avaliar Vendedor -->
+    <div class="modal fade" id="reviewModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0" style="border-radius:16px;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Avalie o vendedor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="row" id="productDetailContent"></div>
+                <div class="modal-body text-center pt-2">
+                    <p class="text-muted small mb-1">Como foi sua experiência com</p>
+                    <p class="fw-bold mb-3" id="reviewSellerName">o vendedor</p>
+                    <div id="reviewStars" class="d-flex justify-content-center gap-2 mb-3" style="font-size:2.2rem;">
+                        <i class="bi bi-star review-star" data-value="1" onclick="window.setReviewStars(1)"></i>
+                        <i class="bi bi-star review-star" data-value="2" onclick="window.setReviewStars(2)"></i>
+                        <i class="bi bi-star review-star" data-value="3" onclick="window.setReviewStars(3)"></i>
+                        <i class="bi bi-star review-star" data-value="4" onclick="window.setReviewStars(4)"></i>
+                        <i class="bi bi-star review-star" data-value="5" onclick="window.setReviewStars(5)"></i>
+                    </div>
+                    <input type="hidden" id="reviewOrderId">
+                    <input type="hidden" id="reviewSellerId">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary flex-grow-1" data-bs-dismiss="modal">Agora não</button>
+                        <button type="button" class="btn btn-success flex-grow-1 fw-bold" onclick="window.submitSellerReview()">Enviar Avaliação</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -834,7 +848,7 @@
                     <i class="bi bi-lightning"></i> <strong>Ofertas do Dia</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-client" onclick="window.renderLikedProducts(); window.closeMobileMenu();">
-                    <i class="bi bi-heart"></i> <strong>Meus Favoritos</strong>
+                    <i class="bi bi-heart"></i> <strong>Meus Curtidos</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-client" onclick="window.renderAccessHistory(); window.closeMobileMenu();">
                     <i class="bi bi-clock-history"></i> <strong>Histórico</strong>
@@ -1110,7 +1124,7 @@
                 <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">SALVAR ALTERAÇÕES</button>
                 <button type="button" class="btn btn-warning w-100 py-2 fw-bold mt-2 text-dark" onclick="logout()">SAIR DA CONTA</button>
                 <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.deleteAccount()">
-                    <i class="bi bi-trash3 me-1"></i>EXCLUIR MINHA CONTA
+                    EXCLUIR MINHA CONTA
                 </button>
             </form>
         </div>
@@ -1127,7 +1141,7 @@
 
                 <!-- Opções de Cliente -->
                 <a href="#" class="nav-item role-client" data-page="renderLikedProducts" onclick="window.renderLikedProducts(); updateMobileNavActive('renderLikedProducts')">
-                    <i class="bi bi-heart"></i><span>Favoritos</span>
+                    <i class="bi bi-heart"></i><span>Curtidos</span>
                 </a>
                 <a href="#" class="nav-item role-client" data-page="renderOrderManagement" onclick="window.renderOrderManagement('buyer'); updateMobileNavActive('renderOrderManagement')">
                     <i class="bi bi-bag"></i><span>Compras</span>
