@@ -540,7 +540,7 @@
                 <button class="btn btn-ml-primary w-100 py-3 fw-bold" onclick="alert('Finalizando compra...')">
                     <i class="bi bi-bag-check-fill me-2"></i>FINALIZAR TUDO
                 </button>
-                <button class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.esvaziarCarrinho()">
+                <button class="btn btn-ml-secondary w-100 py-2 fw-bold mt-2" onclick="window.esvaziarCarrinho()">
                     <i class="bi bi-trash3 me-2"></i>ESVAZIAR CARRINHO
                 </button>
             </div>
@@ -1055,18 +1055,15 @@
         <form id="profileEditForm" class="profile-links-card">
             <div class="profile-links-avatar-wrap">
                 <img id="profilePreview" src="https://placehold.co/100" referrerpolicy="no-referrer">
-                <label for="profileAvatarUploadTrigger" class="profile-links-avatar-edit" title="Alterar foto">
+                <button type="button" class="profile-links-avatar-edit" onclick="abrirUploadExterno()" title="Alterar foto">
                     <i class="bi bi-camera-fill"></i>
-                </label>
+                </button>
             </div>
             <h5 id="profileLinksName" class="profile-links-name">Meu Perfil</h5>
             <span id="profileLinksTypeBadge" class="profile-links-badge">Cliente</span>
 
             <div class="profile-links-avatar-fields">
-                <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirUploadExterno()" id="profileAvatarUploadTrigger">
-                    <i class="bi bi-upload"></i> Subir foto no Imgur
-                </button>
-                <input type="url" class="form-control form-control-sm mt-2" id="editAvatarLink" placeholder="Ou cole o link da imagem aqui">
+                <input type="url" class="form-control form-control-sm" id="editAvatarLink" placeholder="Ou cole o link da imagem aqui">
             </div>
 
             <!-- Seção: Dados Pessoais -->
@@ -1165,13 +1162,13 @@
                 </div>
             </div>
 
-            <button type="submit" class="profile-link-action profile-link-action-primary">
+            <button type="submit" class="btn btn-ml-primary w-100 py-3 fw-bold">
                 <i class="bi bi-check-lg me-2"></i>SALVAR ALTERAÇÕES
             </button>
-            <button type="button" class="profile-link-action profile-link-action-warning" onclick="logout()">
+            <button type="button" class="btn btn-ml-secondary w-100 py-3 fw-bold mt-2" onclick="logout()">
                 <i class="bi bi-box-arrow-right me-2"></i>SAIR DA CONTA
             </button>
-            <button type="button" class="profile-link-action profile-link-action-danger" onclick="window.deleteAccount()">
+            <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.deleteAccount()">
                 <i class="bi bi-trash me-2"></i>EXCLUIR MINHA CONTA
             </button>
         </form>
