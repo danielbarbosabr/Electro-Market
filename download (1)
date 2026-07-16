@@ -1,0 +1,12 @@
+// Copie este arquivo para "config.local.js" (mesma pasta) e preencha com
+// os valores reais do seu Supabase, só pra rodar localmente com Live
+// Server ou outro servidor estático simples (que não roda a função
+// serverless de api/config.js).
+//
+// "config.local.js" já está no .gitignore — não precisa (e não deve) subir
+// pro GitHub. Em produção, quem fornece a config é a Vercel de verdade
+// (Environment Variables + api/config.js), não esse arquivo.
+window.CONFIG_LOCAL_FALLBACK = {
+    SUPABASE_URL: '',
+    SUPABASE_KEY: ''
+};
