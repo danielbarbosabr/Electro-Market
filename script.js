@@ -32,6 +32,7 @@ function formatPreco(valor, opts = {}) {
 
 const ORDER_STATUS_MAP = {
     'pending':         { text: 'Em Aprovação',             class: 'bg-warning text-dark' },
+    'offer_pending':   { text: 'Oferta Enviada',            class: 'bg-info text-dark' },
     'accepted':        { text: 'Aprovado (Chat Liberado)', class: 'bg-success' },
     'agreement':       { text: 'Combinando Entrega',       class: 'bg-info' },
     'shipping':        { text: 'Em Rota de Entrega',       class: 'bg-primary' },
@@ -81,7 +82,7 @@ async function createPersistentNotification(message, type = 'info', userId = nul
  */
 async function updateSellerPendingBadge(sellerId) {
     try {
-        const pending = await supabaseFetch(`orders?select=id&seller_id=eq.${sellerId}&status=eq.pending`);
+        const pending = await supabaseFetch(`orders?select=id,status&seller_id=eq.${sellerId}&status=in.(pending,offer_pending)`);
         const count = pending?.length || 0;
         document.querySelectorAll('#pendingBadgeNav, #pendingBadgeMobile, #pendingBadgeDock').forEach(el => {
             el.textContent = count > 9 ? '9+' : String(count);
@@ -161,6 +162,7 @@ async function loadPage(query = 'eletronicos', forceRefresh = false) {
     const hero = document.getElementById('heroSection');
 
     window.exitWaOrdersView();
+    hideAdminTopNavTabs();
     if (grid) grid.style.display = '';
 
     // Usa o cache já carregado para buscas/filtragens (evita ida à rede a cada letra digitada).
@@ -207,22 +209,38 @@ async function loadPage(query = 'eletronicos', forceRefresh = false) {
         }
 
         let products = allProductsCache;
+        let matchedStores = [];
         if (query !== 'eletronicos' && query !== '') {
             const term = query.toLowerCase();
             if (term === 'ofertas') {
                 products = products.filter(p => parseFloat(p.preco_original || 0) > parseFloat(p.preco || 0));
                 document.getElementById('gridTitle').textContent = 'Ofertas Imperdíveis';
             } else {
+                // Além de título/categoria, a busca também encontra lojas (vendedores) pelo
+                // nome — assim dá pra digitar o nome de uma loja e já ver os anúncios dela,
+                // igual Mercado Livre/Shopee.
                 products = products.filter(p =>
                     (p.titulo    || '').toLowerCase().includes(term) ||
-                    (p.categoria || '').toLowerCase().includes(term)
+                    (p.categoria || '').toLowerCase().includes(term) ||
+                    (p.loja      || '').toLowerCase().includes(term)
                 );
                 document.getElementById('gridTitle').textContent = `Resultados para "${query}"`;
+
+                // Identifica lojas cujo NOME bate com o termo buscado, pra mostrar um
+                // atalho de "loja encontrada" acima dos resultados de produto.
+                const storesMap = new Map(); // vendedor_id -> {loja, vendedor_id}
+                allProductsCache.forEach(p => {
+                    if (p.loja && p.vendedor_id && p.loja.toLowerCase().includes(term)) {
+                        storesMap.set(p.vendedor_id, { loja: p.loja, vendedor_id: p.vendedor_id });
+                    }
+                });
+                matchedStores = [...storesMap.values()];
             }
         } else {
             document.getElementById('gridTitle').textContent = 'Recomendados para você';
         }
 
+        renderStorefrontBanner(matchedStores);
         renderGrid(products);
         updateStoreFilterUI();
         updateCategoryFilterUI();
@@ -237,6 +255,83 @@ async function loadPage(query = 'eletronicos', forceRefresh = false) {
             </div>`;
     }
 }
+
+/** "Início" universal: pro admin, início é literalmente o painel administrativo — não existe
+ *  mais uma vitrine separada pra ele "voltar". Pra cliente/vendedor, início continua sendo a
+ *  vitrine normal de produtos. Use isso em vez de chamar loadPage('eletronicos') direto em
+ *  qualquer botão/link que signifique "voltar pro início". */
+/** Busca do admin: em vez de levar pra vitrine de cliente com produtos aleatórios,
+ *  filtra Publicações E Usuários juntos, dentro da aba única "Conteúdo", e mostra
+ *  o resultado ali (as duas tabelas são atualizadas ao mesmo tempo). */
+window.adminSearchProducts = async function(term) {
+    term = (term || '').trim();
+
+    // Painel ainda não está montado na tela (ex: admin estava em "Todos os Produtos"
+    // ou noutra tela) — carrega o painel primeiro e reaplica a busca quando terminar.
+    if (!document.querySelector('.admin-dash')) {
+        window._pendingAdminSearch = term;
+        await window.renderAdminPanel();
+        return;
+    }
+
+    const allProds = window._adminProductsCache || [];
+    const allUsers = window._adminUsersCache || [];
+    const t = term.toLowerCase();
+
+    const filteredProds = term
+        ? allProds.filter(p =>
+            (p.titulo    || '').toLowerCase().includes(t) ||
+            (p.loja      || '').toLowerCase().includes(t) ||
+            (p.categoria || '').toLowerCase().includes(t))
+        : allProds;
+
+    const filteredUsers = term
+        ? allUsers.filter(u =>
+            (u.nome  || '').toLowerCase().includes(t) ||
+            (u.email || '').toLowerCase().includes(t))
+        : allUsers;
+
+    const currentUser = getSavedUser();
+    const prodsBody = document.getElementById('adminProdsTableBody');
+    if (prodsBody) prodsBody.innerHTML = buildAdminProductsRows(filteredProds);
+    const usersBody = document.getElementById('adminUsersTableBody');
+    if (usersBody) usersBody.innerHTML = buildAdminUsersRows(filteredUsers, currentUser?.id);
+
+    const prodsCount = document.getElementById('adminContentProdsCount');
+    if (prodsCount) prodsCount.textContent = filteredProds.length;
+    const usersCount = document.getElementById('adminContentUsersCount');
+    if (usersCount) usersCount.textContent = filteredUsers.length;
+
+    const navBtn = document.querySelector('.admin-nav-link[data-tab="admin-content"]');
+    if (navBtn) window.switchAdminTab(navBtn);
+    window.updateMobileNavActive('admin-content');
+
+    const titleEl = document.getElementById('adminPanelTitle');
+    if (titleEl) titleEl.textContent = term ? `Conteúdo — resultados para "${term}"` : 'Conteúdo';
+};
+
+window.goHome = function() {
+    const user = getEffectiveUser();
+    if (user?.tipo === 'ADMIN') {
+        window.renderAdminPanel();
+    } else {
+        loadPage('eletronicos');
+    }
+};
+
+/** Navega direto pra uma aba do painel admin a partir do dock mobile (barra de baixo).
+ *  Se o painel ainda não estiver montado na tela, renderiza ele já abrindo na aba pedida;
+ *  se já estiver montado, só troca de aba sem recarregar tudo de novo. */
+window.goToAdminTab = function(tabId) {
+    window._adminActiveTab = tabId;
+    const navBtn = document.querySelector(`.admin-nav-link[data-tab="${tabId}"]`);
+    if (document.querySelector('.admin-dash') && navBtn) {
+        window.switchAdminTab(navBtn);
+    } else {
+        window.renderAdminPanel();
+    }
+    window.updateMobileNavActive(tabId);
+};
 
 // ============================================
 // PRESENÇA ONLINE/OFFLINE
@@ -455,6 +550,108 @@ function updateCategoryFilterUI() {
     if ([...catMap.values()].includes(current)) select.value = current;
 }
 
+/**
+ * Mostra um pequeno "cartão de loja encontrada" acima dos resultados de busca
+ * quando o termo digitado bate com o nome de um ou mais vendedores — igual ao
+ * atalho de loja que aparece na busca do Mercado Livre/Shopee.
+ */
+function renderStorefrontBanner(stores) {
+    const container = document.getElementById('storefrontBanner');
+    if (!container) return;
+    if (!stores || stores.length === 0) { container.innerHTML = ''; return; }
+
+    container.innerHTML = stores.map(s => `
+        <div class="storefront-banner" onclick="window.showSellerProfile('${s.vendedor_id}', '${(s.loja||'').replace(/'/g,"\\'")}')">
+            <div class="storefront-banner-icon"><i class="bi bi-shop"></i></div>
+            <div class="storefront-banner-info">
+                <strong>${s.loja}</strong>
+                <small>Ver todos os anúncios desta loja</small>
+            </div>
+            <i class="bi bi-chevron-right storefront-banner-arrow"></i>
+        </div>
+    `).join('');
+}
+
+/**
+ * Página (tela cheia, mesmo padrão da página de detalhes do produto) com o
+ * perfil público de um vendedor: nome, reputação e todos os anúncios ativos
+ * dele — como a página de loja do Mercado Livre/Shopee.
+ */
+window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+
+    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    grid.className = 'seller-profile-active';
+    grid.style.display = 'block';
+    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border" style="color:var(--market-color);"></div><p class="mt-2">Carregando loja...</p></div>';
+
+    try {
+        const [sellerData, products] = await Promise.all([
+            supabaseFetch(`users?select=nome,avatar,cidade,estado,vendedor_rating,rating_count,created_at&id=eq.${sellerId}&limit=1`),
+            supabaseFetch(`products?select=*&vendedor_id=eq.${sellerId}&order=created_at.desc`)
+        ]);
+        const seller = sellerData?.[0] || {};
+        const nome = seller.nome || sellerNameFallback || 'Loja';
+        const ratingAvg   = parseFloat(seller.vendedor_rating) || 0;
+        const ratingCount = parseInt(seller.rating_count) || 0;
+        const localizacao = [seller.cidade, seller.estado].filter(Boolean).join(' - ');
+        const membroDesde = seller.created_at ? new Date(seller.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '';
+
+        grid.innerHTML = `
+            <div class="seller-profile-page">
+                <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </button>
+
+                <div class="seller-profile-hero">
+                    <img src="${seller.avatar?.startsWith('http') ? seller.avatar : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(nome)}" class="seller-profile-avatar" referrerpolicy="no-referrer">
+                    <div class="seller-profile-info">
+                        <h4 class="fw-bold mb-1">${nome}</h4>
+                        <div class="mb-1">
+                            ${ratingCount > 0
+                                ? `<span class="fw-bold">${ratingAvg.toFixed(1)}</span> <i class="bi bi-star-fill text-warning"></i> <span class="text-muted small">(${ratingCount} avaliaç${ratingCount === 1 ? 'ão' : 'ões'})</span>`
+                                : `<span class="text-muted small">Ainda sem avaliações</span>`}
+                        </div>
+                        <small class="text-muted d-block">${localizacao ? `<i class="bi bi-geo-alt me-1"></i>${localizacao}` : ''}</small>
+                        ${membroDesde ? `<small class="text-muted d-block"><i class="bi bi-calendar3 me-1"></i>No ElectroMarket desde ${membroDesde}</small>` : ''}
+                        <small class="text-muted d-block"><i class="bi bi-box-seam me-1"></i>${products.length} anúncio${products.length === 1 ? '' : 's'} ativo${products.length === 1 ? '' : 's'}</small>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold mt-4 mb-3">Anúncios desta loja</h6>
+                <div class="products-grid-uniform" id="sellerProfileProductsGrid"></div>
+            </div>`;
+
+        const sellerGrid = document.getElementById('sellerProfileProductsGrid');
+        if (products.length === 0) {
+            sellerGrid.innerHTML = '<p class="text-muted text-center py-4 w-100">Esta loja ainda não tem anúncios ativos.</p>';
+        } else {
+            sellerGrid.innerHTML = products.map(p => renderCard(p)).join('');
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+        console.error(e);
+        grid.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar o perfil da loja.</div>';
+    }
+};
+
 /** Remove acentos e normaliza caixa, para comparar nomes de cidade sem erro de digitação/acentuação */
 function normalizeStr(s) {
     return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -667,6 +864,11 @@ window.showDetail = async function(pid) {
 
     const user    = getSavedUser();
     const isOwner = user && (item.vendedor_id == user.id);
+    // Admin olhando o anúncio de outra pessoa: não faz sentido oferecer "comprar"
+    // pra quem administra a plataforma — no lugar disso, ação rápida de excluir.
+    // Enquanto uma simulação de Cliente/Vendedor estiver ativa, o admin vê a
+    // tela normal de compra, como parte da própria simulação.
+    const isAdminViewing = user && getEffectiveUser()?.tipo === 'ADMIN' && !isOwner;
 
     // Histórico
     accessHistory = accessHistory.filter(id => id != pid);
@@ -836,15 +1038,22 @@ window.showDetail = async function(pid) {
                             : 'Ainda sem avaliações'}</small>
                     </div>
 
-                    <p class="mb-1"><strong>Vendedor:</strong> ${item.loja || 'Não informado'}</p>
+                    <p class="mb-1"><strong>Vendedor:</strong> <a href="#" class="fw-bold text-decoration-none" style="color:var(--primary-blue);" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">${item.loja || 'Não informado'}</a> <i class="bi bi-shop text-muted"></i></p>
                     <p class="mb-3"><strong>Estoque:</strong> ${item.quantidade || 1} ${item.quantidade === 1 ? 'unidade' : 'unidades'}</p>
 
                     ${isOwner ? `
-                        <button class="btn btn-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
+                        <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
                             <i class="bi bi-pencil me-2"></i>Editar Anúncio
                         </button>
-                        <button class="btn btn-danger w-100" onclick="window.deleteProduct('${item.id}')">
+                        <button class="btn btn-ml-danger w-100" onclick="window.deleteProduct('${item.id}')">
                             <i class="bi bi-trash me-2"></i>Excluir Anúncio
+                        </button>
+                    ` : isAdminViewing ? `
+                        <button class="btn btn-ml-secondary btn-lg w-100 mb-2" onclick="window.adminEditProduct('${item.id}')">
+                            <i class="bi bi-pencil me-2"></i>Editar Anúncio (Admin)
+                        </button>
+                        <button class="btn btn-ml-danger w-100" onclick="window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')">
+                            <i class="bi bi-trash me-2"></i>Excluir Produto (Admin)
                         </button>
                     ` : `
                         <div class="ml-qty-picker mb-3" id="mlQtyPicker">
@@ -861,6 +1070,10 @@ window.showDetail = async function(pid) {
                         <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true, qty:window._detailQty || 1});window.buyItem(cart.length-1);">
                             <i class="bi bi-lightning me-2"></i>Solicitar Compra
                         </button>
+                        ${item.preco > 0 ? `
+                        <button class="btn btn-ml-outline w-100 mb-2" onclick="window.openOfferModal('${pid}')">
+                            <i class="bi bi-tag me-2"></i>Fazer Oferta
+                        </button>` : ''}
                         <button class="btn btn-ml-secondary w-100 mb-2" onclick="window.addToCart('${pid}', {qty:window._detailQty || 1});">
                             <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
                         </button>
@@ -913,18 +1126,87 @@ function getSavedUser() {
     catch { return null; }
 }
 
+// ============================================
+// SIMULAÇÃO DE PAPEL (só para Administradores)
+// ============================================
+// Como não existe cadastro de conta Administrador pelo site (é sempre uma
+// conta "de verdade" configurada por fora), o admin não tem como ver a
+// plataforma como Cliente ou Vendedor sem sair da própria conta. A simulação
+// resolve isso: guarda só localmente (localStorage) qual papel o admin quer
+// "ver como" no momento — NUNCA grava isso no banco, e o id da conta continua
+// sendo o mesmo o tempo todo. É só trocar de volta pra "Administrador" (ou
+// deslogar) pra sair da simulação a qualquer momento.
+
+function getSimulatedRole() {
+    try { return localStorage.getItem('electroSimRole') || null; } catch { return null; }
+}
+
+/** Ativa/desativa a simulação. `role` deve ser 'CLIENTE', 'VENDEDOR' ou null (desativa). */
+window.setAdminSimulation = function(role) {
+    const real = getSavedUser();
+    if (!real || real.tipo !== 'ADMIN') return; // só administradores de verdade podem simular
+    try {
+        if (role) localStorage.setItem('electroSimRole', role);
+        else localStorage.removeItem('electroSimRole');
+    } catch (e) {}
+    const label = role === 'VENDEDOR' ? 'Vendedor' : (role === 'CLIENTE' ? 'Cliente' : 'Administrador');
+    showToast(role ? `Agora você está vendo a plataforma como ${label}.` : 'Voltando ao modo Administrador normal.', 'info');
+    updateUI();
+    window.renderSimulationBanner();
+    window.goHome();
+};
+
+/** Usuário "efetivo" pra fins de exibição/navegação (menus, home, badges).
+ *  Se o real for Administrador e houver uma simulação ativa, devolve uma
+ *  cópia com o tipo trocado — mesmo id, mesmo nome, mesma conta; só o papel
+ *  exibido muda. Ações realmente privilegiadas (painel admin, apagar
+ *  conta/produto de terceiro etc.) continuam checando o tipo REAL
+ *  (getSavedUser()), não este. */
+function getEffectiveUser() {
+    const user = getSavedUser();
+    if (!user || user.tipo !== 'ADMIN') return user;
+    const sim = getSimulatedRole();
+    if (!sim) return user;
+    return { ...user, tipo: sim };
+}
+
+/** Mostra (ou esconde) a faixa fixa "Simulando: Cliente/Vendedor — Voltar ao Admin",
+ *  visível em qualquer tela enquanto a simulação estiver ativa, já que o menu de
+ *  administrador some da navegação nesse modo. */
+window.renderSimulationBanner = function() {
+    const real = getSavedUser();
+    const sim  = real?.tipo === 'ADMIN' ? getSimulatedRole() : null;
+    let bar = document.getElementById('adminSimBanner');
+    if (!sim) { bar?.remove(); return; }
+
+    const label = sim === 'VENDEDOR' ? 'Vendedor' : 'Cliente';
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'adminSimBanner';
+        document.body.prepend(bar);
+    }
+    bar.innerHTML = `
+        <i class="bi bi-eye-fill"></i>
+        <span>Simulando: <strong>${label}</strong></span>
+        <button type="button" onclick="window.setAdminSimulation(null)">
+            <i class="bi bi-shield-lock-fill me-1"></i>Voltar ao Admin
+        </button>`;
+};
+
 function updateUI() {
     const user   = getSavedUser();
     const logged = !!user;
-    const role   = user?.tipo || 'CLIENTE';
+    const effUser = getEffectiveUser();
+    const role   = effUser?.tipo || 'CLIENTE';
 
     document.querySelectorAll('.role-guest').forEach(el     => el.classList.toggle('d-none', logged));
     document.querySelectorAll('.role-logged-in').forEach(el => el.classList.toggle('d-none', !logged));
-    document.querySelectorAll('.role-client').forEach(el    => el.classList.toggle('d-none', role === 'VENDEDOR'));
-    document.querySelectorAll('.role-seller').forEach(el    => el.classList.toggle('d-none', role !== 'VENDEDOR' && role !== 'ADMIN'));
+    document.querySelectorAll('.role-client').forEach(el    => el.classList.toggle('d-none', role === 'VENDEDOR' || role === 'ADMIN'));
+    document.querySelectorAll('.role-seller').forEach(el    => el.classList.toggle('d-none', role !== 'VENDEDOR'));
     document.querySelectorAll('.role-admin').forEach(el     => el.classList.toggle('d-none', role !== 'ADMIN'));
+    window.renderSimulationBanner();
 
-    if (role === 'VENDEDOR' || role === 'ADMIN') {
+    if (role === 'VENDEDOR') {
         updateSellerPendingBadge(user.id);
     }
 
@@ -1323,6 +1605,121 @@ window.buyItem = async function(i) {
 };
 
 // ============================================
+// FAZER OFERTA (estilo eBay: comprador propõe um
+// valor ao vendedor, que aparece em "Solicitações
+// Pendentes" pra ser aceito ou recusado)
+// ============================================
+
+/** Abre o modal de oferta já preenchido com os dados do produto */
+window.openOfferModal = function(pid) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login para enviar uma oferta!', 'warning'); return; }
+
+    const item = allProductsCache.find(x => x.id == pid || x.id === pid);
+    if (!item) { showToast('Produto não encontrado.', 'error'); return; }
+    if (user.id === item.vendedor_id) { showToast('Você não pode fazer uma oferta no seu próprio anúncio.', 'warning'); return; }
+
+    const preco = parseFloat(item.preco) || 0;
+    document.getElementById('offerForm').dataset.pid = pid;
+    document.getElementById('offerProductTitle').textContent = item.titulo;
+    document.getElementById('offerProductImg').src = safeParseImages(item.img)[0] || 'https://placehold.co/60';
+    document.getElementById('offerProductPrice').innerHTML = `Preço anunciado: <strong>${formatPreco(preco)}</strong>`;
+    document.getElementById('offerAmount').value = '';
+    document.getElementById('offerAmount').max = preco > 0 ? preco - 0.01 : '';
+    document.getElementById('offerQty').value = 1;
+    document.getElementById('offerQty').max = Math.max(1, item.quantidade || 1);
+
+    new bootstrap.Modal(document.getElementById('makeOfferModal')).show();
+};
+
+/** Envia a oferta como um pedido com status especial (offer_pending), reaproveitando
+ *  toda a estrutura de pedidos/chat já existente — o vendedor decide em "Solicitações
+ *  Pendentes", igual ao fluxo de aceitar/recusar uma compra normal. */
+window.submitOffer = async function(event) {
+    event.preventDefault();
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login para enviar uma oferta!', 'warning'); return; }
+
+    const form = document.getElementById('offerForm');
+    const pid  = form.dataset.pid;
+    const item = allProductsCache.find(x => x.id == pid || x.id === pid);
+    if (!item) { showToast('Produto não encontrado.', 'error'); return; }
+
+    const preco      = parseFloat(item.preco) || 0;
+    const offerValue = parseFloat(document.getElementById('offerAmount').value);
+    const qty        = parseInt(document.getElementById('offerQty').value) || 1;
+
+    if (!offerValue || offerValue <= 0) { showToast('Informe um valor de oferta válido.', 'warning'); return; }
+    if (preco > 0 && offerValue >= preco) {
+        showToast('A oferta deve ser menor que o preço anunciado. Pra pagar o valor cheio, use "Solicitar Compra".', 'warning');
+        return;
+    }
+
+    const btn          = form.querySelector('button[type="submit"]');
+    const originalText = btn?.textContent || 'Enviar Oferta';
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+
+    try {
+        const orderId = `ord_${Date.now()}`;
+        const imgs = safeParseImages(item.img);
+        const order = {
+            id:                   orderId,
+            seller_id:            item.vendedor_id || 'system',
+            seller_name:          item.loja || 'Vendedor',
+            buyer_id:             user.id,
+            buyer_name:           user.nome,
+            product_id:           item.id,
+            product_title:        item.titulo,
+            product_img:          (imgs.length > 0 ? imgs[0] : ''),
+            total:                offerValue * qty,
+            quantity:             qty,
+            status:               'offer_pending',
+            offer_amount:         offerValue,
+            offer_original_price: preco,
+            realiza_entrega:      !!(item.realiza_entrega ?? item.realizaEntrega ?? true),
+            agree_buyer:          false,
+            agree_seller:         false,
+            created_at:           new Date().toISOString(),
+            updated_at:           new Date().toISOString()
+        };
+
+        await supabaseFetch('orders', { method: 'POST', body: JSON.stringify(order) });
+
+        await supabaseFetch('chats', {
+            method: 'POST',
+            body: JSON.stringify({
+                id:           `chat_${Date.now()}`,
+                order_id:     orderId,
+                seller_id:    order.seller_id,
+                seller_name:  order.seller_name,
+                buyer_id:     order.buyer_id,
+                buyer_name:   order.buyer_name,
+                participants: [order.seller_id, order.buyer_id],
+                logistics_agreed: false,
+                messages: [{
+                    senderId:  'system',
+                    text:      `Oferta enviada para "${item.titulo}"!\nValor oferecido: ${formatPreco(offerValue, {htmlGratis:false})} (preço anunciado: ${formatPreco(preco, {htmlGratis:false})})\nAguardando resposta do vendedor...`,
+                    timestamp: new Date().toISOString()
+                }]
+            })
+        });
+
+        ordersCache.push(order);
+        bootstrap.Modal.getInstance(document.getElementById('makeOfferModal'))?.hide();
+
+        createPersistentNotification(`Oferta enviada para "${item.titulo}"!`, 'success');
+        showToast('Oferta enviada ao vendedor!', 'success');
+        window.renderOrderManagement('buyer');
+
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao enviar oferta: ' + (err.message || 'Tente novamente.'), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalText; }
+    }
+};
+
+// ============================================
 // TEMA (função global para o switch mobile)
 // ============================================
 
@@ -1344,11 +1741,28 @@ window.toggleTema = function() {
 // INICIALIZAÇÃO
 // ============================================
 
+/**
+ * Mede a altura real do header (que muda de tamanho conforme a tela/estado)
+ * e guarda numa CSS var — usada pra encaixar a sidebar fixa do Painel Admin
+ * exatamente embaixo do header, em qualquer resolução.
+ */
+function syncHeaderHeightVar() {
+    const header = document.querySelector('.header-main');
+    if (header) {
+        document.documentElement.style.setProperty('--header-height', `${header.offsetHeight}px`);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Aplicar tema salvo
     if (localStorage.getItem('modoEscuro') === 'true') {
         document.body.classList.add('dark-theme');
     }
+
+    syncHeaderHeightVar();
+    window.addEventListener('resize', syncHeaderHeightVar);
+    // O header pode mudar de altura ao logar/deslogar (linha extra de endereço, etc.)
+    new ResizeObserver(syncHeaderHeightVar).observe(document.querySelector('.header-main'));
 
     populateFilterEstados();
     populateEstadoSelect('v2CadUF');
@@ -1397,7 +1811,14 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = 'Publicando...';
                 
             const now = new Date().toISOString();
-            const editingId = e.target.dataset.editingId;
+            const editingId  = e.target.dataset.editingId;
+            const isAdminEdit = e.target.dataset.adminEdit === 'true';
+            // Quando é o admin editando o anúncio de outra pessoa, o produto pode não
+            // estar no cache normal da grade (que é escopado à categoria/busca atual),
+            // então também procura no cache carregado pelo painel administrativo.
+            const produtoOriginal = editingId
+                ? (allProductsCache.find(p => p.id === editingId) || window._adminProductsCache?.find(p => p.id === editingId))
+                : null;
 
             let imgsArray = [];
             for (let n = 1; n <= 3; n++) {
@@ -1411,7 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (imgsArray.length === 0 && editingId) {
-                imgsArray = safeParseImages(allProductsCache.find(p => p.id === editingId)?.img);
+                imgsArray = safeParseImages(produtoOriginal?.img);
             }
 
             // OFERTA AUTOMÁTICA (estilo Mercado Livre): se o vendedor está editando
@@ -1420,8 +1841,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // preço "de" automaticamente — o anúncio já nasce como oferta, sem o
             // vendedor precisar digitar nada a mais.
             if (editingId && precoOriginal === null) {
-                const anuncioAnterior = allProductsCache.find(p => p.id === editingId);
-                const precoAnterior = anuncioAnterior ? parseFloat(anuncioAnterior.preco) : null;
+                const precoAnterior = produtoOriginal ? parseFloat(produtoOriginal.preco) : null;
                 if (precoAnterior && preco < precoAnterior) {
                     precoOriginal = precoAnterior;
                 }
@@ -1435,11 +1855,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 quantidade:   quantidade, // Usar o valor validado
                 categoria:    document.getElementById('prodCategory').value, // Usar o valor validado
                 img:          JSON.stringify(imgsArray),
-                loja:         user.nome,
-                vendedor_id:  user.id,
-                // Localização do anúncio = cidade cadastrada do vendedor (evita ficar "Não informada"
-                // e permite que o filtro de Estado/Cidade/CEP encontre o produto corretamente).
-                cidade:       user.cidade || '',
+                // Se for o admin editando o anúncio de outra pessoa, mantém o vendedor
+                // e a cidade originais — não deve "roubar" o anúncio pro admin.
+                loja:         isAdminEdit ? (produtoOriginal?.loja || user.nome)       : user.nome,
+                vendedor_id:  isAdminEdit ? (produtoOriginal?.vendedor_id || user.id)  : user.id,
+                cidade:       isAdminEdit ? (produtoOriginal?.cidade || '')            : (user.cidade || ''),
                 // Padronizando para minúsculo para bater com o Postgres/Supabase
                 realizaentrega: document.getElementById('prodDelivery')?.checked ?? true,
                 updated_at:   now
@@ -1454,9 +1874,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             bootstrap.Modal.getInstance(document.getElementById('announceModal'))?.hide();
-            await loadPage(undefined, true);
-            createPersistentNotification(editingId ? 'Seu anúncio foi atualizado.' : 'Novo anúncio publicado com sucesso!', 'success');
             e.target.reset();
+            if (isAdminEdit) {
+                delete e.target.dataset.adminEdit;
+                createPersistentNotification('Anúncio atualizado pelo administrador.', 'success');
+                window.renderAdminPanel();
+            } else {
+                await loadPage(undefined, true);
+                createPersistentNotification(editingId ? 'Seu anúncio foi atualizado.' : 'Novo anúncio publicado com sucesso!', 'success');
+            }
         } catch (err) {
             console.error(err);
             // Mostra o erro real retornado pelo banco (ex: coluna faltando ou tipo errado)
@@ -1469,6 +1895,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Perfil
+    document.getElementById('supportRequestModal')?.addEventListener('hidden.bs.modal', () => {
+        stopSupportChatPolling();
+    });
+
     document.getElementById('profileEditForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = getSavedUser();
@@ -1488,7 +1918,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bairro  = document.getElementById('editBairro').value.trim();
         const enderecoCompleto = [rua, numero].filter(Boolean).join(', ') + (bairro ? ` - ${bairro}` : '');
 
-        const novoTipo = document.getElementById('editTipo')?.value || user.tipo;
+        const novoTipo = user.tipo === 'ADMIN' ? 'ADMIN' : (document.getElementById('editTipo')?.value || user.tipo);
 
         // Rebaixar de Vendedor pra Cliente apaga tudo que ele publicou (produtos,
         // pedidos como vendedor e as conversas ligadas a eles) — ação destrutiva,
@@ -1538,7 +1968,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Se o tipo de conta mudou, recarrega a página pra garantir que todo o
         // menu/navegação (que depende do papel do usuário) se ajuste corretamente.
         if (novoTipo !== user.tipo) {
-            showToast(`Sua conta agora é do tipo ${novoTipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente'}.`, 'success');
+            const tipoLabel = novoTipo === 'VENDEDOR' ? 'Vendedor' : (novoTipo === 'ADMIN' ? 'Administrador (simulação)' : 'Cliente');
+            showToast(`Sua conta agora é do tipo ${tipoLabel}.`, 'success');
             setTimeout(() => location.reload(), 900);
         }
     });
@@ -1548,12 +1979,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('searchInput');
     const btnSearch   = document.getElementById('btnSearch');
 
+    // Ponto único da busca do topo: admin nunca deve cair na vitrine de cliente vendo
+    // produtos sem relação nenhuma — pra ele, buscar filtra as Publicações do próprio painel.
+    function performTopSearch(term) {
+        const user = getEffectiveUser();
+        if (user?.tipo === 'ADMIN') {
+            window.adminSearchProducts(term);
+        } else {
+            loadPage(term || 'eletronicos');
+        }
+    }
+
     btnSearch?.addEventListener('click', () => {
-        loadPage(searchInput?.value?.trim() || 'eletronicos');
+        performTopSearch(searchInput?.value?.trim());
     });
 
     searchInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') loadPage(e.target.value.trim() || 'eletronicos');
+        if (e.key === 'Enter') performTopSearch(e.target.value.trim());
     });
 
     // Busca ao digitar (debounce 500ms)
@@ -1561,9 +2003,9 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(searchTimeout);
         const val = e.target.value.trim();
         if (val.length >= 3) {
-            searchTimeout = setTimeout(() => loadPage(val), 500);
+            searchTimeout = setTimeout(() => performTopSearch(val), 500);
         } else if (val.length === 0) {
-            loadPage('eletronicos');
+            performTopSearch('');
         }
     });
 
@@ -1584,9 +2026,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCart();
     window.setupAutoComplete();
 
-    const user = getSavedUser();
+    const user = getEffectiveUser();
     if (user?.tipo === 'VENDEDOR') {
         window.renderSellerPanel();
+    } else if (user?.tipo === 'ADMIN') {
+        window.renderAdminPanel();
     } else {
         loadPage();
     }
@@ -1862,7 +2306,12 @@ window.showProfileEdit = () => {
     document.getElementById('editEstado').value   = user.estado   || '';
     document.getElementById('editPagamento').value = user.pagamento || 'pix';
     const tipoSelect = document.getElementById('editTipo');
-    if (tipoSelect) tipoSelect.value = (user.tipo === 'VENDEDOR') ? 'VENDEDOR' : 'CLIENTE';
+    if (tipoSelect) tipoSelect.value = user.tipo === 'VENDEDOR' ? 'VENDEDOR' : 'CLIENTE';
+    // Administrador de verdade não troca o próprio tipo por aqui (isso mudaria
+    // o registro no banco); ele usa a Simulação de Papel no Painel Admin, que
+    // não altera nada — só muda o que aparece na tela.
+    document.getElementById('editTipoWrap')?.classList.toggle('d-none', user.tipo === 'ADMIN');
+    document.getElementById('editTipoAdminNote')?.classList.toggle('d-none', user.tipo !== 'ADMIN');
 
     const linkInput = document.getElementById('editAvatarLink');
     if (linkInput) {
@@ -1876,7 +2325,8 @@ window.showProfileEdit = () => {
     }
 
     document.getElementById('profileLinksName').textContent = user.nome || 'Meu Perfil';
-    document.getElementById('profileLinksTypeBadge').textContent = (user.tipo === 'VENDEDOR') ? 'Vendedor' : 'Cliente';
+    document.getElementById('profileLinksTypeBadge').textContent =
+        user.tipo === 'ADMIN' ? 'Administrador' : (user.tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
     document.getElementById('profileEditScreen').classList.remove('d-none');
     document.body.style.overflow = 'hidden';
 };
@@ -2032,7 +2482,9 @@ window.mlCadPrevStep = function() {
 
 window.forgotPassword = function(event) {
   event?.preventDefault();
-  window.open('https://github.com/danielbarbosabr', '_blank', 'noopener');
+  // Abre um chamado de suporte de recuperação de senha — cai direto na aba
+  // "Suporte" do administrador, que passa a acompanhar e resolver o caso.
+  window.openSupportRequestModal('esqueci_senha');
 };
 
 window.hideAuthScreen = function() {
@@ -2361,7 +2813,7 @@ async function renderOrdersListSilently(type) {
         const previousSignature = JSON.stringify(ordersCache.map(o => `${o.id}:${o.status}:${o.agree_buyer}:${o.agree_seller}`));
         ordersCache = orders;
 
-        orders = orders.filter(o => o.status !== 'pending' || type === 'buyer');
+        orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
         orders = orders.slice().sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
 
         const newSignature = JSON.stringify(orders.map(o => `${o.id}:${o.status}:${o.agree_buyer}:${o.agree_seller}`));
@@ -2371,13 +2823,13 @@ async function renderOrdersListSilently(type) {
 
         waList.innerHTML = orders.map(order => {
             const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
-            const isPending = order.status === 'pending';
+            const isPending = order.status === 'pending' || order.status === 'offer_pending';
             const isBuyer   = user.id === order.buyer_id;
             const partnerName = isBuyer ? order.seller_name : order.buyer_name;
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
-                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">Cancelar Pedido</button>`;
+                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">${order.status === 'offer_pending' ? 'Cancelar Oferta' : 'Cancelar Pedido'}</button>`;
             } else if (order.status === 'cancelled' || order.status === 'finished') {
                 actionsHtml = `<button class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash me-1"></i>Remover</button>`;
             }
@@ -2387,7 +2839,7 @@ async function renderOrdersListSilently(type) {
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
-                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${formatPreco(order.total, {htmlGratis:false})}</div>
+                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
                     ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
                 <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
@@ -2440,8 +2892,8 @@ window.renderOrderManagement = async function(type = 'buyer') {
         let orders = await supabaseFetch(path);
         ordersCache = orders;
 
-        // Aqui só entram pedidos já aceitos (a tela de chat não faz sentido pra pendentes)
-        orders = orders.filter(o => o.status !== 'pending' || type === 'buyer');
+        // Aqui só entram pedidos já aceitos (a tela de chat não faz sentido pra pendentes/ofertas)
+        orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
 
         // Mais recentes primeiro, como numa lista de conversas de verdade
         orders = orders.slice().sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
@@ -2458,13 +2910,13 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
         waList.innerHTML = orders.map(order => {
             const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
-            const isPending = order.status === 'pending';
+            const isPending = order.status === 'pending' || order.status === 'offer_pending';
             const isBuyer   = user.id === order.buyer_id;
             const partnerName = isBuyer ? order.seller_name : order.buyer_name;
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
-                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">Cancelar Pedido</button>`;
+                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">${order.status === 'offer_pending' ? 'Cancelar Oferta' : 'Cancelar Pedido'}</button>`;
             } else if (order.status === 'cancelled' || order.status === 'finished') {
                 actionsHtml = `<button class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash me-1"></i>Remover</button>`;
             }
@@ -2474,7 +2926,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
-                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${formatPreco(order.total, {htmlGratis:false})}</div>
+                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
                     ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
                 <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
@@ -2511,7 +2963,7 @@ window.renderSellerRequests = async function() {
     try {
         let orders = await supabaseFetch(`orders?select=*&seller_id=eq.${user.id}`);
         ordersCache = orders;
-        orders = orders.filter(o => o.status === 'pending');
+        orders = orders.filter(o => o.status === 'pending' || o.status === 'offer_pending');
 
         if (!orders.length) {
             grid.innerHTML = `<div class="col-12 text-center py-5"><i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i><h5>Nenhuma solicitação pendente.</h5></div>`;
@@ -2528,15 +2980,23 @@ window.renderSellerRequests = async function() {
 
         grid.innerHTML = orders.map(order => {
             const buyer = buyerMap[order.buyer_id] || {};
+            const isOffer = order.status === 'offer_pending';
             return `
             <div class="col-12 col-lg-6">
-                <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius:14px;${isOffer ? 'border:1.5px solid #3483fa !important;' : ''}">
+                    ${isOffer ? `<span class="badge bg-primary align-self-start mb-2" style="font-size:0.68rem;"><i class="bi bi-tag-fill me-1"></i>OFERTA DO CLIENTE</span>` : ''}
                     <div class="d-flex gap-3">
                         <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/70'"
                              style="width:70px;height:70px;object-fit:cover;border-radius:10px;flex-shrink:0;">
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-1">${order.product_title || 'Produto'}</h6>
-                            <p class="mb-1 text-success fw-bold">${formatPreco(order.total, {htmlGratis:false})} <small class="text-muted fw-normal">(${order.quantity} un.)</small></p>
+                            ${isOffer ? `
+                                <p class="mb-1"><span class="text-muted text-decoration-line-through small">${formatPreco(order.offer_original_price, {htmlGratis:false})}</span>
+                                    <span class="fw-bold text-primary ms-1">${formatPreco(order.offer_amount, {htmlGratis:false})}</span>
+                                    <small class="text-muted fw-normal">(${order.quantity} un. · oferta)</small></p>
+                            ` : `
+                                <p class="mb-1 text-success fw-bold">${formatPreco(order.total, {htmlGratis:false})} <small class="text-muted fw-normal">(${order.quantity} un.)</small></p>
+                            `}
                             <p class="mb-0 small text-muted">ID: #${order.id.slice(-8).toUpperCase()}</p>
                         </div>
                     </div>
@@ -2546,10 +3006,10 @@ window.renderSellerRequests = async function() {
                     ${buyer.endereco ? `<p class="small mb-2"><i class="bi bi-geo-alt-fill me-2 text-muted"></i>${buyer.endereco}${buyer.cep ? `, CEP ${buyer.cep}` : ''} — ${buyer.cidade || ''}/${buyer.estado || ''}</p>` : `<p class="small mb-2 text-muted"><i class="bi bi-geo-alt-fill me-2"></i>Endereço não informado</p>`}
                     <div class="d-flex gap-2 mt-2">
                         <button class="btn btn-success fw-bold flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
-                            <i class="bi bi-check-lg me-1"></i>Aceitar
+                            <i class="bi bi-check-lg me-1"></i>${isOffer ? 'Aceitar Oferta' : 'Aceitar'}
                         </button>
                         <button class="btn btn-outline-danger flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
-                            Recusar
+                            ${isOffer ? 'Recusar Oferta' : 'Recusar'}
                         </button>
                     </div>
                 </div>
@@ -2596,7 +3056,8 @@ window.updateOrderStatus = async function(orderId, newStatus) {
             method: 'PATCH',
             body: JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() })
         });
-        showToast(`Pedido ${newStatus === 'accepted' ? 'aceito' : 'recusado'}!`, newStatus === 'accepted' ? 'success' : 'info');
+        const isOffer = order?.status === 'offer_pending';
+        showToast(`${isOffer ? 'Oferta' : 'Pedido'} ${newStatus === 'accepted' ? 'aceita' : 'recusada'}!`, newStatus === 'accepted' ? 'success' : 'info');
 
         // CORREÇÃO: antes o comprador nunca era avisado que o pedido tinha sido
         // aceito/recusado — só descobriria se, por conta própria, saísse da tela
@@ -2604,8 +3065,12 @@ window.updateOrderStatus = async function(orderId, newStatus) {
         // notificação (sino) assim que o vendedor decide.
         if (order?.buyer_id) {
             const msg = newStatus === 'accepted'
-                ? `Sua proposta para "${order.product_title || 'produto'}" foi aceita! Você já pode conversar com o vendedor.`
-                : `Sua proposta para "${order.product_title || 'produto'}" foi recusada pelo vendedor.`;
+                ? (isOffer
+                    ? `Sua oferta de ${formatPreco(order.offer_amount, {htmlGratis:false})} para "${order.product_title || 'produto'}" foi aceita! Você já pode conversar com o vendedor.`
+                    : `Sua proposta para "${order.product_title || 'produto'}" foi aceita! Você já pode conversar com o vendedor.`)
+                : (isOffer
+                    ? `Sua oferta para "${order.product_title || 'produto'}" foi recusada pelo vendedor.`
+                    : `Sua proposta para "${order.product_title || 'produto'}" foi recusada pelo vendedor.`);
             await createPersistentNotification(msg, newStatus === 'accepted' ? 'success' : 'warning', order.buyer_id);
         }
 
@@ -3018,9 +3483,11 @@ function updateChatLogistics(order, user) {
         }
     } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
         if (isBuyer) {
-            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button>`;
+            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button>
+                <button class="btn btn-link btn-sm w-100 text-muted" onclick="window.reportOrderProblem('${order.id}','produto_nao_recebido')"><i class="bi bi-exclamation-triangle me-1"></i>Não recebi o produto</button>`;
         } else {
-            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>`;
+            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>
+                <button class="btn btn-link btn-sm w-100 text-muted" onclick="window.reportOrderProblem('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-exclamation-triangle me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
         }
     } else if (order.status === 'finished') {
         if (isBuyer) {
@@ -3571,7 +4038,7 @@ async function baixarEstoqueProduto(productId, quantidadeComprada) {
 window.renderSellerPanel = async function() {
     const user = getSavedUser();
     if (!user)                                           { showToast('Faça login!', 'warning'); return; }
-    if (user.tipo !== 'VENDEDOR' && user.tipo !== 'ADMIN') { showToast('Acesso restrito a vendedores!', 'warning'); return; }
+    if (user.tipo !== 'VENDEDOR') { showToast('Acesso restrito a vendedores!', 'warning'); return; }
 
     window.exitWaOrdersView();
     document.getElementById('gridTitle').textContent = 'Meus Produtos';
@@ -3627,6 +4094,92 @@ window.renderSellerPanel = async function() {
 /**
  * Renderiza a interface de controle total para administradores
  */
+/** Definição única das abas do painel admin — usada tanto na navbar principal (desktop) quanto na barrinha mobile dentro do painel */
+function buildAdminTabButtons(counts, variant) {
+    const tabs = [
+        { tab: 'admin-overview', icon: 'bi-grid-1x2-fill',        label: 'Início' },
+        { tab: 'admin-content',  icon: 'bi-collection-fill',      label: 'Conteúdo',    count: counts.users + counts.products },
+        { tab: 'admin-cats',     icon: 'bi-tags-fill',            label: 'Categorias',  count: counts.categorias },
+        { tab: 'admin-chats',    icon: 'bi-chat-dots-fill',       label: 'Chats',       count: counts.chatsAbertos },
+        { tab: 'admin-support',  icon: 'bi-headset',              label: 'Suporte',     count: counts.ticketsAbertos }
+    ];
+    return tabs.map((t, i) => `
+        <button class="admin-nav-link ${variant}${i === 0 ? ' active' : ''}" data-tab="${t.tab}" onclick="window.switchAdminTab(this)">
+            <i class="bi ${t.icon}"></i> ${t.label}${t.count != null ? ` <span class="admin-nav-count">${t.count}</span>` : ''}
+        </button>`).join('');
+}
+
+/** Mostra as abas do painel admin direto na navbar principal (topo do site) */
+function showAdminTopNavTabs(counts) {
+    const nav = document.getElementById('adminPanelTabsNav');
+    if (nav) {
+        nav.innerHTML = buildAdminTabButtons(counts, 'admin-topnav-tab');
+        nav.classList.remove('d-none');
+        nav.classList.add('d-flex');
+    }
+}
+
+/** Some com as abas do painel admin da navbar (usado só pelas telas rápidas "Todos os Produtos"/"Todos os Chats") */
+function hideAdminTopNavTabs() {
+    const nav = document.getElementById('adminPanelTabsNav');
+    if (nav) {
+        nav.classList.add('d-none');
+        nav.classList.remove('d-flex');
+        nav.innerHTML = '';
+    }
+}
+
+/** Monta as linhas da tabela de Publicações do painel admin — usada tanto na
+ *  renderização inicial quanto pra atualizar só a tabela quando o admin pesquisa. */
+function buildAdminProductsRows(products) {
+    if (!products.length) return `<tr><td colspan="4" class="admin-table-empty">Nenhuma publicação encontrada.</td></tr>`;
+    return products.map(p => `
+        <tr class="admin-table-row-clickable" onclick="window.adminEditProduct('${p.id}')" title="Clique para abrir o anúncio">
+            <td>
+                <div class="d-flex align-items-center gap-2">
+                    <img src="${safeParseImages(p.img)[0] || 'https://placehold.co/45'}" class="admin-row-avatar" style="border-radius:6px;" onerror="this.src='https://placehold.co/45'">
+                    <strong>${p.titulo}</strong>
+                </div>
+            </td>
+            <td class="text-muted">${p.loja || 'N/A'}</td>
+            <td class="admin-row-value">${parseFloat(p.preco) === 0 ? 'GRÁTIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</td>
+            <td class="text-end">
+                <div class="d-flex gap-1 justify-content-end">
+                    <button class="admin-icon-btn" onclick="event.stopPropagation(); window.adminEditProduct('${p.id}')" title="Editar Anúncio">
+                        <i class="bi bi-pencil-fill"></i>
+                    </button>
+                    <button class="admin-icon-btn danger" onclick="event.stopPropagation(); window.adminDeleteProduct('${p.id}', '${(p.titulo || '').replace(/'/g, "\\'")}')" title="Remover Publicação">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`).join('');
+}
+
+/** Monta as linhas da tabela de Usuários do painel admin — usada tanto na
+ *  renderização inicial quanto pra atualizar só a tabela quando o admin pesquisa. */
+function buildAdminUsersRows(users, currentUserId) {
+    if (!users.length) return `<tr><td colspan="4" class="admin-table-empty">Nenhum usuário encontrado.</td></tr>`;
+    return users.map(u => `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center gap-2">
+                    <img src="${u.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.nome)}" class="admin-row-avatar" referrerpolicy="no-referrer">
+                    <strong>${u.nome}</strong>
+                </div>
+            </td>
+            <td class="text-muted">${u.email}</td>
+            <td><span class="admin-badge-tipo ${u.tipo==='ADMIN'?'tipo-admin':(u.tipo==='VENDEDOR'?'tipo-vendedor':'tipo-cliente')}">${u.tipo === 'ADMIN' ? 'Administrador' : (u.tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente')}</span></td>
+            <td class="text-end">
+                ${u.id !== currentUserId ? `
+                    <button class="admin-icon-btn danger" onclick="window.adminDeleteUser('${u.id}', '${(u.nome || '').replace(/'/g, "\\'")}')" title="Apagar Conta">
+                        <i class="bi bi-person-x-fill"></i>
+                    </button>
+                ` : '<span class="admin-row-badge badge-muted">Você</span>'}
+            </td>
+        </tr>`).join('');
+}
+
 window.renderAdminPanel = async function() {
     const user = getSavedUser();
     if (!user || user.tipo !== 'ADMIN') {
@@ -3634,14 +4187,15 @@ window.renderAdminPanel = async function() {
         return;
     }
 
+    window._adminViewMode = 'panel';
     window.exitWaOrdersView();
-    document.getElementById('gridTitle').textContent = 'Painel Administrativo';
+    document.getElementById('gridTitle').textContent = '';
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
 
     const grid = document.getElementById('productsGrid');
-    grid.style.display = ''; // deixa a classe CSS controlar (grid), sem forçar bloco via estilo inline
-    grid.classList.add('order-view-active');
+    grid.style.display = '';
+    grid.className = 'admin-panel-active';
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando base de dados...</p></div>';
 
     try {
@@ -3650,89 +4204,221 @@ window.renderAdminPanel = async function() {
             supabaseFetch('users?select=*&order=nome.asc'),
             supabaseFetch('products?select=*&order=created_at.desc'),
             supabaseFetch('orders?select=*&order=created_at.desc'),
-            supabaseFetch('chats?select=*')
+            supabaseFetch('chats?select=*&order_id=not.is.null')
         ]);
         adminOrdersCache = orders;
+        window._adminProductsCache = products;
+        window._adminUsersCache = users;
+
+        // Chamados de suporte (linhas de `chats` com order_id NULL) — busca à parte.
+        const tickets = await fetchSupportTicketsSafe();
+
+        const categorias = [...new Set(products.map(p => p.categoria || 'Geral'))];
+        const chatsAbertos = chats.filter(c => !c.closed).length;
+        const ticketsAbertos = tickets.filter(t => t.status !== 'closed').length;
+        const tabCounts = { users: users.length, products: products.length, categorias: categorias.length, chatsAbertos, ticketsAbertos };
+
+        // Badge de aviso no dock mobile (mesma contagem da aba Chats do painel)
+        const chatsDockBadge = document.getElementById('adminChatsBadgeDock');
+        if (chatsDockBadge) {
+            chatsDockBadge.textContent = chatsAbertos;
+            chatsDockBadge.classList.toggle('d-none', chatsAbertos === 0);
+        }
+        // Badge de aviso no dock mobile pros chamados de suporte em aberto
+        const supportDockBadge = document.getElementById('adminSupportBadgeDock');
+        if (supportDockBadge) {
+            supportDockBadge.textContent = ticketsAbertos;
+            supportDockBadge.classList.toggle('d-none', ticketsAbertos === 0);
+        }
 
         grid.innerHTML = `
-            <div class="container-fluid py-2">
-                <nav class="mb-4 d-flex justify-content-center">
-                    <div class="nav nav-pills border-0 bg-light p-1 rounded-pill shadow-sm flex-wrap" id="nav-tab" role="tablist">
-                        <button class="nav-link active rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-users" type="button">Usuários (${users.length})</button>
-                        <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-cats" type="button">Categorias</button>
-                        <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-prods" type="button">Publicações (${products.length})</button>
-                        <button class="nav-link rounded-pill px-4 fw-bold" data-bs-toggle="pill" data-bs-target="#admin-chats" type="button">Chats (${chats.length})</button>
+            <div class="admin-dash">
+                <main class="admin-main">
+                    <header class="admin-topbar">
+                        <div>
+                            <h4 class="fw-bold mb-0" id="adminPanelTitle">Início</h4>
+                            <small class="text-muted">Bem-vindo(a), ${user.nome}</small>
+                        </div>
+                        <div class="admin-sim-controls">
+                            <span class="admin-sim-label"><i class="bi bi-eye-fill me-1"></i>Simular como:</span>
+                            <button type="button" class="btn btn-sm btn-ml-secondary" onclick="window.setAdminSimulation('CLIENTE')">
+                                <i class="bi bi-person-fill me-1"></i>Cliente
+                            </button>
+                            <button type="button" class="btn btn-sm btn-ml-secondary" onclick="window.setAdminSimulation('VENDEDOR')">
+                                <i class="bi bi-shop me-1"></i>Vendedor
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="admin-stats-row">
+                        <div class="admin-stat-card stat-blue"><i class="bi bi-people-fill"></i><div><h3>${users.length}</h3><span>Usuários</span></div></div>
+                        <div class="admin-stat-card stat-green"><i class="bi bi-box-seam-fill"></i><div><h3>${products.length}</h3><span>Publicações</span></div></div>
+                        <div class="admin-stat-card stat-orange"><i class="bi bi-bag-check-fill"></i><div><h3>${orders.length}</h3><span>Pedidos</span></div></div>
+                        <div class="admin-stat-card stat-red"><i class="bi bi-headset"></i><div><h3>${ticketsAbertos}</h3><span>Chamados Abertos</span></div></div>
                     </div>
-                </nav>
-                <div class="tab-content" id="nav-tabContent">
-                    <div class="tab-pane fade show active" id="admin-users">
-                        <div class="list-group shadow-sm mt-2">
-                            ${users.map(u => `
-                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
-                                    <div class="d-flex align-items-center gap-3 text-dark">
-                                        <img src="${u.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.nome)}" class="rounded-circle border" width="45" height="45" style="object-fit:cover;" referrerpolicy="no-referrer">
-                                        <div>
-                                            <h6 class="mb-0 fw-bold">${u.nome}</h6>
-                                            <small class="text-muted">${u.email} • <span class="badge ${u.tipo==='ADMIN'?'bg-danger':'bg-primary'}">${u.tipo}</span></small>
-                                        </div>
+
+                    <div class="admin-tab-panel active" id="admin-overview">
+                        <div class="admin-card">
+                            <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>Últimas Publicações</h6>
+                            ${products.slice(0, 5).map(p => `
+                                <div class="admin-row">
+                                    <img src="${safeParseImages(p.img)[0] || 'https://placehold.co/40'}" class="admin-row-avatar" onerror="this.src='https://placehold.co/40'">
+                                    <div class="admin-row-info">
+                                        <strong>${p.titulo}</strong>
+                                        <small>Loja: ${p.loja || 'N/A'}</small>
                                     </div>
-                                    ${u.id !== user.id ? `
-                                        <button class="btn btn-sm btn-outline-danger border-0" onclick="window.adminDeleteUser('${u.id}', '${u.nome}')" title="Apagar Conta">
-                                            <i class="bi bi-person-x fs-5"></i>
-                                        </button>
-                                    ` : '<span class="badge bg-light text-dark border">Você</span>'}
+                                    <span class="admin-row-value">${parseFloat(p.preco) === 0 ? 'GRÁTIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</span>
                                 </div>
-                            `).join('')}
+                            `).join('') || '<p class="text-muted small mb-0">Nenhuma publicação ainda.</p>'}
                         </div>
-                    </div>
-                    <div class="tab-pane fade" id="admin-cats">
-                        <div class="list-group shadow-sm mt-2">
-                            ${[...new Set(products.map(p => p.categoria || 'Geral'))].map(cat => `
-                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
-                                    <h6 class="mb-0 fw-bold">${cat}</h6>
-                                    <span class="badge bg-light text-dark border">${products.filter(p => p.categoria === cat).length} anúncios</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div class="tab-pane fade" id="admin-prods">
-                        <div class="list-group shadow-sm mt-2">
-                            ${products.map(p => `
-                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white">
-                                    <div class="d-flex align-items-center gap-3 text-dark">
-                                        <img src="${safeParseImages(p.img)[0] || 'https://placehold.co/45'}" 
-                                             class="rounded" width="45" height="45" style="object-fit:cover;" 
-                                             onerror="this.src='https://placehold.co/45'">
-                                        <div style="max-width: 250px;">
-                                            <h6 class="mb-0 fw-bold text-truncate">${p.titulo}</h6>
-                                            <small class="text-muted">Loja: ${p.loja} • ${parseFloat(p.preco) === 0 ? 'GRÁTIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</small>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-sm btn-outline-danger border-0" onclick="window.adminDeleteProduct('${p.id}', '${p.titulo}')" title="Remover Publicação">
-                                        <i class="bi bi-trash fs-5"></i>
-                                    </button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div class="tab-pane fade" id="admin-chats">
-                        <div class="list-group shadow-sm mt-2">
-                            ${chats.length === 0 ? `<p class="text-muted text-center py-4">Nenhuma conversa no sistema ainda.</p>` : chats.map(c => {
+                        <div class="admin-card">
+                            <h6 class="admin-card-title"><i class="bi bi-chat-dots-fill me-2"></i>Últimos Chats de Pedido</h6>
+                            ${chats.slice(0, 5).map(c => {
                                 const order = orders.find(o => o.id === c.order_id) || {};
-                                const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
-                                const lastMsg = (c.messages || [])[c.messages.length - 1];
                                 return `
-                                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 mb-2 rounded shadow-sm bg-white flex-wrap gap-2">
-                                    <div class="text-dark" style="max-width: 320px;">
-                                        <h6 class="mb-0 fw-bold text-truncate">${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</h6>
-                                        <small class="text-muted d-block">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} mensagens</small>
-                                        ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate">"${(lastMsg.text || '[mídia]').slice(0,60)}"</small>` : ''}
+                                <div class="admin-row">
+                                    <div class="admin-row-icon"><i class="bi bi-chat-dots-fill"></i></div>
+                                    <div class="admin-row-info">
+                                        <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</strong>
+                                        <small>${order.buyer_name || '?'} ↔ ${order.seller_name || '?'}</small>
+                                    </div>
+                                    <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'}">${c.closed ? 'Encerrado' : 'Aberto'}</span>
+                                </div>`;
+                            }).join('') || '<p class="text-muted small mb-0">Nenhuma conversa ainda.</p>'}
+                        </div>
+                        <div class="admin-card">
+                            <h6 class="admin-card-title"><i class="bi bi-headset me-2"></i>Últimos Chamados de Suporte</h6>
+                            ${tickets.slice(0, 5).map(t => `
+                                <div class="admin-row">
+                                    <div class="admin-row-icon"><i class="bi bi-life-preserver"></i></div>
+                                    <div class="admin-row-info">
+                                        <strong>${SUPPORT_CATEGORY_LABELS[t.category] || t.subject || 'Chamado'}</strong>
+                                        <small>${t.requester_name || 'Visitante'}</small>
+                                    </div>
+                                    <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}">${t.status === 'closed' ? 'Encerrado' : 'Aberto'}</span>
+                                </div>`).join('') || '<p class="text-muted small mb-0">Nenhum chamado ainda.</p>'}
+                        </div>
+
+                        <h6 class="admin-section-subtitle"><i class="bi bi-bar-chart-line-fill me-2"></i>Relatórios</h6>
+                        <div class="admin-reports-grid">
+                            <div class="admin-card admin-chart-card">
+                                <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários por Tipo</h6>
+                                <div class="admin-chart-wrap"><canvas id="chartUsersType"></canvas></div>
+                            </div>
+                            <div class="admin-card admin-chart-card">
+                                <h6 class="admin-card-title"><i class="bi bi-headset me-2"></i>Chats: Abertos x Encerrados</h6>
+                                <div class="admin-chart-wrap"><canvas id="chartChatsStatus"></canvas></div>
+                            </div>
+                            <div class="admin-card admin-chart-card">
+                                <h6 class="admin-card-title"><i class="bi bi-bag-check-fill me-2"></i>Pedidos por Status</h6>
+                                <div class="admin-chart-wrap"><canvas id="chartOrdersStatus"></canvas></div>
+                            </div>
+                            <div class="admin-card admin-chart-card admin-chart-wide">
+                                <h6 class="admin-card-title"><i class="bi bi-tags-fill me-2"></i>Publicações por Categoria</h6>
+                                <div class="admin-chart-wrap"><canvas id="chartProdsCategory"></canvas></div>
+                            </div>
+                            <div class="admin-card admin-chart-card admin-chart-wide">
+                                <h6 class="admin-card-title"><i class="bi bi-graph-up me-2"></i>Novas Publicações (últimos 6 meses)</h6>
+                                <div class="admin-chart-wrap"><canvas id="chartProdsTimeline"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab-panel" id="admin-content">
+                        <div class="admin-card" id="adminContentProdsCard">
+                            <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>Publicações <span class="admin-nav-count" id="adminContentProdsCount">${products.length}</span></h6>
+                            <div class="admin-table-wrap">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Publicação</th>
+                                            <th>Loja</th>
+                                            <th>Preço</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminProdsTableBody">
+                                        ${buildAdminProductsRows(products)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="admin-card" id="adminContentUsersCard">
+                            <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários <span class="admin-nav-count" id="adminContentUsersCount">${users.length}</span></h6>
+                            <div class="admin-table-wrap">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>E-mail</th>
+                                            <th>Tipo de Conta</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminUsersTableBody">
+                                        ${buildAdminUsersRows(users, user.id)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab-panel" id="admin-cats">
+                        <div class="admin-card">
+                            ${categorias.map(cat => `
+                                <div class="admin-row">
+                                    <div class="admin-row-icon"><i class="bi bi-tag-fill"></i></div>
+                                    <div class="admin-row-info"><strong>${cat}</strong></div>
+                                    <span class="admin-row-badge badge-muted">${products.filter(p => p.categoria === cat).length} anúncios</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="admin-tab-panel" id="admin-chats">
+                        <div class="wa-main admin-chat-main" id="adminChatsTabMain">
+                            <section class="wa-side">
+                                <div class="wa-side__header">
+                                    <h6 class="mb-0">Todas as Conversas</h6>
+                                </div>
+                                <div class="wa-side__search">
+                                    <i class="bi bi-search"></i>
+                                    <input type="text" id="adminChatsTabSearch" placeholder="Buscar conversa..." autocomplete="off" oninput="window.filterAdminChatsTab(this.value)">
+                                </div>
+                                <div id="adminChatsTabList" class="wa-side__list"></div>
+                            </section>
+
+                            <section class="wa-chat">
+                                <div id="adminChatsTabEmpty" class="wa-empty-state">
+                                    <i class="bi bi-chat-square-text"></i>
+                                    <p>Selecione uma conversa ao lado</p>
+                                </div>
+                                <div id="adminChatsTabActive" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;"></div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab-panel" id="admin-support">
+                        <div class="admin-card">
+                            ${tickets.length === 0 ? `
+                                <p class="text-muted text-center py-4 mb-0">Nenhum chamado de suporte ainda. Assim que um cliente ou vendedor esquecer a senha, relatar um problema com a entrega ou pedir ajuda, o chamado aparece aqui automaticamente.</p>
+                            ` : tickets.slice().sort((a, b) => (a.status === b.status) ? 0 : (a.status === 'closed' ? 1 : -1)).map(t => {
+                                const msgCount = (t.messages || []).filter(m => m.type !== 'system').length;
+                                const lastMsg = (t.messages || [])[t.messages.length - 1];
+                                return `
+                                <div class="admin-row admin-row-wrap">
+                                    <div class="admin-row-icon"><i class="bi bi-life-preserver"></i></div>
+                                    <div class="admin-row-info">
+                                        <strong>${SUPPORT_CATEGORY_LABELS[t.category] || t.subject || 'Chamado'} <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'} ms-1">${t.status === 'closed' ? 'Encerrado' : 'Aberto'}</span></strong>
+                                        <small class="d-block">${t.requester_name || 'Visitante'}${t.requester_email ? ' • ' + t.requester_email : ''}${t.requester_role ? ' • ' + (t.requester_role === 'ADMIN' ? 'Administrador' : (t.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente')) : ''} • ${msgCount} mensagens</small>
+                                        ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate" style="max-width:320px;">"${(lastMsg.text || '[mídia]').slice(0,60)}"</small>` : ''}
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <button class="btn btn-sm btn-ml-secondary" onclick="window.adminViewChat('${c.order_id}')">
-                                            <i class="bi bi-eye me-1"></i>Ver Conversa
+                                        <button class="btn btn-sm btn-ml-secondary" onclick="window.adminViewTicket('${t.id}')">
+                                            <i class="bi bi-eye me-1"></i>Ver Chamado
                                         </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="window.adminDeleteChat('${c.order_id}')" title="Apagar conversa e pedido">
+                                        <button class="btn btn-sm btn-ml-danger" onclick="window.adminDeleteTicket('${t.id}')" title="Apagar chamado">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -3740,13 +4426,360 @@ window.renderAdminPanel = async function() {
                             }).join('')}
                         </div>
                     </div>
+                </main>
+            </div>`;
+
+        showAdminTopNavTabs(tabCounts);
+        window.renderAdminChatsTab(chats, orders);
+
+        // Guarda os dados carregados pra alimentar os gráficos (usados aqui
+        // mesmo, dentro da aba "Início" — só constrói quando o canvas estiver
+        // realmente visível, senão o Chart.js mede a largura errada).
+        window._adminReportsData = { users, products, orders, chats, tickets, categorias };
+        window._adminChartsReady = false;
+
+        // Se o admin já estava numa aba específica (ex: voltou de uma conversa
+        // aberta a partir da aba "Chats" ou "Suporte"), reabre na mesma aba
+        // em vez de sempre cair no Início.
+        if (window._adminActiveTab && window._adminActiveTab !== 'admin-overview') {
+            const navBtn = document.querySelector(`.admin-nav-link[data-tab="${window._adminActiveTab}"]`);
+            if (navBtn) window.switchAdminTab(navBtn);
+        } else {
+            window._adminChartsReady = true;
+            requestAnimationFrame(() => window.renderAdminCharts());
+        }
+
+        window.closeMobileMenu();
+
+        // Se o admin disparou uma busca antes do painel terminar de carregar
+        // (ex: painel ainda montando), aplica ela agora que já está tudo pronto.
+        if (window._pendingAdminSearch !== undefined) {
+            const pending = window._pendingAdminSearch;
+            window._pendingAdminSearch = undefined;
+            window.adminSearchProducts(pending);
+        }
+    } catch (e) {
+        console.error(e);
+        grid.innerHTML = '<div class="alert alert-danger">Erro ao acessar o banco de dados.</div>';
+    }
+};
+
+/** Troca de aba do painel administrativo (sidebar estilo Ocellaris/Vali Admin) */
+window.switchAdminTab = function(navBtn) {
+    const tabId = navBtn.dataset.tab;
+    window._adminActiveTab = tabId;
+    document.querySelectorAll('.admin-nav-link').forEach(el => el.classList.remove('active'));
+    navBtn.classList.add('active');
+    document.querySelectorAll('.admin-tab-panel').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId)?.classList.add('active');
+    const titles = {
+        'admin-overview': 'Início',
+        'admin-content': 'Conteúdo',
+        'admin-cats': 'Categorias',
+        'admin-chats': 'Chats',
+        'admin-support': 'Suporte'
+    };
+    const titleEl = document.getElementById('adminPanelTitle');
+    if (titleEl) titleEl.textContent = titles[tabId] || '';
+
+    // Os canvases dos gráficos ficam com display:none enquanto a aba "Início"
+    // não está ativa, e o Chart.js não mede a largura corretamente nesse
+    // estado — por isso, se o admin chegou aqui vindo de outra aba antes dos
+    // gráficos serem montados, monta agora que o canvas ficou visível.
+    if (tabId === 'admin-overview' && !window._adminChartsReady) {
+        window._adminChartsReady = true;
+        requestAnimationFrame(() => window.renderAdminCharts());
+    }
+};
+
+/**
+ * Devolve pra tela administrativa certa depois de uma ação (excluir produto,
+ * apagar/encerrar chat etc.) — sem essa checagem, qualquer ação sempre
+ * jogaria o admin de volta pro dashboard completo, mesmo que ele estivesse
+ * na tela rápida "Todos os Produtos" ou "Todos os Chats".
+ */
+function adminRefreshCurrentView() {
+    if (window._adminViewMode === 'products') return window.renderAdminAllProducts();
+    if (window._adminViewMode === 'chats')    return window.renderAdminAllChats();
+    return window.renderAdminPanel();
+}
+
+/**
+ * Atalho da navbar: "Todos os Produtos" — navegação igual à visão normal do
+ * cliente (mesma grade de cards), só que trazendo TODOS os anúncios da
+ * plataforma (não só os de um vendedor) e com um botão de excluir no overlay
+ * de cada card, pra o admin poder remover qualquer anúncio na hora.
+ */
+window.renderAdminAllProducts = async function() {
+    const user = getSavedUser();
+    if (!user || user.tipo !== 'ADMIN') { showToast('Acesso restrito a administradores!', 'error'); return; }
+
+    window._adminViewMode = 'products';
+    window.exitWaOrdersView();
+    hideAdminTopNavTabs();
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    document.getElementById('gridTitle').textContent = 'Todos os Produtos';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    const grid = document.getElementById('productsGrid');
+    grid.style.display = 'grid';
+    grid.className = 'products-grid-uniform';
+    grid.innerHTML = Array(12).fill(0).map(() => `
+        <div class="card border-0" style="border-radius: 10px; overflow: hidden;">
+            <div class="skeleton" style="height: 160px;"></div>
+            <div style="padding: 12px;">
+                <div class="skeleton mb-2" style="height: 14px; width: 80%;"></div>
+                <div class="skeleton mb-1" style="height: 14px; width: 60%;"></div>
+                <div class="skeleton" style="height: 22px; width: 50%;"></div>
+            </div>
+        </div>`).join('');
+
+    try {
+        const products = await supabaseFetch('products?select=*&order=created_at.desc');
+        window._adminProductsCache = products;
+        // Sincroniza com o cache global pra window.showDetail funcionar ao clicar no card
+        products.forEach(p => { if (!allProductsCache.find(x => x.id === p.id)) allProductsCache.push(p); });
+
+        if (!products.length) {
+            grid.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <i class="bi bi-box-seam" style="font-size:3.5rem;color:#ccc;"></i>
+                    <h5 class="mt-3">Nenhum produto cadastrado na plataforma ainda.</h5>
+                </div>`;
+            return;
+        }
+
+        grid.innerHTML = products.map(p => renderAdminProductCard(p)).join('');
+        window.closeMobileMenu();
+    } catch (e) {
+        console.error(e);
+        grid.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar os produtos.</div>';
+    }
+};
+
+/** Card de produto padrão (igual ao que o cliente vê) + botões de editar/excluir no overlay, só pro admin — mesma lógica de gerenciamento usada no painel do vendedor */
+function renderAdminProductCard(item) {
+    const html = renderCard(item);
+    if (!html) return '';
+    const actionBtns = `
+                <button class="btn btn-action btn-admin-edit" onclick="event.stopPropagation();window.adminEditProduct('${item.id}')" title="Editar Anúncio (Admin)">
+                    <i class="bi bi-pencil-fill"></i>
+                </button>
+                <button class="btn btn-action btn-admin-delete" onclick="event.stopPropagation();window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')" title="Excluir Anúncio (Admin)">
+                    <i class="bi bi-trash-fill"></i>
+                </button>`;
+    return html.replace('<div class="overlay">', `<div class="overlay">${actionBtns}`);
+}
+
+/**
+ * Atalho da navbar: "Todos os Chats" — lista rápida de TODAS as conversas de
+ * suporte da plataforma (abertas primeiro), com acesso direto a ver, entrar,
+ * responder e encerrar/apagar qualquer uma delas, sem precisar abrir o
+ * dashboard completo.
+ */
+window.renderAdminAllChats = async function() {
+    const user = getSavedUser();
+    if (!user || user.tipo !== 'ADMIN') { showToast('Acesso restrito a administradores!', 'error'); return; }
+
+    window._adminViewMode = 'chats';
+    window.exitWaOrdersView();
+    hideAdminTopNavTabs();
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    document.getElementById('gridTitle').textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    const grid = document.getElementById('productsGrid');
+    grid.style.display = '';
+    grid.className = 'admin-panel-active';
+    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando conversas...</p></div>';
+
+    try {
+        const [orders, chats] = await Promise.all([
+            supabaseFetch('orders?select=*&order=created_at.desc'),
+            supabaseFetch('chats?select=*&order_id=not.is.null')
+        ]);
+        adminOrdersCache = orders;
+
+        // Abertos primeiro, pra facilitar a triagem do suporte
+        const sorted = chats.slice().sort((a, b) => (a.closed === b.closed) ? 0 : (a.closed ? 1 : -1));
+        const abertos = chats.filter(c => !c.closed).length;
+
+        grid.innerHTML = `
+            <div class="admin-standalone-page">
+                <div class="admin-standalone-header">
+                    <div>
+                        <h4 class="fw-bold mb-0"><i class="bi bi-headset me-2"></i>Todos os Chats</h4>
+                        <small class="text-muted">${abertos} aberto${abertos === 1 ? '' : 's'} de ${chats.length} conversa${chats.length === 1 ? '' : 's'} no total</small>
+                    </div>
+                </div>
+                <div class="admin-card">
+                    ${sorted.length === 0 ? `<p class="text-muted text-center py-4 mb-0">Nenhuma conversa no sistema ainda.</p>` : sorted.map(c => {
+                        const order = orders.find(o => o.id === c.order_id) || {};
+                        const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
+                        const lastMsg = (c.messages || [])[c.messages.length - 1];
+                        return `
+                        <div class="admin-row admin-row-wrap admin-row-clickable" onclick="window.adminOpenChatsModal('${c.order_id}')">
+                            <div class="admin-row-icon"><i class="bi bi-chat-dots-fill"></i></div>
+                            <div class="admin-row-info">
+                                <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)} <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'} ms-1">${c.closed ? 'Encerrado' : 'Aberto'}</span></strong>
+                                <small class="d-block">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} mensagens</small>
+                                ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate" style="max-width:320px;">"${(lastMsg.text || '[mídia]').slice(0,60)}"</small>` : ''}
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-ml-secondary" onclick="event.stopPropagation(); window.adminOpenChatsModal('${c.order_id}')">
+                                    <i class="bi bi-eye me-1"></i>Ver Conversa
+                                </button>
+                                <button class="btn btn-sm btn-ml-danger" onclick="event.stopPropagation(); window.adminDeleteChat('${c.order_id}')" title="Apagar conversa e pedido">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>`;
         window.closeMobileMenu();
     } catch (e) {
         console.error(e);
-        grid.innerHTML = '<div class="alert alert-danger">Erro ao acessar o banco de dados.</div>';
+        grid.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar as conversas.</div>';
     }
+};
+
+/**
+ * Monta os 5 gráficos do painel administrativo (Chart.js) usando os dados já
+ * carregados pelo renderAdminPanel — visão geral de usuários, produtos,
+ * pedidos e chats "de tudo", como pedido pelo administrador.
+ */
+window.renderAdminCharts = function() {
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js não carregou — verifique a conexão com o CDN.');
+        return;
+    }
+    const data = window._adminReportsData;
+    if (!data) return;
+    const { users, products, orders, chats, categorias } = data;
+
+    // Cores lidas do tema atual (claro/escuro) pra combinar com o resto do painel
+    const css = getComputedStyle(document.documentElement);
+    const textColor  = css.getPropertyValue('--text-main').trim()  || '#333';
+    const gridColor  = css.getPropertyValue('--border-light').trim() || 'rgba(0,0,0,0.08)';
+    const palette = ['#2dcc71', '#3483fa', '#f0a020', '#e74c3c', '#8e44ad', '#16a2b8', '#e67e22', '#95a5a6'];
+
+    Chart.defaults.color = textColor;
+    Chart.defaults.font.family = "'Sora', sans-serif";
+
+    // Destrói instâncias anteriores (evita "Canvas is already in use" ao reabrir a aba)
+    window._adminChartInstances = window._adminChartInstances || {};
+    Object.values(window._adminChartInstances).forEach(c => c?.destroy());
+    window._adminChartInstances = {};
+
+    const baseOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { boxWidth: 12, padding: 14 } } }
+    };
+
+    // --- Usuários por tipo ---
+    const tipoCount = { CLIENTE: 0, VENDEDOR: 0, ADMIN: 0 };
+    users.forEach(u => { tipoCount[u.tipo] = (tipoCount[u.tipo] || 0) + 1; });
+    window._adminChartInstances.usersType = new Chart(document.getElementById('chartUsersType'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Clientes', 'Vendedores', 'Administradores'],
+            datasets: [{ data: [tipoCount.CLIENTE, tipoCount.VENDEDOR, tipoCount.ADMIN], backgroundColor: [palette[1], palette[0], palette[3]], borderWidth: 0 }]
+        },
+        options: baseOptions
+    });
+
+    // --- Chats abertos x encerrados ---
+    const abertos   = chats.filter(c => !c.closed).length;
+    const encerrados = chats.length - abertos;
+    window._adminChartInstances.chatsStatus = new Chart(document.getElementById('chartChatsStatus'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Abertos', 'Encerrados'],
+            datasets: [{ data: [abertos, encerrados], backgroundColor: [palette[0], palette[7]], borderWidth: 0 }]
+        },
+        options: baseOptions
+    });
+
+    // --- Pedidos por status ---
+    const statusOrder = ['pending', 'accepted', 'agreement', 'shipping', 'awaiting_pickup', 'finished', 'cancelled', 'dispute'];
+    const statusCount = {};
+    orders.forEach(o => { statusCount[o.status] = (statusCount[o.status] || 0) + 1; });
+    const statusLabels = statusOrder.filter(s => statusCount[s]);
+    window._adminChartInstances.ordersStatus = new Chart(document.getElementById('chartOrdersStatus'), {
+        type: 'doughnut',
+        data: {
+            labels: statusLabels.map(s => ORDER_STATUS_MAP[s]?.text || s),
+            datasets: [{ data: statusLabels.map(s => statusCount[s]), backgroundColor: palette, borderWidth: 0 }]
+        },
+        options: baseOptions
+    });
+
+    // --- Publicações por categoria (nível principal, ex: "Games", "Informática") ---
+    const catCount = {};
+    products.forEach(p => {
+        const top = (p.categoria || 'Geral').split(' > ')[0];
+        catCount[top] = (catCount[top] || 0) + 1;
+    });
+    const catLabels = Object.keys(catCount).sort((a, b) => catCount[b] - catCount[a]);
+    window._adminChartInstances.prodsCategory = new Chart(document.getElementById('chartProdsCategory'), {
+        type: 'bar',
+        data: {
+            labels: catLabels,
+            datasets: [{ label: 'Publicações', data: catLabels.map(c => catCount[c]), backgroundColor: palette[0], borderRadius: 6, maxBarThickness: 46 }]
+        },
+        options: {
+            ...baseOptions,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: textColor } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: textColor }, grid: { color: gridColor } }
+            }
+        }
+    });
+
+    // --- Novas publicações por mês (últimos 6 meses) ---
+    const now = new Date();
+    const monthKeys = [];
+    const monthLabels = [];
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        monthKeys.push(`${d.getFullYear()}-${d.getMonth()}`);
+        monthLabels.push(d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }));
+    }
+    const monthCount = Object.fromEntries(monthKeys.map(k => [k, 0]));
+    products.forEach(p => {
+        if (!p.created_at) return;
+        const d = new Date(p.created_at);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (key in monthCount) monthCount[key]++;
+    });
+    window._adminChartInstances.prodsTimeline = new Chart(document.getElementById('chartProdsTimeline'), {
+        type: 'line',
+        data: {
+            labels: monthLabels,
+            datasets: [{
+                label: 'Novos anúncios',
+                data: monthKeys.map(k => monthCount[k]),
+                borderColor: palette[1],
+                backgroundColor: 'rgba(52, 131, 250, 0.15)',
+                fill: true,
+                tension: 0.35,
+                pointBackgroundColor: palette[1]
+            }]
+        },
+        options: {
+            ...baseOptions,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: textColor } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: textColor }, grid: { color: gridColor } }
+            }
+        }
+    });
 };
 
 window.adminDeleteUser = async function(userId, userName) {
@@ -3763,63 +4796,234 @@ window.adminDeleteProduct = async function(pid, title) {
     try {
         await supabaseFetch(`products?id=eq.${pid}`, { method: 'DELETE' });
         showToast('Publicação removida pelo administrador.', 'success');
-        window.renderAdminPanel(); // Atualiza a lista
+        adminRefreshCurrentView(); // Atualiza a lista (fica na mesma tela em que o admin estava)
     } catch (e) { showToast('Erro ao remover produto.', 'error'); }
 };
 
 /**
- * Visão total do administrador: abre qualquer conversa do site em modo
- * leitura, sem precisar ser comprador/vendedor daquele pedido.
+ * Abre o anúncio de QUALQUER vendedor no formulário de edição, como um
+ * administrador geral do marketplace. Ao salvar, o vendedor/loja original é
+ * preservado (ver flag `adminEdit` tratada no submit do #announceForm) e o
+ * usuário volta pro painel administrativo em vez da grade normal de produtos.
+ */
+window.adminEditProduct = function(pid) {
+    const p = window._adminProductsCache?.find(x => x.id === pid) || allProductsCache.find(x => x.id === pid);
+    if (!p) { showToast('Produto não encontrado.', 'error'); return; }
+
+    document.getElementById('prodTitle').value          = p.titulo;
+    document.getElementById('prodDescription').value     = p.descricao;
+    document.getElementById('prodPrice').value           = p.preco;
+    document.getElementById('prodQuantity').value        = p.quantidade;
+    document.getElementById('prodPrecoOriginal').value   = '';
+    document.getElementById('prodCategory').value        = p.categoria;
+    document.getElementById('prodDelivery').checked      = !!(p.realiza_entrega ?? p.realizaEntrega ?? p.realizaentrega ?? true);
+    document.getElementById('announceForm').dataset.editingId  = p.id;
+    document.getElementById('announceForm').dataset.adminEdit  = 'true';
+
+    for (let n = 1; n <= 3; n++) {
+        const el = document.getElementById(`prodLink${n}`);
+        if (el) el.value = '';
+    }
+    safeParseImages(p.img).forEach((url, i) => {
+        const el = document.getElementById(`prodLink${i + 1}`);
+        if (el) el.value = url;
+    });
+
+    const modalTitle = document.querySelector('#announceModal .modal-title');
+    const submitBtn  = document.querySelector('#announceForm button[type="submit"]');
+    if (modalTitle) modalTitle.textContent = `Editar Anúncio (Admin) — loja ${p.loja || ''}`;
+    if (submitBtn)  submitBtn.textContent  = 'Salvar Alterações';
+
+    new bootstrap.Modal(document.getElementById('announceModal')).show();
+};
+
+/**
+ * Monta o HTML de uma bolha de mensagem no MESMO padrão visual do chat
+ * cliente ↔ vendedor (.msg-row/.msg-bubble), usado tanto na visão de admin
+ * de conversas de pedido quanto na de chamados de suporte. Mensagens da
+ * equipe de suporte (isStaff) ficam à direita, destacadas em amarelo.
+ */
+function adminMsgBubbleHtml(m, resolveSenderName) {
+    if (m.type === 'system' || m.senderId === 'system') {
+        return `<div class="text-center my-3"><span class="system-chip"><i class="bi bi-info-circle-fill"></i>${m.text}</span></div>`;
+    }
+    const isStaff = !!m.isStaff;
+    const senderLabel = m.senderName || resolveSenderName(m) || 'Usuário';
+    const bodyHtml = m.deleted
+        ? `<em class="small">Mensagem apagada</em>`
+        : `<div class="chat-bubble-text" style="white-space:pre-wrap;">${(m.text ? m.text.replace(/</g, '&lt;') : (m.image ? '[imagem]' : '[arquivo]'))}</div>`;
+    return `
+        <div class="msg-row ${isStaff ? 'is-me' : 'is-them'}">
+            <div class="msg-bubble ${isStaff ? 'is-me is-staff' : 'is-them'}">
+                <span class="msg-sender">${senderLabel}${isStaff ? ' <i class="bi bi-patch-check-fill"></i>' : ''}</span>
+                ${bodyHtml}
+                <div class="msg-time">${new Date(m.timestamp).toLocaleString('pt-BR')}</div>
+            </div>
+        </div>`;
+}
+
+/**
+ * Visão total do administrador: abre qualquer conversa de pedido do site,
+ * no MESMO layout usado no chat entre cliente e vendedor — ver usuários,
+ * encerrar e apagar ficam integrados ao próprio chat, sem modais.
  */
 window.adminViewChat = async function(orderId) {
+    const grid = document.getElementById('productsGrid');
+    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando conversa...</p></div>';
     try {
         const [chatResult, order] = await Promise.all([
             supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`),
             Promise.resolve(adminOrdersCache.find(o => o.id === orderId))
         ]);
         const chat = chatResult?.[0];
-        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); adminRefreshCurrentView(); return; }
 
-        const msgsHtml = (chat.messages || []).map(m => {
-            if (m.type === 'system' || m.senderId === 'system') {
-                return `<div class="text-center my-2"><span class="badge bg-light text-dark border">${m.text}</span></div>`;
-            }
-            const isBuyer = m.senderId === order?.buyer_id;
-            return `
-                <div class="d-flex ${isBuyer ? 'justify-content-start' : 'justify-content-end'} mb-2">
-                    <div class="p-2 px-3 rounded-3 ${isBuyer ? 'bg-light' : 'bg-primary text-white'}" style="max-width:75%;">
-                        <small class="d-block fw-bold" style="font-size:0.65rem; opacity:0.75;">${m.senderName || (isBuyer ? order?.buyer_name : order?.seller_name) || '?'}</small>
-                        ${m.deleted ? `<em class="small">Mensagem apagada</em>` : (m.text ? m.text.replace(/</g,'&lt;') : (m.image ? '[imagem]' : '[arquivo]'))}
-                        <small class="d-block text-end" style="font-size:0.6rem; opacity:0.7;">${new Date(m.timestamp).toLocaleString('pt-BR')}</small>
-                    </div>
-                </div>`;
-        }).join('') || '<p class="text-muted text-center">Sem mensagens.</p>';
+        const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
+        const msgsHtml = (chat.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+            || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
+        const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
 
-        let modalEl = document.getElementById('adminChatViewerModal');
-        if (!modalEl) {
-            modalEl = document.createElement('div');
-            modalEl.id = 'adminChatViewerModal';
-            modalEl.className = 'modal fade';
-            modalEl.tabIndex = -1;
-            document.body.appendChild(modalEl);
-        }
-        modalEl.innerHTML = `
-            <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
-                <div class="modal-content" style="border-radius:16px;">
-                    <div class="modal-header">
-                        <h6 class="modal-title fw-bold"><i class="bi bi-eye me-2"></i>${order?.product_title || 'Conversa'} — modo administrador</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body" style="background: var(--bg-color);">${msgsHtml}</div>
-                    <div class="modal-footer">
-                        <button class="btn btn-outline-danger btn-sm" onclick="window.adminDeleteChat('${orderId}'); bootstrap.Modal.getInstance(document.getElementById('adminChatViewerModal'))?.hide();">
-                            <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
-                        </button>
-                    </div>
+        grid.className = 'admin-panel-active';
+        grid.innerHTML = `
+            <div class="admin-standalone-page">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <button class="btn btn-sm btn-ml-secondary" onclick="adminRefreshCurrentView()"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
+                    <h5 class="fw-bold mb-0">Conversa do pedido <span class="admin-row-badge ${chat.closed ? 'badge-muted' : 'badge-open'} ms-1">${chat.closed ? 'Encerrado' : 'Aberto'}</span></h5>
+                </div>
+                <div class="wa-main admin-chat-main" style="margin:0;">
+                    <section class="wa-chat" style="flex-grow:1;">
+                        <div class="chat-container" style="height:100%;">
+                            <div class="chat-header-pro">
+                                <div class="chat-header-avatar-wrap">
+                                    <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                                </div>
+                                <div class="chat-header-info">
+                                    <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
+                                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · ${msgCount} mensagens</span>
+                                </div>
+                                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuários da conversa">
+                                    <i class="bi bi-people-fill"></i>
+                                </button>
+                            </div>
+
+                            <div id="adminChatParticipants" class="chat-participants-panel d-none">
+                                <div class="chat-participant-row">
+                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.buyer_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer">
+                                    <div class="chat-participant-info">
+                                        <strong>${order?.buyer_name || 'Comprador não identificado'}</strong>
+                                        <small><i class="bi bi-bag-fill me-1"></i>Comprador</small>
+                                    </div>
+                                </div>
+                                <div class="chat-participant-row">
+                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.seller_name || '?')}&background=22c98e&color=fff" referrerpolicy="no-referrer">
+                                    <div class="chat-participant-info">
+                                        <strong>${order?.seller_name || 'Vendedor não identificado'}</strong>
+                                        <small><i class="bi bi-shop me-1"></i>Vendedor</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="adminChatMsgsBody" class="chat-messages">${msgsHtml}</div>
+
+                            ${!chat.closed ? `
+                                <div class="chat-input-bar">
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="text" id="adminChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
+                                               onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSendChatMessage('${orderId}');}">
+                                        <button type="button" class="chat-send-btn" onclick="window.adminSendChatMessage('${orderId}')"><i class="bi bi-send-fill"></i></button>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="chat-admin-actions">
+                                <button class="btn btn-ml-danger btn-sm" onclick="window.adminDeleteChat('${orderId}')">
+                                    <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
+                                </button>
+                                ${!chat.closed ? `
+                                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminCloseChat('${orderId}')">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Atendimento
+                                    </button>
+                                ` : `
+                                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>
+                                `}
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>`;
-        new bootstrap.Modal(modalEl).show();
-    } catch (e) { showToast('Erro ao carregar a conversa.', 'error'); }
+
+        const msgsBody = document.getElementById('adminChatMsgsBody');
+        if (msgsBody) msgsBody.scrollTop = msgsBody.scrollHeight;
+    } catch (e) {
+        console.error(e);
+        showToast('Erro ao carregar a conversa.', 'error');
+    }
+};
+
+/** Mostra/esconde o painel "ver usuários da conversa", integrado ao próprio chat (sem modal) */
+window.adminToggleParticipants = function(panelId = 'adminChatParticipants') {
+    document.getElementById(panelId)?.classList.toggle('d-none');
+};
+
+/** Envia uma mensagem como membro da equipe de suporte dentro da conversa do pedido */
+window.adminSendChatMessage = async function(orderId) {
+    const input = document.getElementById('adminChatInput');
+    const text  = input?.value.trim();
+    if (!text) return;
+    const user = getSavedUser();
+
+    try {
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat) return;
+
+        const messages = chat.messages || [];
+        messages.push({
+            senderId:   user.id,
+            senderName: `${user.nome} (Suporte)`,
+            text,
+            timestamp:  new Date().toISOString(),
+            isStaff:    true
+        });
+
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        window.adminViewChat(orderId); // recarrega a conversa já com a mensagem nova
+    } catch (e) {
+        showToast('Erro ao enviar mensagem.', 'error');
+    }
+};
+
+/**
+ * Encerra o atendimento: registra uma mensagem de sistema avisando o
+ * encerramento e marca a conversa como fechada (não recebe mais respostas
+ * pelo lado do admin, embora comprador/vendedor continuem podendo se falar).
+ *
+ * IMPORTANTE: exige a coluna `closed` (boolean) na tabela `chats` do Supabase.
+ */
+window.adminCloseChat = async function(orderId) {
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    const user = getSavedUser();
+
+    try {
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat) return;
+
+        const messages = chat.messages || [];
+        messages.push({
+            type:      'system',
+            senderId:  'system',
+            text:      `Atendimento encerrado por ${user.nome} (Suporte).`,
+            timestamp: new Date().toISOString()
+        });
+
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages, closed: true }) });
+        showToast('Atendimento encerrado.', 'success');
+        window.adminViewChat(orderId); // recarrega a mesma tela já como encerrada
+    } catch (e) {
+        showToast('Erro ao encerrar atendimento.', 'error');
+    }
 };
 
 /** Apaga a conversa E o pedido associado (ação total de administrador) */
@@ -3829,8 +5033,1031 @@ window.adminDeleteChat = async function(orderId) {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
         showToast('Conversa e pedido removidos pelo administrador.', 'success');
-        window.renderAdminPanel();
+        adminRefreshCurrentView();
     } catch (e) { showToast('Erro ao remover a conversa.', 'error'); }
+};
+
+// ============================================
+// MODAL "CENTRAL DE CONVERSAS" DO ADMIN
+// ============================================
+// Mesmo layout visual do chat cliente ↔ vendedor (lista lateral de conversas
+// + painel de chat, classes .wa-main/.wa-side/.wa-chat), só que dentro de um
+// modal e com permissões de administrador (vê TODAS as conversas da
+// plataforma, responde como Suporte, encerra e apaga qualquer uma delas).
+
+/**
+ * Abre o modal "Central de Conversas" do admin. Se orderId for passado, já
+ * abre direto naquela conversa; senão, mostra só a lista pra escolher.
+ */
+window.adminOpenChatsModal = async function(orderId) {
+    const user = getSavedUser();
+    if (!user || user.tipo !== 'ADMIN') { showToast('Acesso restrito a administradores!', 'error'); return; }
+
+    const list = document.getElementById('adminChatsModalList');
+    const emptyEl = document.getElementById('adminChatsModalEmpty');
+    const activeEl = document.getElementById('adminChatsModalActive');
+    if (!list) return;
+
+    document.getElementById('adminChatsModalMain')?.classList.remove('wa-chat-open');
+    emptyEl?.classList.remove('d-none');
+    activeEl?.classList.add('d-none');
+    list.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-danger"></div></div>';
+
+    new bootstrap.Modal(document.getElementById('adminChatsModal')).show();
+
+    try {
+        const [orders, chats] = await Promise.all([
+            supabaseFetch('orders?select=*&order=created_at.desc'),
+            supabaseFetch('chats?select=*&order_id=not.is.null')
+        ]);
+        adminOrdersCache = orders;
+
+        const sorted = chats.slice().sort((a, b) => (a.closed === b.closed) ? 0 : (a.closed ? 1 : -1));
+
+        window._adminChatsModalRenderList = (term = '') => {
+            const q = term.trim().toLowerCase();
+            const filtered = sorted.filter(c => {
+                if (!q) return true;
+                const order = orders.find(o => o.id === c.order_id) || {};
+                return `${order.product_title || ''} ${order.buyer_name || ''} ${order.seller_name || ''}`.toLowerCase().includes(q);
+            });
+            list.innerHTML = filtered.length === 0
+                ? '<p class="text-muted text-center small py-4 px-3 mb-0">Nenhuma conversa encontrada.</p>'
+                : filtered.map(c => {
+                    const order = orders.find(o => o.id === c.order_id) || {};
+                    const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
+                    const lastMsg = (c.messages || [])[c.messages.length - 1];
+                    return `
+                    <div class="wa-contact ${c.order_id === window._adminActiveChatOrderId ? 'active-chat' : ''}" data-order-id="${c.order_id}" onclick="window.adminChatsModalSelect('${c.order_id}')">
+                        <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
+                        <div class="wa-contact-textbox">
+                            <div class="wa-contact-name">${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</div>
+                            <div class="wa-contact-text">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} msgs</div>
+                            ${lastMsg ? `<div class="wa-contact-text fst-italic">"${(lastMsg.text || '[mídia]').slice(0,40)}"</div>` : ''}
+                        </div>
+                        <span class="badge ${c.closed ? 'bg-secondary' : 'bg-success'} wa-contact-badge">${c.closed ? 'Encerrado' : 'Aberto'}</span>
+                    </div>`;
+                }).join('');
+        };
+        window._adminChatsModalRenderList();
+
+        if (orderId) window.adminChatsModalSelect(orderId);
+    } catch (e) {
+        console.error(e);
+        list.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar as conversas.</div>';
+    }
+};
+
+/** Filtra a lista lateral do modal de conversas do admin conforme o usuário digita */
+window.filterAdminChatsModal = function(term) {
+    window._adminChatsModalRenderList?.(term);
+};
+
+/** Seleciona e carrega uma conversa específica dentro do modal de conversas do admin */
+window.adminChatsModalSelect = async function(orderId) {
+    window._adminActiveChatOrderId = orderId;
+    document.getElementById('adminChatsModalMain')?.classList.add('wa-chat-open'); // no mobile, troca a lista pelo chat
+    document.querySelectorAll('#adminChatsModalList .wa-contact').forEach(el => el.classList.toggle('active-chat', el.dataset.orderId === orderId));
+
+    const emptyEl = document.getElementById('adminChatsModalEmpty');
+    const activeEl = document.getElementById('adminChatsModalActive');
+    emptyEl?.classList.add('d-none');
+    activeEl?.classList.remove('d-none');
+    activeEl.classList.add('d-flex');
+    activeEl.innerHTML = '<div class="text-center py-5 flex-grow-1"><div class="spinner-border text-danger"></div></div>';
+
+    try {
+        const [chatResult, order] = await Promise.all([
+            supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`),
+            Promise.resolve(adminOrdersCache.find(o => o.id === orderId))
+        ]);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+
+        const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
+        const msgsHtml = (chat.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+            || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
+        const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
+        const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '—', class: 'bg-secondary' };
+
+        activeEl.innerHTML = `
+            <div class="chat-header-pro">
+                <button type="button" class="chat-header-close d-lg-none" onclick="window.adminChatsModalBack()" style="margin-right:4px;" title="Voltar para a lista">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <div class="chat-header-avatar-wrap">
+                    <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                </div>
+                <div class="chat-header-info">
+                    <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
+                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · ${msgCount} mensagens</span>
+                </div>
+                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsModalParticipants')" title="Ver usuários da conversa">
+                    <i class="bi bi-people-fill"></i>
+                </button>
+            </div>
+
+            <!-- Resumo do Produto + Status do Pedido, direto junto com o chat (mesmas informações do chat cliente ↔ vendedor) -->
+            <div class="chat-product-summary">
+                <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                <div class="chat-product-summary-info">
+                    <div class="chat-product-summary-title">${order?.product_title || 'Produto'}</div>
+                    <div class="chat-product-summary-price">${order ? formatPreco(order.total, {htmlGratis:false}) : '—'}</div>
+                </div>
+                <small class="chat-product-summary-id">#${orderId.slice(-6).toUpperCase()}</small>
+            </div>
+            <div class="chat-status-bar">
+                <span class="badge ${st.class}">${st.text}</span>
+                ${order?.buyer_name ? `<span class="small text-muted ms-2"><i class="bi bi-bag-fill me-1"></i>${order.buyer_name}</span>` : ''}
+                ${order?.seller_name ? `<span class="small text-muted ms-2"><i class="bi bi-shop me-1"></i>${order.seller_name}</span>` : ''}
+            </div>
+
+            <div id="adminChatsModalParticipants" class="chat-participants-panel d-none">
+                <div class="chat-participant-row">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.buyer_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer">
+                    <div class="chat-participant-info">
+                        <strong>${order?.buyer_name || 'Comprador não identificado'}</strong>
+                        <small><i class="bi bi-bag-fill me-1"></i>Comprador</small>
+                    </div>
+                </div>
+                <div class="chat-participant-row">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.seller_name || '?')}&background=22c98e&color=fff" referrerpolicy="no-referrer">
+                    <div class="chat-participant-info">
+                        <strong>${order?.seller_name || 'Vendedor não identificado'}</strong>
+                        <small><i class="bi bi-shop me-1"></i>Vendedor</small>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminChatsModalMsgsBody" class="chat-messages" style="flex-grow:1; overflow-y:auto;">${msgsHtml}</div>
+
+            ${!chat.closed ? `
+                <div class="chat-input-bar">
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" id="adminChatsModalInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminChatsModalSend('${orderId}');}">
+                        <button type="button" class="chat-send-btn" onclick="window.adminChatsModalSend('${orderId}')"><i class="bi bi-send-fill"></i></button>
+                    </div>
+                </div>
+            ` : ''}
+
+            <div class="chat-admin-actions">
+                <button class="btn btn-ml-danger btn-sm" onclick="window.adminChatsModalDelete('${orderId}')">
+                    <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
+                </button>
+                ${!chat.closed ? `
+                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminChatsModalCloseChat('${orderId}')">
+                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Atendimento
+                    </button>
+                ` : `
+                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>
+                `}
+            </div>`;
+
+        const msgsBody = document.getElementById('adminChatsModalMsgsBody');
+        if (msgsBody) msgsBody.scrollTop = msgsBody.scrollHeight;
+    } catch (e) {
+        console.error(e);
+        showToast('Erro ao carregar a conversa.', 'error');
+    }
+};
+
+/** No mobile, volta da conversa aberta pra lista lateral sem fechar o modal */
+window.adminChatsModalBack = function() {
+    document.getElementById('adminChatsModalMain')?.classList.remove('wa-chat-open');
+};
+
+/** Envia uma mensagem como membro da equipe de suporte, dentro do modal de conversas do admin */
+window.adminChatsModalSend = async function(orderId) {
+    const input = document.getElementById('adminChatsModalInput');
+    const text  = input?.value.trim();
+    if (!text) return;
+    const user = getSavedUser();
+
+    try {
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat) return;
+
+        const messages = chat.messages || [];
+        messages.push({
+            senderId:   user.id,
+            senderName: `${user.nome} (Suporte)`,
+            text,
+            timestamp:  new Date().toISOString(),
+            isStaff:    true
+        });
+
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        window.adminChatsModalSelect(orderId); // recarrega a conversa já com a mensagem nova
+    } catch (e) {
+        showToast('Erro ao enviar mensagem.', 'error');
+    }
+};
+
+/** Encerra o atendimento a partir do modal de conversas do admin */
+window.adminChatsModalCloseChat = async function(orderId) {
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    const user = getSavedUser();
+
+    try {
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat) return;
+
+        const messages = chat.messages || [];
+        messages.push({
+            type:      'system',
+            senderId:  'system',
+            text:      `Atendimento encerrado por ${user.nome} (Suporte).`,
+            timestamp: new Date().toISOString()
+        });
+
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages, closed: true }) });
+        showToast('Atendimento encerrado.', 'success');
+        window.adminChatsModalSelect(orderId); // recarrega a mesma conversa já como encerrada
+        window._adminChatsModalRenderList?.(document.getElementById('adminChatsModalSearch')?.value || '');
+    } catch (e) {
+        showToast('Erro ao encerrar atendimento.', 'error');
+    }
+};
+
+/** Apaga a conversa E o pedido associado, a partir do modal de conversas do admin */
+window.adminChatsModalDelete = async function(orderId) {
+    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    try {
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
+        await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
+        showToast('Conversa e pedido removidos pelo administrador.', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('adminChatsModal'))?.hide();
+        adminRefreshCurrentView();
+    } catch (e) {
+        showToast('Erro ao remover a conversa.', 'error');
+    }
+};
+
+// ============================================
+// ABA "CHATS" DO PAINEL ADMIN — chat embutido (sem modal)
+// ============================================
+// Mesmo layout e comportamento do chat cliente ↔ vendedor (lista lateral +
+// janela de chat, classes .wa-main/.wa-side/.wa-chat), só que vive direto
+// dentro da aba "Chats" do dashboard (com os quadros de estatística em cima)
+// e com as ações de administrador (encerrar/apagar) integradas ao próprio
+// chat — nada de popup.
+
+/** Preenche a lista lateral da aba "Chats" com as conversas já carregadas pelo renderAdminPanel */
+window.renderAdminChatsTab = function(chats, orders) {
+    const list = document.getElementById('adminChatsTabList');
+    if (!list) return;
+
+    window._adminChatsTabData = {
+        chats: chats.slice().sort((a, b) => (a.closed === b.closed) ? 0 : (a.closed ? 1 : -1)),
+        orders
+    };
+
+    window._adminChatsTabRenderList = (term = '') => {
+        const { chats: sorted, orders } = window._adminChatsTabData;
+        const q = term.trim().toLowerCase();
+        const filtered = sorted.filter(c => {
+            if (!q) return true;
+            const order = orders.find(o => o.id === c.order_id) || {};
+            return `${order.product_title || ''} ${order.buyer_name || ''} ${order.seller_name || ''}`.toLowerCase().includes(q);
+        });
+        list.innerHTML = filtered.length === 0
+            ? '<p class="text-muted text-center small py-4 px-3 mb-0">Nenhuma conversa encontrada.</p>'
+            : filtered.map(c => {
+                const order = orders.find(o => o.id === c.order_id) || {};
+                const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
+                const lastMsg = (c.messages || [])[c.messages.length - 1];
+                return `
+                <div class="wa-contact ${c.order_id === window._adminActiveChatOrderId ? 'active-chat' : ''}" data-order-id="${c.order_id}" onclick="window.adminChatsTabSelect('${c.order_id}')">
+                    <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
+                    <div class="wa-contact-textbox">
+                        <div class="wa-contact-name">${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</div>
+                        <div class="wa-contact-text">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} msgs</div>
+                        ${lastMsg ? `<div class="wa-contact-text fst-italic">"${(lastMsg.text || '[mídia]').slice(0,40)}"</div>` : ''}
+                    </div>
+                    <span class="badge ${c.closed ? 'bg-secondary' : 'bg-success'} wa-contact-badge">${c.closed ? 'Encerrado' : 'Aberto'}</span>
+                </div>`;
+            }).join('');
+    };
+    window._adminChatsTabRenderList();
+
+    // Se a aba "Chats" já estava aberta com uma conversa selecionada (ex: o
+    // admin encerrou/apagou algo e o painel recarregou), reabre a mesma
+    // conversa em vez de voltar pro estado vazio.
+    if (window._adminActiveTab === 'admin-chats' && window._adminActiveChatOrderId &&
+        window._adminChatsTabData.chats.some(c => c.order_id === window._adminActiveChatOrderId)) {
+        window.adminChatsTabSelect(window._adminActiveChatOrderId);
+    }
+};
+
+/** Filtra a lista lateral da aba "Chats" conforme o admin digita */
+window.filterAdminChatsTab = function(term) {
+    window._adminChatsTabRenderList?.(term);
+};
+
+/** Seleciona e carrega uma conversa específica dentro da aba "Chats" do admin */
+window.adminChatsTabSelect = async function(orderId) {
+    window._adminActiveChatOrderId = orderId;
+    document.getElementById('adminChatsTabMain')?.classList.add('wa-chat-open'); // no mobile, troca a lista pelo chat
+    document.querySelectorAll('#adminChatsTabList .wa-contact').forEach(el => el.classList.toggle('active-chat', el.dataset.orderId === orderId));
+
+    const emptyEl = document.getElementById('adminChatsTabEmpty');
+    const activeEl = document.getElementById('adminChatsTabActive');
+    emptyEl?.classList.add('d-none');
+    activeEl?.classList.remove('d-none');
+    activeEl.classList.add('d-flex');
+    activeEl.innerHTML = '<div class="text-center py-5 flex-grow-1"><div class="spinner-border text-danger"></div></div>';
+
+    try {
+        const [chatResult, order] = await Promise.all([
+            supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`),
+            Promise.resolve((window._adminChatsTabData?.orders || adminOrdersCache).find(o => o.id === orderId))
+        ]);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+
+        const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
+        const msgsHtml = (chat.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+            || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
+        const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
+        const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '—', class: 'bg-secondary' };
+
+        activeEl.innerHTML = `
+            <div class="chat-header-pro">
+                <button type="button" class="chat-header-close d-lg-none" onclick="window.adminChatsTabBack()" style="margin-right:4px;" title="Voltar para a lista">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <div class="chat-header-avatar-wrap">
+                    <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                </div>
+                <div class="chat-header-info">
+                    <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
+                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · ${msgCount} mensagens</span>
+                </div>
+                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsTabParticipants')" title="Ver usuários da conversa">
+                    <i class="bi bi-people-fill"></i>
+                </button>
+            </div>
+
+            <!-- Resumo do Produto + Status do Pedido, igual ao chat cliente ↔ vendedor -->
+            <div class="chat-product-summary">
+                <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+                <div class="chat-product-summary-info">
+                    <div class="chat-product-summary-title">${order?.product_title || 'Produto'}</div>
+                    <div class="chat-product-summary-price">${order ? formatPreco(order.total, {htmlGratis:false}) : '—'}</div>
+                </div>
+                <small class="chat-product-summary-id">#${orderId.slice(-6).toUpperCase()}</small>
+            </div>
+            <div class="chat-status-bar">
+                <span class="badge ${st.class}">${st.text}</span>
+                ${order?.buyer_name ? `<span class="small text-muted ms-2"><i class="bi bi-bag-fill me-1"></i>${order.buyer_name}</span>` : ''}
+                ${order?.seller_name ? `<span class="small text-muted ms-2"><i class="bi bi-shop me-1"></i>${order.seller_name}</span>` : ''}
+            </div>
+
+            <div id="adminChatsTabParticipants" class="chat-participants-panel d-none">
+                <div class="chat-participant-row">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.buyer_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer">
+                    <div class="chat-participant-info">
+                        <strong>${order?.buyer_name || 'Comprador não identificado'}</strong>
+                        <small><i class="bi bi-bag-fill me-1"></i>Comprador</small>
+                    </div>
+                </div>
+                <div class="chat-participant-row">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.seller_name || '?')}&background=22c98e&color=fff" referrerpolicy="no-referrer">
+                    <div class="chat-participant-info">
+                        <strong>${order?.seller_name || 'Vendedor não identificado'}</strong>
+                        <small><i class="bi bi-shop me-1"></i>Vendedor</small>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminChatsTabMsgsBody" class="chat-messages" style="flex-grow:1; overflow-y:auto;">${msgsHtml}</div>
+
+            ${!chat.closed ? `
+                <div class="chat-input-bar">
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" id="adminChatsTabInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminChatsTabSend('${orderId}');}">
+                        <button type="button" class="chat-send-btn" onclick="window.adminChatsTabSend('${orderId}')"><i class="bi bi-send-fill"></i></button>
+                    </div>
+                </div>
+            ` : ''}
+
+            <div class="chat-admin-actions">
+                <button class="btn btn-ml-danger btn-sm" onclick="window.adminChatsTabDelete('${orderId}')">
+                    <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
+                </button>
+                ${!chat.closed ? `
+                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminChatsTabCloseChat('${orderId}')">
+                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Atendimento
+                    </button>
+                ` : `
+                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>
+                `}
+            </div>`;
+
+        const msgsBody = document.getElementById('adminChatsTabMsgsBody');
+        if (msgsBody) msgsBody.scrollTop = msgsBody.scrollHeight;
+    } catch (e) {
+        console.error(e);
+        showToast('Erro ao carregar a conversa.', 'error');
+    }
+};
+
+/** No mobile, volta da conversa aberta pra lista lateral, sem sair da aba */
+window.adminChatsTabBack = function() {
+    document.getElementById('adminChatsTabMain')?.classList.remove('wa-chat-open');
+    window._adminActiveChatOrderId = null;
+};
+
+/** Envia uma mensagem como membro da equipe de suporte, direto na aba "Chats" */
+window.adminChatsTabSend = async function(orderId) {
+    const input = document.getElementById('adminChatsTabInput');
+    const text  = input?.value.trim();
+    if (!text) return;
+    const user = getSavedUser();
+
+    try {
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat) return;
+
+        const messages = chat.messages || [];
+        messages.push({
+            senderId:   user.id,
+            senderName: `${user.nome} (Suporte)`,
+            text,
+            timestamp:  new Date().toISOString(),
+            isStaff:    true
+        });
+
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        window.adminChatsTabSelect(orderId); // recarrega a conversa já com a mensagem nova
+    } catch (e) {
+        showToast('Erro ao enviar mensagem.', 'error');
+    }
+};
+
+/** Encerra o atendimento a partir da aba "Chats" do admin */
+window.adminChatsTabCloseChat = async function(orderId) {
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    const user = getSavedUser();
+
+    try {
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat) return;
+
+        const messages = chat.messages || [];
+        messages.push({
+            type:      'system',
+            senderId:  'system',
+            text:      `Atendimento encerrado por ${user.nome} (Suporte).`,
+            timestamp: new Date().toISOString()
+        });
+
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages, closed: true }) });
+        showToast('Atendimento encerrado.', 'success');
+
+        // Atualiza o cache local pra badge da lista virar "Encerrado" na hora
+        const cached = window._adminChatsTabData?.chats.find(c => c.order_id === orderId);
+        if (cached) cached.closed = true;
+
+        window.adminChatsTabSelect(orderId); // recarrega a mesma conversa já como encerrada
+        window._adminChatsTabRenderList?.(document.getElementById('adminChatsTabSearch')?.value || '');
+    } catch (e) {
+        showToast('Erro ao encerrar atendimento.', 'error');
+    }
+};
+
+/** Apaga a conversa E o pedido associado, a partir da aba "Chats" do admin */
+window.adminChatsTabDelete = async function(orderId) {
+    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    try {
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
+        await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
+        showToast('Conversa e pedido removidos pelo administrador.', 'success');
+        window._adminActiveChatOrderId = null;
+        adminRefreshCurrentView();
+    } catch (e) {
+        showToast('Erro ao remover a conversa.', 'error');
+    }
+};
+
+// ============================================
+// CENTRAL DE SUPORTE (chamados: senha, entrega, conta etc.)
+// ============================================
+// Reaproveita a tabela `chats` (mesma dos chats comprador ↔ vendedor) sem criar
+// nenhuma coluna nova. Um chamado de suporte é uma linha de `chats` onde:
+//  - `order_id` fica sempre NULL (é isso que diferencia um chamado de um chat
+//    de pedido de verdade, que sempre tem `order_id` preenchido);
+//  - `buyer_id` / `buyer_name` guardam o solicitante;
+//  - `closed` (mesma coluna já usada pelos chats) guarda o status;
+//  - categoria, assunto, e-mail, cargo e pedido relacionado ficam dentro do
+//    próprio JSON de `messages`, numa mensagem de metadados (type: 'ticket_meta')
+//    que fica escondida da conversa exibida pro usuário/admin.
+
+const SUPPORT_CATEGORY_LABELS = {
+    esqueci_senha:            'Esqueci minha senha',
+    produto_nao_recebido:     'Não recebi o produto',
+    entrega_sem_confirmacao:  'Entreguei, mas o comprador não confirmou',
+    conta_ajuda:               'Dúvida sobre a conta/plataforma',
+    outro:                     'Outro assunto'
+};
+
+/** Converte a linha crua de `chats` (com a mensagem de metadados embutida) num objeto de chamado "achatado" e fácil de usar na UI */
+function normalizeTicket(raw) {
+    if (!raw) return null;
+    const msgs = raw.messages || [];
+    const meta = msgs.find(m => m.type === 'ticket_meta') || {};
+    return {
+        id:              raw.id,
+        category:        meta.category,
+        subject:         meta.subject,
+        status:          raw.closed ? 'closed' : 'open',
+        requester_id:    raw.buyer_id,
+        requester_name:  raw.buyer_name,
+        requester_email: meta.requester_email,
+        requester_role:  meta.requester_role,
+        order_id:        meta.related_order_id || null,
+        messages:        msgs.filter(m => m.type !== 'ticket_meta')
+    };
+}
+
+/** Busca os chamados de suporte (linhas de `chats` com order_id NULL) sem derrubar o painel em caso de erro */
+async function fetchSupportTicketsSafe() {
+    try {
+        const rows = await supabaseFetch('chats?order_id=is.null&select=*&order=id.desc');
+        return rows.map(normalizeTicket);
+    } catch (e) {
+        console.warn('Erro ao buscar chamados de suporte:', e);
+        return [];
+    }
+}
+
+/**
+ * Cria um chamado de suporte. Chamado automaticamente sempre que: o usuário
+ * pede recuperação de senha, o comprador reporta que não recebeu o produto,
+ * o vendedor reporta que entregou mas não teve confirmação, ou o usuário
+ * pede ajuda geral pelo formulário "Falar com o Suporte".
+ */
+async function createSupportTicket({ category, subject, message = null, orderId = null, overrideEmail = null }) {
+    const user = getSavedUser();
+    const firstMsgText = message || subject;
+    const ticket = {
+        id: `ticket_${Date.now()}`,
+        // order_id fica NULL de propósito: é o que marca esta linha como um
+        // chamado de suporte (todo chat de pedido de verdade tem order_id).
+        order_id:   null,
+        buyer_id:   user?.id || null,
+        buyer_name: user?.nome || 'Visitante',
+        closed:     false,
+        messages: [
+            {
+                // "Mensagem" de metadados: não é exibida na conversa, só carrega
+                // os dados extras do chamado dentro do próprio JSON de messages.
+                type:              'ticket_meta',
+                category,
+                subject,
+                requester_email:   overrideEmail || user?.email || null,
+                requester_role:    user?.tipo || null,
+                related_order_id:  orderId
+            },
+            {
+                senderId:   user?.id || 'anon',
+                senderName: user?.nome || 'Visitante',
+                text:       firstMsgText,
+                timestamp:  new Date().toISOString()
+            }
+        ]
+    };
+    try {
+        await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(ticket) });
+        return ticket.id;
+    } catch (e) {
+        console.error('Erro ao abrir chamado de suporte:', e);
+        return null;
+    }
+}
+
+/**
+ * Abre "Falar com o Suporte". Se o usuário (logado, ou visitante que já abriu
+ * um chamado nesta sessão) já tiver um atendimento em aberto, pula direto pra
+ * conversa em vez de mostrar o formulário de novo — é assim que vira um
+ * "chatinho" de verdade: clicou, escolheu o assunto, confirmou, e a partir
+ * daí sempre volta pra mesma conversa até o admin encerrar o atendimento.
+ * `presetCategory`/`presetOrderId` (vindos dos atalhos de "esqueci senha" e
+ * "problema com o pedido") sempre abrem um chamado novo com o assunto certo.
+ */
+window.openSupportRequestModal = async function(presetCategory, presetOrderId) {
+    const user = getSavedUser();
+    window._supportReqOrderId = presetOrderId || null;
+
+    const modalEl = document.getElementById('supportRequestModal');
+    if (!modalEl) return;
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    if (!presetCategory) {
+        modalInstance.show();
+        window.showSupportChatLoading();
+        const existing = await findMyOpenSupportTicket();
+        if (existing) {
+            window.enterSupportChatMode(existing.id);
+            return;
+        }
+    }
+
+    window.showSupportRequestForm();
+
+    const emailInput = document.getElementById('supportReqEmail');
+    const emailWrap  = document.getElementById('supportReqEmailWrap');
+    if (emailInput) emailInput.value = user?.email || '';
+    if (emailWrap)  emailWrap.classList.toggle('d-none', !!user);
+
+    const catSelect = document.getElementById('supportReqCategory');
+    if (catSelect) catSelect.value = presetCategory || 'conta_ajuda';
+
+    modalInstance.show();
+};
+
+/** Envia o formulário de suporte, cria o chamado e já entra na conversa (etapa 2) */
+window.submitSupportRequest = async function(event) {
+    event.preventDefault();
+    const category = document.getElementById('supportReqCategory')?.value || 'outro';
+    const email    = document.getElementById('supportReqEmail')?.value.trim();
+    const subject  = SUPPORT_CATEGORY_LABELS[category] || 'Solicitação de suporte';
+    const message  = subject;
+    const user     = getSavedUser();
+
+    if (!user && !email) { showToast('Informe seu e-mail para podermos retornar.', 'warning'); return false; }
+
+    const btn = document.querySelector('#supportRequestForm button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.dataset.origText = btn.dataset.origText || btn.textContent; btn.textContent = 'Abrindo chamado...'; }
+
+    const ticketId = await createSupportTicket({
+        category,
+        subject,
+        message,
+        orderId:      window._supportReqOrderId || null,
+        overrideEmail: email
+    });
+
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText; }
+
+    if (ticketId) {
+        if (!user) { try { localStorage.setItem('electroGuestTicketId', ticketId); } catch (e) {} }
+        document.getElementById('supportRequestForm')?.reset();
+        window._supportReqOrderId = null;
+        showToast('Chamado aberto! Continue a conversa por aqui.', 'success');
+        window.enterSupportChatMode(ticketId);
+    } else {
+        showToast('Erro ao abrir chamado. Tente novamente em instantes.', 'error');
+    }
+    return false;
+};
+
+// -------- Chat do chamado de suporte (visão do usuário que abriu) --------
+
+let supportChatPollInterval  = null;
+let supportChatLastSignature = null;
+window._activeSupportTicketId = null;
+
+/** Procura um chamado ainda aberto pertencente ao usuário atual (logado, pelo
+ *  id da conta; visitante, pelo id salvo no localStorage quando abriu o
+ *  chamado) — usado pra retomar a conversa em vez de repetir o formulário. */
+async function findMyOpenSupportTicket() {
+    const user = getSavedUser();
+    try {
+        if (user) {
+            const rows = await supabaseFetch(`chats?order_id=is.null&buyer_id=eq.${user.id}&closed=eq.false&select=*&order=id.desc&limit=1`);
+            return rows?.[0] || null;
+        }
+        let guestId = null;
+        try { guestId = localStorage.getItem('electroGuestTicketId'); } catch (e) {}
+        if (!guestId) return null;
+        const rows = await supabaseFetch(`chats?id=eq.${guestId}&select=*&limit=1`);
+        const t = rows?.[0];
+        if (!t || t.closed) { try { localStorage.removeItem('electroGuestTicketId'); } catch (e) {} return null; }
+        return t;
+    } catch (e) {
+        console.warn('Erro ao buscar chamado em andamento:', e);
+        return null;
+    }
+}
+
+/** Volta a etapa 1 (formulário) do modal de suporte */
+window.showSupportRequestForm = function() {
+    stopSupportChatPolling();
+    window._activeSupportTicketId = null;
+    document.getElementById('supportRequestForm')?.classList.remove('d-none');
+    document.getElementById('supportChatView')?.classList.add('d-none');
+    const title = document.getElementById('supportModalTitle');
+    if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Falar com o Suporte';
+};
+
+/** Mostra um estado de carregamento rápido enquanto checa se já existe um chamado em aberto */
+window.showSupportChatLoading = function() {
+    document.getElementById('supportRequestForm')?.classList.add('d-none');
+    const chatView = document.getElementById('supportChatView');
+    chatView?.classList.remove('d-none');
+    const container = document.getElementById('supportChatMessages');
+    if (container) container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>';
+    document.getElementById('supportChatInputBar')?.classList.add('d-none');
+};
+
+/** Entra na etapa 2 (conversa) do modal de suporte, pro chamado indicado */
+window.enterSupportChatMode = function(ticketId) {
+    window._activeSupportTicketId = ticketId;
+    supportChatLastSignature = null;
+    document.getElementById('supportRequestForm')?.classList.add('d-none');
+    document.getElementById('supportChatView')?.classList.remove('d-none');
+    const title = document.getElementById('supportModalTitle');
+    if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Atendimento do Suporte';
+    loadMySupportTicket(ticketId);
+    startSupportChatPolling(ticketId);
+};
+
+function startSupportChatPolling(ticketId) {
+    stopSupportChatPolling();
+    supportChatPollInterval = setInterval(() => {
+        const modalEl = document.getElementById('supportRequestModal');
+        const isOpen  = modalEl?.classList.contains('show');
+        if (!isOpen || window._activeSupportTicketId !== ticketId) { stopSupportChatPolling(); return; }
+        loadMySupportTicket(ticketId, true);
+    }, 4000);
+}
+
+function stopSupportChatPolling() {
+    if (supportChatPollInterval) { clearInterval(supportChatPollInterval); supportChatPollInterval = null; }
+}
+
+/** Fecha o modal de suporte e para o polling — chamado pelo X do modal */
+window.closeSupportChatModal = function() {
+    stopSupportChatPolling();
+};
+
+async function loadMySupportTicket(ticketId, silent = false) {
+    const container = document.getElementById('supportChatMessages');
+    if (!container) return;
+    if (!silent) container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando conversa...</p></div>';
+
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const raw = result?.[0];
+        if (!raw) {
+            stopSupportChatPolling();
+            if (!silent) container.innerHTML = '<div class="text-center text-muted py-4">Chamado não encontrado.</div>';
+            return;
+        }
+        const ticket = normalizeTicket(raw);
+
+        const signature = JSON.stringify(raw.messages) + '|' + !!raw.closed;
+        if (silent && signature === supportChatLastSignature) return;
+        supportChatLastSignature = signature;
+
+        const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
+
+        container.innerHTML = (ticket.messages || []).map(m => supportMsgBubbleHtml(m)).join('')
+            || '<div class="text-center text-muted py-4">Sem mensagens ainda.</div>';
+
+        const inputBar = document.getElementById('supportChatInputBar');
+        if (inputBar) inputBar.classList.toggle('d-none', ticket.status === 'closed');
+
+        const statusBar = document.getElementById('supportChatStatusBar');
+        if (statusBar) {
+            statusBar.innerHTML = ticket.status === 'closed'
+                ? '<span class="admin-row-badge badge-muted"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>'
+                : `<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>${SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado'}</span>`;
+        }
+
+        if (ticket.status === 'closed') {
+            stopSupportChatPolling();
+            try {
+                if (localStorage.getItem('electroGuestTicketId') === ticketId) localStorage.removeItem('electroGuestTicketId');
+            } catch (e) {}
+        }
+
+        if (wasNearBottom) container.scrollTop = container.scrollHeight;
+    } catch (e) {
+        console.error(e);
+        if (!silent) container.innerHTML = '<div class="text-center text-muted py-4">Erro ao carregar a conversa.</div>';
+    }
+}
+
+/** Bolha de mensagem na visão do usuário: a mensagem dele fica à direita, e
+ *  as respostas da equipe de suporte (isStaff) ficam à esquerda em destaque. */
+function supportMsgBubbleHtml(m) {
+    if (m.type === 'system' || m.senderId === 'system') {
+        return `<div class="text-center my-3"><span class="system-chip"><i class="bi bi-info-circle-fill"></i>${m.text}</span></div>`;
+    }
+    const isMe = !m.isStaff;
+    const senderLabel = m.isStaff ? (m.senderName || 'Suporte') : 'Você';
+    return `
+        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}">
+            <div class="msg-bubble ${isMe ? 'is-me' : 'is-them is-staff'}">
+                <span class="msg-sender">${senderLabel}${m.isStaff ? ' <i class="bi bi-patch-check-fill"></i>' : ''}</span>
+                <div class="chat-bubble-text" style="white-space:pre-wrap;">${(m.text || '').replace(/</g, '&lt;')}</div>
+                <div class="msg-time">${new Date(m.timestamp).toLocaleString('pt-BR')}</div>
+            </div>
+        </div>`;
+}
+
+/** Envia uma nova mensagem do usuário dentro do chamado já aberto */
+window.sendMySupportMessage = async function() {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    const input = document.getElementById('supportChatInput');
+    const text  = input?.value.trim();
+    if (!text) return;
+    const user = getSavedUser();
+
+    input.disabled = true;
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) return;
+        if (ticket.closed) { showToast('Este atendimento já foi encerrado.', 'warning'); loadMySupportTicket(ticketId); return; }
+
+        const messages = ticket.messages || [];
+        messages.push({
+            senderId:   user?.id || 'anon',
+            senderName: user?.nome || 'Visitante',
+            text,
+            timestamp:  new Date().toISOString()
+        });
+
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        supportChatLastSignature = null;
+        await loadMySupportTicket(ticketId);
+    } catch (e) {
+        showToast('Erro ao enviar mensagem.', 'error');
+    } finally {
+        input.disabled = false;
+        input?.focus();
+    }
+};
+
+/**
+ * Atalhos usados dentro do chat do pedido (área de logística) quando o
+ * comprador não recebeu o produto, ou o vendedor entregou mas não teve
+ * confirmação — abre o chamado já com o pedido vinculado.
+ */
+window.reportOrderProblem = function(orderId, category) {
+    window.openSupportRequestModal(category, orderId);
+};
+
+// -------- Visão do administrador sobre um chamado (mesmo design do chat) --------
+
+/** Abre um chamado de suporte no mesmo layout do chat cliente↔vendedor, sem modal */
+window.adminViewTicket = async function(ticketId) {
+    const grid = document.getElementById('productsGrid');
+    grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando chamado...</p></div>';
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = normalizeTicket(result?.[0]);
+        if (!ticket) { showToast('Chamado não encontrado.', 'error'); adminRefreshCurrentView(); return; }
+
+        const resolveSenderName = () => ticket.requester_name;
+        const msgsHtml = (ticket.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+            || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
+
+        grid.className = 'admin-panel-active';
+        grid.innerHTML = `
+            <div class="admin-standalone-page">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <button class="btn btn-sm btn-ml-secondary" onclick="adminRefreshCurrentView()"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
+                    <h5 class="fw-bold mb-0">Chamado de Suporte <span class="admin-row-badge ${ticket.status === 'closed' ? 'badge-muted' : 'badge-open'} ms-1">${ticket.status === 'closed' ? 'Encerrado' : 'Aberto'}</span></h5>
+                </div>
+                <div class="wa-main admin-chat-main" style="margin:0;">
+                    <section class="wa-chat" style="flex-grow:1;">
+                        <div class="chat-container" style="height:100%;">
+                            <div class="chat-header-pro">
+                                <div class="chat-header-avatar-wrap">
+                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(ticket.requester_name || '?')}&background=e50914&color=fff" referrerpolicy="no-referrer">
+                                </div>
+                                <div class="chat-header-info">
+                                    <span class="chat-header-name">${SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado'}</span>
+                                    <span class="chat-header-order-id">${ticket.requester_name || 'Visitante'}${ticket.order_id ? ' · Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''}</span>
+                                </div>
+                                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuário do chamado">
+                                    <i class="bi bi-people-fill"></i>
+                                </button>
+                            </div>
+
+                            <div id="adminChatParticipants" class="chat-participants-panel d-none">
+                                <div class="chat-participant-row">
+                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(ticket.requester_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer">
+                                    <div class="chat-participant-info">
+                                        <strong>${ticket.requester_name || 'Visitante'}</strong>
+                                        <small>${ticket.requester_email || 'E-mail não informado'} ${ticket.requester_role ? '• ' + (ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente')) : ''}</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="adminChatMsgsBody" class="chat-messages">${msgsHtml}</div>
+
+                            ${ticket.status !== 'closed' ? `
+                                <div class="chat-input-bar">
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="text" id="adminChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
+                                               onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSendTicketMessage('${ticketId}');}">
+                                        <button type="button" class="chat-send-btn" onclick="window.adminSendTicketMessage('${ticketId}')"><i class="bi bi-send-fill"></i></button>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="chat-admin-actions">
+                                <button class="btn btn-ml-danger btn-sm" onclick="window.adminDeleteTicket('${ticketId}')">
+                                    <i class="bi bi-trash me-1"></i>Apagar chamado
+                                </button>
+                                ${ticket.status !== 'closed' ? `
+                                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminCloseTicket('${ticketId}')">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Chamado
+                                    </button>
+                                ` : `
+                                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Chamado encerrado</span>
+                                `}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>`;
+
+        const msgsBody = document.getElementById('adminChatMsgsBody');
+        if (msgsBody) msgsBody.scrollTop = msgsBody.scrollHeight;
+    } catch (e) {
+        console.error(e);
+        showToast('Erro ao carregar o chamado.', 'error');
+    }
+};
+
+/** Envia uma resposta da equipe de suporte dentro do chamado */
+window.adminSendTicketMessage = async function(ticketId) {
+    const input = document.getElementById('adminChatInput');
+    const text  = input?.value.trim();
+    if (!text) return;
+    const user = getSavedUser();
+
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) return;
+
+        const messages = ticket.messages || [];
+        messages.push({
+            senderId:   user.id,
+            senderName: `${user.nome} (Suporte)`,
+            text,
+            timestamp:  new Date().toISOString(),
+            isStaff:    true
+        });
+
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        window.adminViewTicket(ticketId);
+    } catch (e) {
+        showToast('Erro ao enviar mensagem.', 'error');
+    }
+};
+
+/** Encerra o chamado de suporte (o requerente pode ver o encerramento se acompanhar o próprio chamado no futuro) */
+window.adminCloseTicket = async function(ticketId) {
+    if (!confirm('Encerrar este chamado?\nUma mensagem de encerramento será registrada.')) return;
+    const user = getSavedUser();
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) return;
+
+        const messages = ticket.messages || [];
+        messages.push({
+            type:      'system',
+            senderId:  'system',
+            text:      `Chamado encerrado por ${user.nome} (Suporte).`,
+            timestamp: new Date().toISOString()
+        });
+
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages, closed: true }) });
+        showToast('Chamado encerrado.', 'success');
+        window.adminViewTicket(ticketId);
+    } catch (e) {
+        showToast('Erro ao encerrar chamado.', 'error');
+    }
+};
+
+/** Apaga o chamado de suporte permanentemente */
+window.adminDeleteTicket = async function(ticketId) {
+    if (!confirm('Apagar este chamado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    try {
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'DELETE' });
+        showToast('Chamado removido.', 'success');
+        adminRefreshCurrentView();
+    } catch (e) { showToast('Erro ao remover o chamado.', 'error'); }
 };
 
 // ============================================

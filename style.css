@@ -642,7 +642,8 @@ body.dark-theme .btn-close {
 /* GRID DE PRODUTOS                             */
 /* ============================================ */
 
-#productsGrid {
+#productsGrid,
+.products-grid-uniform {
     display: grid;
     grid-template-columns: repeat(6, 1fr); /* 6 por linha estilo ML */
     gap: 12px;
@@ -651,7 +652,8 @@ body.dark-theme .btn-close {
 
 /* Visual Android/ML: 2 colunas e cards mais compactos */
 @media (max-width: 576px) {
-    #productsGrid {
+    #productsGrid,
+    .products-grid-uniform {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
         padding: 5px;
@@ -659,6 +661,14 @@ body.dark-theme .btn-close {
     .product-card-img-container {
         height: 150px;
         padding: 10px;
+    }
+}
+
+/* Tablet: a página de loja não tem a coluna lateral do grid principal,
+   então usa uma faixa intermediária de colunas pra não ficar apertada */
+@media (min-width: 577px) and (max-width: 900px) {
+    .products-grid-uniform {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
@@ -688,6 +698,15 @@ body.dark-theme .btn-close {
 /* padrão usado em Curtidos/Pedidos)             */
 /* ============================================ */
 #productsGrid.product-detail-active {
+    display: block;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+/* Painel Admin: o container principal vira um bloco normal (sem grid/gradiente
+   herdado do estado de "loading", que reaproveita o visual roxo dos pedidos) */
+#productsGrid.admin-panel-active {
     display: block;
     background: none;
     padding: 0;
@@ -1096,6 +1115,18 @@ body.dark-theme .product-card-img-container {
 
 .product-card-ml .overlay .btn-action:hover {
     color: var(--primary-action);
+    transform: scale(1.1);
+}
+
+/* Botão de excluir que o admin vê nos cards da tela "Todos os Produtos" */
+.product-card-ml .overlay .btn-admin-delete {
+    background: rgba(231, 76, 60, 0.92);
+    color: #fff;
+}
+
+.product-card-ml .overlay .btn-admin-delete:hover {
+    background: #e74c3c;
+    color: #fff;
     transform: scale(1.1);
 }
 
@@ -1715,6 +1746,14 @@ body.dark-theme .cart-item-img {
     font-weight: 700;
     color: #049588;
     margin-bottom: 2px;
+}
+
+/* Mensagens enviadas pela equipe de suporte (admin) dentro de uma conversa
+   de pedido ou chamado — mesma bolha do chat normal, só com um tom
+   diferenciado pra ficar claro que quem falou foi o time de suporte. */
+.msg-bubble.is-staff {
+    background: #ffe9b3;
+    color: #1c1c1c;
 }
 
 .msg-bubble.msg-deleted {
@@ -3660,6 +3699,68 @@ body.dark-theme .btn-ml-secondary:hover {
     border-color: var(--border-light);
 }
 
+/* Botão de ação destrutiva no mesmo estilo "Mercado Livre" dos demais botões
+   (fundo suave + texto colorido), usado em Excluir Anúncio, exclusão de
+   produto pelo admin, apagar/encerrar chat etc. — substitui o btn-danger
+   "cru" do Bootstrap, que ficava fora do padrão visual do site. */
+.btn-ml-danger {
+    background-color: #fde3e3;
+    border: none;
+    border-radius: 8px;
+    color: #e02b2b !important;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    transition: background-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+
+.btn-ml-danger:hover {
+    background-color: #fbcaca;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    color: #c81f1f !important;
+}
+
+.btn-ml-danger:active {
+    transform: scale(0.98);
+}
+
+body.dark-theme .btn-ml-danger {
+    background-color: #3a1a1a;
+    color: #ff6b6b !important;
+}
+
+body.dark-theme .btn-ml-danger:hover {
+    background-color: #4a2020;
+}
+
+/* Variante "contorno" — usada no botão "Fazer Oferta" (produto com preço),
+   pra diferenciar visualmente de "Solicitar Compra" (preço cheio) sem
+   competir com ele em destaque. */
+.btn-ml-outline {
+    background-color: transparent;
+    border: 1.5px solid #3483fa;
+    border-radius: 8px;
+    color: #3483fa !important;
+    font-weight: 700;
+    transition: background-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+
+.btn-ml-outline:hover {
+    background-color: #e3edfd;
+}
+
+.btn-ml-outline:active {
+    transform: scale(0.98);
+}
+
+body.dark-theme .btn-ml-outline {
+    border-color: var(--market-color);
+    color: var(--market-color) !important;
+}
+
+body.dark-theme .btn-ml-outline:hover {
+    background-color: #2a1416;
+}
+
 /* ============================================ */
 /* SELETOR DE QUANTIDADE (PÁGINA DE PRODUTO)     */
 /* ============================================ */
@@ -4019,4 +4120,814 @@ body.dark-theme .chat-file-chip {
 
 @media (max-width: 768px) {
     body.dark-theme .wa-side { background: var(--card-bg); }
+}
+
+/* ============================================ */
+/* CHAT DO ADMINISTRADOR — REAPROVEITA O MESMO   */
+/* DESIGN DO CHAT CLIENTE ↔ VENDEDOR (.wa-main)  */
+/* ============================================ */
+
+/* Variante de .wa-main para quando o chat aparece embutido dentro de uma aba
+   do painel administrativo (em vez de ocupar a tela toda como no chat normal) */
+.admin-chat-main {
+    height: 66vh;
+    min-height: 460px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* Variante de .wa-main para o modal "Central de Conversas" do admin — ocupa
+   toda a área do modal fullscreen (sem o box-shadow/borda do chat normal) */
+.admin-chat-modal-main {
+    height: 100%;
+    min-height: 70vh;
+    box-shadow: none;
+    border-top: none;
+}
+
+/* Linhas clicáveis do painel admin (produtos, conversas) que abrem um modal
+   ao serem clicadas em qualquer ponto, não só no botão de ação */
+.admin-table-row-clickable { cursor: pointer; }
+.admin-table-row-clickable:hover { background: rgba(0,0,0,0.03); }
+.admin-row-clickable { cursor: pointer; }
+.admin-row-clickable:hover { background: rgba(0,0,0,0.03); }
+
+/* Cabeçalho das ações do admin dentro do próprio chat (ver participantes,
+   encerrar, apagar) — tudo integrado ao chat, sem abrir modais */
+.chat-participants-panel {
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: adminPanelSlide .15s ease;
+}
+
+@keyframes adminPanelSlide {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.chat-participant-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chat-participant-row img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.chat-participant-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.chat-participant-info strong {
+    font-size: 0.85rem;
+    color: #1c1c1c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-participant-info small {
+    font-size: 0.72rem;
+    color: #777;
+}
+
+.chat-admin-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #fff;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    flex-wrap: wrap;
+}
+
+.chat-admin-actions .btn { flex: 1 1 auto; white-space: nowrap; }
+
+body.dark-theme .chat-participants-panel,
+body.dark-theme .chat-admin-actions {
+    background: var(--card-bg);
+    border-color: var(--border-light);
+}
+
+body.dark-theme .chat-participant-info strong { color: var(--text-main); }
+body.dark-theme .chat-participant-info small { color: var(--text-muted); }
+
+/* ============================================ */
+/* PAINEL ADMINISTRATIVO — ESTILO OCELLARIS/VALI ADMIN */
+/* ============================================ */
+
+/* ============================================ */
+/* PAINEL ADMIN — BASEADO NO TABLER              */
+/* https://tabler.io — tokens de cor, raio de    */
+/* borda e tipografia inspirados no design       */
+/* system do Tabler (navbar-vertical, card,      */
+/* table, form-*), aplicados só à área do admin. */
+/* ============================================ */
+
+.admin-dash {
+    --tblr-primary: #206bc4;
+    --tblr-primary-rgb: 32, 107, 196;
+    --tblr-sidebar-bg: #1a2234;
+    --tblr-sidebar-bg-hover: rgba(255,255,255,0.06);
+    --tblr-sidebar-text: #a6b0cf;
+    --tblr-border: var(--border-light, #e6e7e9);
+    --tblr-radius: 4px;
+    --tblr-muted: #626976;
+
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 70vh;
+    margin: -1rem;
+    background: var(--bg-color);
+    font-family: 'Sora', sans-serif;
+}
+
+/* ---------- Abas do admin: estilo base (usado na barrinha mobile dentro do painel) ---------- */
+
+.admin-navbar-mobile {
+    flex: 0 0 auto;
+    width: 100%;
+    background: var(--tblr-sidebar-bg);
+    color: var(--tblr-sidebar-text);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    position: sticky;
+    top: var(--header-height, 92px);
+    padding: 0.4rem 0.5rem;
+    overflow-x: auto;
+    z-index: 2;
+}
+
+.admin-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    border-radius: var(--tblr-radius);
+    color: var(--tblr-sidebar-text);
+    text-align: left;
+    white-space: nowrap;
+    padding: 0.55rem 0.75rem;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background .15s ease, color .15s ease;
+    cursor: pointer;
+}
+
+.admin-nav-link i {
+    font-size: 1rem;
+    width: 18px;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.admin-nav-link:hover {
+    background: var(--tblr-sidebar-bg-hover, rgba(255,255,255,0.06));
+    color: #fff;
+}
+
+.admin-nav-link.active {
+    background: var(--tblr-primary, #206bc4);
+    color: #fff;
+}
+
+.admin-nav-link.active i {
+    opacity: 1;
+}
+
+.admin-nav-count {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 999px;
+}
+
+.admin-nav-link.active .admin-nav-count {
+    background: rgba(255,255,255,0.25);
+}
+
+/* ---------- Abas do admin: variante usada dentro da navbar principal do site (fundo azul) ---------- */
+
+.admin-nav-link.admin-topnav-tab {
+    color: rgba(255,255,255,0.8);
+    padding: 0.35rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+}
+
+.admin-nav-link.admin-topnav-tab:hover {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+}
+
+.admin-nav-link.admin-topnav-tab.active {
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+}
+
+.admin-topnav-exit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0.35rem 0.5rem;
+}
+
+.admin-topnav-exit:hover {
+    color: #fff;
+}
+
+/* ---------- Conteúdo principal ---------- */
+
+.admin-main {
+    flex: 1 1 auto;
+    padding: 1.25rem 1.5rem 2rem;
+    min-width: 0;
+    background: var(--bg-color);
+    width: 100%;
+}
+
+.admin-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--tblr-border);
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.admin-sim-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.admin-sim-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--tblr-muted);
+    margin-right: 2px;
+}
+
+/* ---------- Faixa fixa de aviso enquanto o admin está simulando um papel ---------- */
+#adminSimBanner {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: #f76707;
+    color: #fff;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 8px 14px;
+    text-align: center;
+    flex-wrap: wrap;
+}
+
+#adminSimBanner i { font-size: 0.95rem; }
+
+#adminSimBanner button {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255,255,255,0.22);
+    border: none;
+    color: #fff;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+
+#adminSimBanner button:hover { background: rgba(255,255,255,0.35); }
+
+.admin-topbar h4 {
+    color: var(--text-main);
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+}
+
+/* ---------- Cartões de estatística ---------- */
+
+.admin-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--tblr-border);
+    border-radius: var(--tblr-radius);
+    box-shadow: none;
+    padding: 1rem 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.admin-stat-card i {
+    font-size: 1.35rem;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--tblr-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.admin-stat-card h3 {
+    margin: 0;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1;
+    font-size: 1.4rem;
+}
+
+.admin-stat-card span {
+    font-size: 0.76rem;
+    color: var(--tblr-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.admin-stat-card.stat-blue i   { background: var(--tblr-primary); }
+.admin-stat-card.stat-green i  { background: #2fb344; }
+.admin-stat-card.stat-orange i { background: #f76707; }
+.admin-stat-card.stat-red i    { background: #d63939; }
+
+/* Mobile: 2 colunas em vez de 4, cards e ícones menores, texto sem cortar/dar scroll horizontal */
+@media (max-width: 576px) {
+    .admin-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.6rem;
+        margin-bottom: 1rem;
+    }
+    .admin-stat-card {
+        padding: 0.7rem 0.6rem;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+    .admin-stat-card i {
+        font-size: 1.05rem;
+        width: 34px;
+        height: 34px;
+    }
+    .admin-stat-card h3 {
+        font-size: 1.1rem;
+    }
+    .admin-stat-card span {
+        font-size: 0.62rem;
+        display: block;
+        line-height: 1.2;
+        white-space: normal;
+    }
+    .admin-stat-card > div {
+        min-width: 0;
+    }
+}
+
+.admin-tab-panel {
+    display: none;
+}
+
+.admin-tab-panel.active {
+    display: block;
+}
+
+/* ---------- Card padrão Tabler (.card + .card-header) ---------- */
+
+.admin-card {
+    background: var(--card-bg);
+    border: 1px solid var(--tblr-border);
+    border-radius: var(--tblr-radius);
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+}
+
+.admin-card-title {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--text-main);
+    padding: 0.85rem 1.1rem;
+    margin: 0;
+    border-bottom: 1px solid var(--tblr-border);
+    background: var(--bg-color);
+}
+
+/* ---------- Tabela estilo Tabler (card-table) ---------- */
+
+.admin-table-wrap {
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    color: var(--text-main);
+}
+
+.admin-table thead th {
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--tblr-muted);
+    padding: 0.7rem 1.1rem;
+    border-bottom: 1px solid var(--tblr-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.admin-table tbody td {
+    padding: 0.65rem 1.1rem;
+    border-bottom: 1px solid var(--tblr-border);
+    vertical-align: middle;
+}
+
+.admin-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+    background: var(--bg-color);
+}
+
+.admin-table-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--tblr-muted);
+}
+
+/* Linha "solta" usada em Chats/Suporte (sem grade de colunas fixas) */
+.admin-row {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.7rem 1.1rem;
+    border-bottom: 1px solid var(--tblr-border);
+}
+
+.admin-row:last-child {
+    border-bottom: none;
+}
+
+.admin-row-wrap {
+    flex-wrap: wrap;
+}
+
+.admin-row-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--tblr-border);
+}
+
+.admin-row-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(var(--tblr-primary-rgb), 0.1);
+    color: var(--tblr-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.admin-row-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-main);
+}
+
+.admin-row-info strong {
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+}
+
+.admin-row-info small {
+    color: var(--tblr-muted);
+    font-size: 0.76rem;
+}
+
+.admin-row-value {
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+}
+
+.admin-row-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+}
+
+.admin-row-badge.badge-open {
+    background: rgba(47, 179, 68, 0.12);
+    color: #2fb344;
+}
+
+.admin-row-badge.badge-muted {
+    background: var(--bg-color);
+    color: var(--tblr-muted);
+    border: 1px solid var(--tblr-border);
+}
+
+.admin-badge-tipo {
+    font-size: 0.66rem;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.admin-badge-tipo.tipo-admin     { background: rgba(214, 57, 57, 0.12); color: #d63939; }
+.admin-badge-tipo.tipo-vendedor  { background: rgba(32, 107, 196, 0.12); color: var(--tblr-primary, #206bc4); }
+.admin-badge-tipo.tipo-cliente   { background: var(--bg-color); color: var(--tblr-muted, #626976); border: 1px solid var(--tblr-border); }
+
+/* ---------- Botões de ação da tabela (ícone) ---------- */
+
+.admin-icon-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--tblr-radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tblr-border);
+    background: var(--card-bg);
+    color: var(--tblr-muted);
+    font-size: 0.85rem;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.admin-icon-btn:hover {
+    background: var(--tblr-primary);
+    border-color: var(--tblr-primary);
+    color: #fff;
+}
+
+.admin-icon-btn.danger:hover {
+    background: #d63939;
+    border-color: #d63939;
+    color: #fff;
+}
+
+/* ---------- Formulários estilo Tabler dentro do admin ---------- */
+
+.admin-main .form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.35rem;
+}
+
+.admin-main .form-control,
+.admin-main .form-select {
+    border-radius: var(--tblr-radius);
+    border-color: var(--tblr-border);
+    font-size: 0.88rem;
+}
+
+.admin-main .form-control:focus,
+.admin-main .form-select:focus {
+    border-color: var(--tblr-primary);
+    box-shadow: 0 0 0 3px rgba(var(--tblr-primary-rgb), 0.15);
+}
+
+.admin-main .btn-primary,
+.admin-btn-primary {
+    background: var(--tblr-primary);
+    border-color: var(--tblr-primary);
+    border-radius: var(--tblr-radius);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.admin-main .btn-primary:hover,
+.admin-btn-primary:hover {
+    background: #1a56a0;
+    border-color: #1a56a0;
+}
+
+/* ============================================ */
+/* PAINEL ADMIN — TELAS RÁPIDAS (TODOS OS       */
+/* PRODUTOS / TODOS OS CHATS), FORA DA SIDEBAR  */
+/* ============================================ */
+
+.admin-standalone-page {
+    padding: 0.25rem 0.25rem 1rem;
+}
+
+.admin-standalone-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.admin-standalone-header h4 {
+    color: var(--text-main);
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+}
+
+/* Overlay de "Editar" nos cards de produto do admin (ao lado do excluir) */
+.btn-admin-edit {
+    color: #206bc4 !important;
+}
+
+.btn-admin-delete {
+    color: #d63939 !important;
+}
+
+/* ============================================ */
+/* PAINEL ADMIN — ABA DE RELATÓRIOS (GRÁFICOS)  */
+/* ============================================ */
+
+.admin-reports-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+
+.admin-chart-card {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+}
+
+.admin-chart-card .admin-card-title {
+    background: var(--card-bg);
+}
+
+.admin-chart-wide {
+    grid-column: 1 / -1;
+}
+
+.admin-chart-wrap {
+    position: relative;
+    height: 260px;
+    padding: 0.75rem 1rem 1rem;
+}
+
+@media (max-width: 900px) {
+    .admin-reports-grid {
+        grid-template-columns: 1fr;
+    }
+    .admin-chart-wrap {
+        height: 240px;
+    }
+}
+
+@media (max-width: 900px) {
+    .admin-navbar-mobile {
+        position: static;
+    }
+    .admin-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ============================================ */
+/* BUSCA POR LOJA / PERFIL DO VENDEDOR           */
+/* ============================================ */
+
+.storefront-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--market-color);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+    transition: box-shadow .15s ease, transform .1s ease;
+}
+
+.storefront-banner:hover {
+    box-shadow: 0 4px 14px rgba(45, 204, 113, 0.18);
+}
+
+.storefront-banner:active {
+    transform: scale(0.995);
+}
+
+.storefront-banner-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    background: rgba(45, 204, 113, 0.12);
+    color: var(--market-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.storefront-banner-info {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-main);
+}
+
+.storefront-banner-info strong {
+    font-size: 0.98rem;
+}
+
+.storefront-banner-info small {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.storefront-banner-arrow {
+    color: var(--market-color);
+    font-size: 1.2rem;
+}
+
+.seller-profile-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0.5rem 0.25rem 2rem;
+}
+
+.seller-profile-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    padding: 1.25rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.seller-profile-avatar {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--card-bg);
+    box-shadow: 0 0 0 2px var(--market-color);
+    flex-shrink: 0;
+}
+
+.seller-profile-info {
+    flex: 1 1 auto;
+    min-width: 200px;
+    color: var(--text-main);
 }
