@@ -1,7 +1,0 @@
-# Nunca suba suas chaves reais do Supabase pro GitHub
-config.js
-
-# Arquivos comuns de sistema/editor
-.DS_Store
-Thumbs.db
-node_modules/
