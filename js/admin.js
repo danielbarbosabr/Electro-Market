@@ -1809,7 +1809,7 @@ window.createSupportTicket = async function({ category, subject, message = null,
     const user = getSavedUser();
     const firstMsgText = message || subject;
     const ticket = {
-        id: `ticket_${Date.now()}`,
+        id: crypto.randomUUID(),
         // order_id fica NULL de propósito: é o que marca esta linha como um
         // chamado de suporte (todo chat de pedido de verdade tem order_id).
         order_id:   null,

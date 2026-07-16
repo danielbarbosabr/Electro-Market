@@ -52,7 +52,7 @@ const ORDER_STATUS_MAP = {
 async function createPersistentNotification(message, type = 'info', userId = null) {
     const targetId = userId || getSavedUser()?.id;
     const newNotif = { 
-        id: Date.now(), 
+        id: crypto.randomUUID(),
         message, 
         type, 
         read: false, 
@@ -1572,7 +1572,7 @@ window.buyItem = async function(i) {
         await supabaseFetch('chats', {
             method: 'POST',
             body: JSON.stringify({
-                id:           `chat_${Date.now()}`,
+                id:           crypto.randomUUID(),
                 order_id:     orderId,
                 seller_id:    order.seller_id,
                 seller_name:  order.seller_name,
@@ -1686,7 +1686,7 @@ window.submitOffer = async function(event) {
         await supabaseFetch('chats', {
             method: 'POST',
             body: JSON.stringify({
-                id:           `chat_${Date.now()}`,
+                id:           crypto.randomUUID(),
                 order_id:     orderId,
                 seller_id:    order.seller_id,
                 seller_name:  order.seller_name,
@@ -2035,12 +2035,13 @@ function bootstrapApp() {
     }
 }
 
-// window.CONFIG agora e carregado de forma assincrona (fetch em
-// api/config.js, ver js/config-loader.js) — por isso esperamos a Promise
+// window.CONFIG e carregado de forma assincrona (fetch em /api/config ou,
+// no dev local com Live Server, fallback em js/config.local.js — ver o
+// loader inline em index.html). Por isso esperamos a Promise
 // window._configReady terminar antes de inicializar o app, garantindo que
 // CONFIG.SUPABASE_URL/KEY ja estejam definidos quando o app comecar a
-// fazer chamadas pro Supabase. Se a config falhar, o proprio config-loader.js
-// ja mostra uma tela de erro, entao nem tentamos inicializar o app.
+// fazer chamadas pro Supabase. Se a config falhar, o proprio loader ja
+// mostra uma tela de erro, entao nem tentamos inicializar o app.
 (function startWhenReady() {
     function start() {
         Promise.resolve(window._configReady).then(function () {
@@ -2672,7 +2673,7 @@ document.addEventListener('submit', async (e) => {
         }
 
         const payload = {
-            id:       `user_${Date.now()}`,
+            id:       crypto.randomUUID(),
             tipo:     document.getElementById('v2CadTipo').value,
             nome:     document.getElementById('v2CadNome').value,
             cpf:      document.getElementById('v2CadCPF').value.replace(/\D/g, ''),
@@ -2807,12 +2808,13 @@ window.closeMobileMenu = () =>
  * sair e voltar pra essa aba manualmente.
  */
 
-// window.CONFIG agora e carregado de forma assincrona (fetch em
-// api/config.js, ver js/config-loader.js) — por isso esperamos a Promise
+// window.CONFIG e carregado de forma assincrona (fetch em /api/config ou,
+// no dev local com Live Server, fallback em js/config.local.js — ver o
+// loader inline em index.html). Por isso esperamos a Promise
 // window._configReady terminar antes de inicializar o app, garantindo que
 // CONFIG.SUPABASE_URL/KEY ja estejam definidos quando o app comecar a
-// fazer chamadas pro Supabase. Se a config falhar, o proprio config-loader.js
-// ja mostra uma tela de erro, entao nem tentamos inicializar o app.
+// fazer chamadas pro Supabase. Se a config falhar, o proprio loader ja
+// mostra uma tela de erro, entao nem tentamos inicializar o app.
 (function startWhenReady() {
     function start() {
         Promise.resolve(window._configReady).then(function () {

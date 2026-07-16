@@ -1424,9 +1424,32 @@
          que lê as variáveis de ambiente do servidor — a chave não fica
          exposta aqui no HTML/JS do front-end. -->
     <script>
-        // Busca a config do Supabase na função serverless (api/config.js),
-        // que lê as variáveis de ambiente do SERVIDOR — a chave não fica
-        // escrita aqui no front-end.
+        // Em produção (Vercel): busca a config do Supabase na função
+        // serverless (api/config.js), que lê as variáveis de ambiente do
+        // SERVIDOR — a chave não fica escrita aqui no front-end.
+        // Em dev local com Live Server (servidor estático, sem função
+        // serverless): cai no fallback js/config.local.js (fora do Git).
+        function setConfig(cfg) {
+            window.CONFIG = { SUPABASE_URL: cfg.SUPABASE_URL, SUPABASE_KEY: cfg.SUPABASE_KEY };
+            window.dispatchEvent(new Event('config:ready'));
+        }
+        function tryLocalDevFallback() {
+            return new Promise(function (resolve, reject) {
+                var s = document.createElement('script');
+                s.src = 'js/config.local.js';
+                s.onload = function () {
+                    var local = window.CONFIG_LOCAL_FALLBACK;
+                    if (local && local.SUPABASE_URL && local.SUPABASE_KEY) {
+                        setConfig(local);
+                        resolve();
+                    } else {
+                        reject(new Error('js/config.local.js existe mas está sem os valores.'));
+                    }
+                };
+                s.onerror = function () { reject(new Error('js/config.local.js não encontrado.')); };
+                document.head.appendChild(s);
+            });
+        }
         window._configReady = fetch('/api/config', { cache: 'no-store' })
             .then(function (res) {
                 if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1434,8 +1457,11 @@
             })
             .then(function (cfg) {
                 if (!cfg.SUPABASE_URL || !cfg.SUPABASE_KEY) throw new Error('Config incompleta.');
-                window.CONFIG = { SUPABASE_URL: cfg.SUPABASE_URL, SUPABASE_KEY: cfg.SUPABASE_KEY };
-                window.dispatchEvent(new Event('config:ready'));
+                setConfig(cfg);
+            })
+            .catch(function (err) {
+                console.warn('api/config indisponível (' + err.message + '), usando fallback de dev local (js/config.local.js)...');
+                return tryLocalDevFallback();
             });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

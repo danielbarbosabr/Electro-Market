@@ -486,7 +486,7 @@ async function loadChatMessages(orderId, silent = false) {
 
         if (!chat && order) {
             const newChat = {
-                id:           `chat_${Date.now()}`,
+                id:           crypto.randomUUID(),
                 order_id:     orderId,
                 seller_id:    order.seller_id,
                 seller_name:  order.seller_name,
@@ -1178,7 +1178,7 @@ window.submitReview = async function() {
         await supabaseFetch('avaliacoes', {
             method: 'POST',
             body: JSON.stringify({
-                id:             `av_${Date.now()}`,
+                id:             crypto.randomUUID(),
                 order_id:       orderId,
                 tipo:           mode,
                 avaliador_id:   user.id,
