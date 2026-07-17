@@ -207,7 +207,7 @@ window.renderSellerRequests = async function() {
             const buyer = buyerMap[order.buyer_id] || {};
             const isOffer = order.status === 'offer_pending';
             return `
-            <div class="col-12 col-lg-6">
+            <div class="col-12">
                 <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius:14px;${isOffer ? 'border:1.5px solid #3483fa !important;' : ''}">
                     ${isOffer ? `<span class="badge bg-primary align-self-start mb-2" style="font-size:0.68rem;"><i class="bi bi-tag-fill me-1"></i>OFERTA DO CLIENTE</span>` : ''}
                     <div class="d-flex gap-3">
@@ -230,10 +230,10 @@ window.renderSellerRequests = async function() {
                     ${buyer.telefone ? `<p class="small mb-1"><i class="bi bi-telephone-fill me-2 text-muted"></i>${buyer.telefone}</p>` : ''}
                     ${buyer.endereco ? `<p class="small mb-2"><i class="bi bi-geo-alt-fill me-2 text-muted"></i>${buyer.endereco}${buyer.cep ? `, CEP ${buyer.cep}` : ''} — ${buyer.cidade || ''}/${buyer.estado || ''}</p>` : `<p class="small mb-2 text-muted"><i class="bi bi-geo-alt-fill me-2"></i>Endereço não informado</p>`}
                     <div class="d-flex gap-2 mt-2">
-                        <button class="btn btn-success fw-bold flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                        <button class="btn btn-ml-primary fw-bold flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
                             <i class="bi bi-check-lg me-1"></i>${isOffer ? 'Aceitar Oferta' : 'Aceitar'}
                         </button>
-                        <button class="btn btn-outline-danger flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                        <button class="btn btn-ml-secondary flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
                             ${isOffer ? 'Recusar Oferta' : 'Recusar'}
                         </button>
                     </div>

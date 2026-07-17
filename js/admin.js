@@ -9,9 +9,8 @@ function buildAdminTabButtons(counts, variant) {
     const tabs = [
         { tab: 'admin-overview', icon: 'bi-grid-1x2-fill',        label: 'Início' },
         { tab: 'admin-content',  icon: 'bi-collection-fill',      label: 'Conteúdo',    count: counts.users + counts.products },
-        { tab: 'admin-cats',     icon: 'bi-tags-fill',            label: 'Categorias',  count: counts.categorias },
-        { tab: 'admin-chats',    icon: 'bi-chat-dots-fill',       label: 'Chats',       count: counts.chatsAbertos },
-        { tab: 'admin-support',  icon: 'bi-headset',              label: 'Suporte',     count: counts.ticketsAbertos }
+        { tab: 'admin-support',  icon: 'bi-headset',              label: 'Suporte',     count: (counts.chatsAbertos || 0) + (counts.ticketsAbertos || 0) },
+        { tab: 'admin-cats',     icon: 'bi-tags-fill',            label: 'Categorias',  count: counts.categorias }
     ];
     return tabs.map((t, i) => `
         <button class="admin-nav-link ${variant}${i === 0 ? ' active' : ''}" data-tab="${t.tab}" onclick="window.switchAdminTab(this)">
@@ -128,17 +127,12 @@ window.renderAdminPanel = async function() {
         const ticketsAbertos = tickets.filter(t => t.status !== 'closed').length;
         const tabCounts = { users: users.length, products: products.length, categorias: categorias.length, chatsAbertos, ticketsAbertos };
 
-        // Badge de aviso no dock mobile (mesma contagem da aba Chats do painel)
-        const chatsDockBadge = document.getElementById('adminChatsBadgeDock');
-        if (chatsDockBadge) {
-            chatsDockBadge.textContent = chatsAbertos;
-            chatsDockBadge.classList.toggle('d-none', chatsAbertos === 0);
-        }
-        // Badge de aviso no dock mobile pros chamados de suporte em aberto
+        // Badge de aviso no dock mobile (aba Suporte unificada: conversas + chamados)
         const supportDockBadge = document.getElementById('adminSupportBadgeDock');
         if (supportDockBadge) {
-            supportDockBadge.textContent = ticketsAbertos;
-            supportDockBadge.classList.toggle('d-none', ticketsAbertos === 0);
+            const totalAbertos = chatsAbertos + ticketsAbertos;
+            supportDockBadge.textContent = totalAbertos;
+            supportDockBadge.classList.toggle('d-none', totalAbertos === 0);
         }
 
         grid.innerHTML = `
@@ -187,7 +181,12 @@ window.renderAdminPanel = async function() {
                                 const order = orders.find(o => o.id === c.order_id) || {};
                                 return `
                                 <div class="admin-row">
-                                    <div class="admin-row-icon"><i class="bi bi-chat-dots-fill"></i></div>
+                                    ${(() => {
+                                        const pid = order.buyer_id || c.buyer_id;
+                                        const u = (window._adminUsersCache || []).find(x => x.id === pid);
+                                        const av = normalizeImageUrl(u?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent((order.buyer_name || '?').slice(0,2))}&background=22c98e&color=fff&size=40`;
+                                        return `<img src="${av}" class="admin-row-avatar" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=22c98e&color=fff&size=40'">`;
+                                    })()}
                                     <div class="admin-row-info">
                                         <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</strong>
                                         <small>${order.buyer_name || '?'} ↔ ${order.seller_name || '?'}</small>
@@ -200,7 +199,7 @@ window.renderAdminPanel = async function() {
                             <h6 class="admin-card-title"><i class="bi bi-headset me-2"></i>Últimos Chamados de Suporte</h6>
                             ${tickets.slice(0, 5).map(t => `
                                 <div class="admin-row">
-                                    <div class="admin-row-icon"><i class="bi bi-life-preserver"></i></div>
+                                    <img src="${t.requester_avatar || ('https://ui-avatars.com/api/?name=' + encodeURIComponent((t.requester_name || '?').slice(0,2)) + '&background=e50914&color=fff&size=40')}" class="admin-row-avatar" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
                                     <div class="admin-row-info">
                                         <strong>${SUPPORT_CATEGORY_LABELS[t.category] || t.subject || 'Chamado'}</strong>
                                         <small>${t.requester_name || 'Visitante'}</small>
@@ -223,10 +222,7 @@ window.renderAdminPanel = async function() {
                                 <h6 class="admin-card-title"><i class="bi bi-bag-check-fill me-2"></i>Pedidos por Status</h6>
                                 <div class="admin-chart-wrap"><canvas id="chartOrdersStatus"></canvas></div>
                             </div>
-                            <div class="admin-card admin-chart-card admin-chart-wide">
-                                <h6 class="admin-card-title"><i class="bi bi-tags-fill me-2"></i>Publicações por Categoria</h6>
-                                <div class="admin-chart-wrap"><canvas id="chartProdsCategory"></canvas></div>
-                            </div>
+
                             <div class="admin-card admin-chart-card admin-chart-wide">
                                 <h6 class="admin-card-title"><i class="bi bi-graph-up me-2"></i>Novas Publicações (últimos 6 meses)</h6>
                                 <div class="admin-chart-wrap"><canvas id="chartProdsTimeline"></canvas></div>
@@ -286,16 +282,15 @@ window.renderAdminPanel = async function() {
                         </div>
                     </div>
 
-                    <div class="admin-tab-panel" id="admin-chats">
-                        <!-- Lista de conversas no MESMO padrão visual das outras abas do admin
-                             (Publicações/Usuários/Suporte): admin-card + admin-row, nada de
-                             sidebar estilo WhatsApp. Ao clicar numa conversa, ela é substituída
-                             pelo chat em tela cheia (igual ao cliente ↔ vendedor, só sem a lista
-                             lateral do lado). -->
+                    <div class="admin-tab-panel" id="admin-support">
+                        <!-- Lista de conversas de pedido no MESMO padrão visual das outras abas do
+                             admin (Publicações/Usuários): admin-card + admin-row, nada de sidebar
+                             estilo WhatsApp. Ao clicar numa conversa, ela é substituída pelo chat em
+                             tela cheia. -->
                         <div id="adminChatsTabListWrap">
                             <div class="admin-card">
                                 <div class="admin-card-title d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                                    <span><i class="bi bi-chat-dots-fill me-2"></i>Todas as Conversas</span>
+                                    <span><i class="bi bi-chat-dots-fill me-2"></i>Conversas de Pedido</span>
                                 </div>
                                 <div id="adminChatsTabList"></div>
                             </div>
@@ -304,10 +299,14 @@ window.renderAdminPanel = async function() {
                         <div id="adminChatsTabActiveWrap" class="d-none">
                             <div id="adminChatsTabActive" class="chat-container admin-chat-standalone"></div>
                         </div>
-                    </div>
 
-                    <div class="admin-tab-panel" id="admin-support">
-                        <div class="admin-card">
+                        <!-- Chamados de suporte, logo abaixo das conversas de pedido,
+                             separados por um título próprio. -->
+                        <div class="admin-card mt-3">
+                            <div class="admin-card-title d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                <span><i class="bi bi-headset me-2"></i>Chamados de Suporte</span>
+                            </div>
+                            <div id="adminSupportTabList">
                             ${tickets.length === 0 ? `
                                 <p class="text-muted text-center py-4 mb-0">Nenhum chamado de suporte ainda. Assim que um cliente ou vendedor esquecer a senha, relatar um problema com a entrega ou pedir ajuda, o chamado aparece aqui automaticamente.</p>
                             ` : tickets.slice().sort((a, b) => (a.status === b.status) ? 0 : (a.status === 'closed' ? 1 : -1)).map(t => {
@@ -315,7 +314,7 @@ window.renderAdminPanel = async function() {
                                 const lastMsg = (t.messages || [])[t.messages.length - 1];
                                 return `
                                 <div class="admin-row admin-row-wrap">
-                                    <div class="admin-row-icon"><i class="bi bi-life-preserver"></i></div>
+                                    <img src="${t.requester_avatar || ('https://ui-avatars.com/api/?name=' + encodeURIComponent((t.requester_name || '?').slice(0,2)) + '&background=e50914&color=fff&size=40')}" class="admin-row-avatar" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
                                     <div class="admin-row-info">
                                         <strong>${SUPPORT_CATEGORY_LABELS[t.category] || t.subject || 'Chamado'} <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'} ms-1">${t.status === 'closed' ? 'Encerrado' : 'Aberto'}</span></strong>
                                         <small class="d-block">${t.requester_name || 'Visitante'}${t.requester_email ? ' • ' + t.requester_email : ''}${t.requester_role ? ' • ' + (t.requester_role === 'ADMIN' ? 'Administrador' : (t.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente')) : ''} • ${msgCount} mensagens</small>
@@ -331,6 +330,7 @@ window.renderAdminPanel = async function() {
                                     </div>
                                 </div>`;
                             }).join('')}
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -347,7 +347,9 @@ window.renderAdminPanel = async function() {
 
         // Se o admin já estava numa aba específica (ex: voltou de uma conversa
         // aberta a partir da aba "Chats" ou "Suporte"), reabre na mesma aba
-        // em vez de sempre cair no Início.
+        // em vez de sempre cair no Início. Mapeia a aba "admin-chats" (antiga)
+        // para a aba unificada "admin-support".
+        if (window._adminActiveTab === 'admin-chats') window._adminActiveTab = 'admin-support';
         if (window._adminActiveTab && window._adminActiveTab !== 'admin-overview') {
             const navBtn = document.querySelector(`.admin-nav-link[data-tab="${window._adminActiveTab}"]`);
             if (navBtn) window.switchAdminTab(navBtn);
@@ -380,12 +382,11 @@ window.switchAdminTab = function(navBtn) {
     document.querySelectorAll('.admin-tab-panel').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId)?.classList.add('active');
     // Sai do modo "chat em tela cheia": restaura a navbar inferior (footer) e o resto do painel admin
-    if (tabId !== 'admin-chats') document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
+    if (tabId !== 'admin-support') document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
     const titles = {
         'admin-overview': 'Início',
         'admin-content': 'Conteúdo',
         'admin-cats': 'Categorias',
-        'admin-chats': 'Chats',
         'admin-support': 'Suporte'
     };
     const titleEl = document.getElementById('adminPanelTitle');
@@ -752,22 +753,46 @@ window.adminEditProduct = function(pid) {
  * de conversas de pedido quanto na de chamados de suporte. Mensagens da
  * equipe de suporte (isStaff) ficam à direita, destacadas em amarelo.
  */
-function adminMsgBubbleHtml(m, resolveSenderName) {
+function adminMsgBubbleHtml(m, index, resolveSenderName, myAvatarSrc, partnerAvatarSrc) {
     if (m.type === 'system' || m.senderId === 'system') {
         return `<div class="text-center my-3"><span class="system-chip"><i class="bi bi-info-circle-fill"></i>${m.text}</span></div>`;
     }
     const isStaff = !!m.isStaff;
     const senderLabel = m.senderName || resolveSenderName(m) || 'Usuário';
-    const bodyHtml = m.deleted
-        ? `<em class="small">Mensagem apagada</em>`
-        : `<div class="chat-bubble-text" style="white-space:pre-wrap;">${(m.text ? m.text.replace(/</g, '&lt;') : (m.image ? '[imagem]' : '[arquivo]'))}</div>`;
+    const avatarForThem = isStaff ? myAvatarSrc : partnerAvatarSrc;
+    const replyHtml = m.replyTo ? `
+        <div class="p-2 mb-2 rounded ${isStaff ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-10'} small border-start border-4 border-info">
+            <div class="fw-bold" style="font-size: 0.7rem;">${m.replyTo.senderName}</div>
+            <div class="text-truncate chat-reply-preview">${(m.replyTo.text || '').replace(/</g, '&lt;')}</div>
+        </div>
+    ` : '';
+    let bodyHtml;
+    if (m.deleted) {
+        bodyHtml = `<em class="small">Mensagem apagada</em>`;
+    } else if (m.image) {
+        bodyHtml = `${replyHtml}<div class="msg-image-wrap"><img class="msg-image" src="${normalizeImageUrl(m.image)}" referrerpolicy="no-referrer" onclick="window.openImageFull('${encodeURIComponent(normalizeImageUrl(m.image))}')"></div><div class="chat-bubble-text" style="white-space:pre-wrap;">${(m.text ? m.text.replace(/</g, '&lt;') : '')}</div>`;
+    } else if (m.type === 'file' && m.file) {
+        bodyHtml = `${replyHtml}<a class="msg-file-chip" href="${normalizeImageUrl(m.file.url)}" target="_blank" rel="noopener"><i class="bi bi-paperclip"></i> ${m.file.name || 'Arquivo'}</a><div class="chat-bubble-text" style="white-space:pre-wrap;">${(m.text ? m.text.replace(/</g, '&lt;') : '')}</div>`;
+    } else {
+        bodyHtml = `${replyHtml}<div class="chat-bubble-text" style="white-space:pre-wrap;">${(m.text ? m.text.replace(/</g, '&lt;') : '')}</div>`;
+    }
     return `
         <div class="msg-row ${isStaff ? 'is-me' : 'is-them'}">
+            ${!isStaff ? `<img class="msg-avatar" src="${avatarForThem || partnerAvatarSrc}" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=22c98e&color=fff&size=40'">` : ''}
             <div class="msg-bubble ${isStaff ? 'is-me is-staff' : 'is-them'}">
-                <span class="msg-sender">${senderLabel}${isStaff ? ' <i class="bi bi-patch-check-fill"></i>' : ''}</span>
+                <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+                    <span class="msg-sender">${senderLabel}${isStaff ? ' <i class="bi bi-patch-check-fill"></i>' : ''}</span>
+                    <div class="msg-actions-visible">
+                        <i class="bi bi-reply" onclick="window.startAdminTicketReply(${index})" title="Responder"></i>
+                        <i class="bi bi-clipboard" onclick="window.copyAdminTicketMessageText(${index})" title="Copiar"></i>
+                        ${isStaff ? `<i class="bi bi-pencil" onclick="window.startAdminTicketEdit(${index})" title="Editar"></i>` : ''}
+                        ${isStaff ? `<i class="bi bi-trash text-danger" onclick="window.deleteAdminTicketMessage(${index})" title="Apagar"></i>` : ''}
+                    </div>
+                </div>
                 ${bodyHtml}
-                <div class="msg-time">${new Date(m.timestamp).toLocaleString('pt-BR')}</div>
+                <div class="msg-time">${m.edited ? '<span>(editada)</span> ' : ''}${new Date(m.timestamp).toLocaleString('pt-BR')}</div>
             </div>
+            ${isStaff ? `<img class="msg-avatar" src="${myAvatarSrc}" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=ffc107&color=1c1c1c&size=40'">` : ''}
         </div>`;
 }
 
@@ -1018,7 +1043,11 @@ window.adminViewChat = async function(orderId) {
         if (!chat) { showToast('Conversa não encontrada.', 'error'); adminRefreshCurrentView(); return; }
 
         const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
-        const msgsHtml = (chat.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+        const adminUser = getSavedUser();
+        const adminChatMyAvatar = normalizeImageUrl(adminUser?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminUser?.nome || 'Suporte')}&background=ffc107&color=1c1c1c&size=40`;
+        const partnerFromCache = (window._adminUsersCache || []).find(u => u.id === order?.buyer_id);
+        const adminChatPartnerAvatar = normalizeImageUrl(partnerFromCache?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent((order?.buyer_name || '?').slice(0,2))}&background=22c98e&color=fff&size=40`;
+        const msgsHtml = (chat.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, adminChatMyAvatar, adminChatPartnerAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
         const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
 
@@ -1271,7 +1300,11 @@ window.adminChatsModalSelect = async function(orderId) {
         if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
 
         const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
-        const msgsHtml = (chat.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+        const adminUser = getSavedUser();
+        const adminChatMyAvatar = normalizeImageUrl(adminUser?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminUser?.nome || 'Suporte')}&background=ffc107&color=1c1c1c&size=40`;
+        const partnerFromCache = (window._adminUsersCache || []).find(u => u.id === order?.buyer_id);
+        const adminChatPartnerAvatar = normalizeImageUrl(partnerFromCache?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent((order?.buyer_name || '?').slice(0,2))}&background=22c98e&color=fff&size=40`;
+        const msgsHtml = (chat.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, adminChatMyAvatar, adminChatPartnerAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
         const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
         const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '—', class: 'bg-secondary' };
@@ -1476,10 +1509,10 @@ window.renderAdminChatsTab = function(chats, orders) {
     };
     window._adminChatsTabRenderList();
 
-    // Se a aba "Chats" já estava aberta com uma conversa selecionada (ex: o
+    // Se a aba "Suporte" já estava aberta com uma conversa selecionada (ex: o
     // admin encerrou/apagou algo e o painel recarregou), reabre a mesma
     // conversa em vez de voltar pra lista.
-    if (window._adminActiveTab === 'admin-chats' && window._adminActiveChatOrderId &&
+    if (window._adminActiveTab === 'admin-support' && window._adminActiveChatOrderId &&
         window._adminChatsTabData.chats.some(c => c.order_id === window._adminActiveChatOrderId)) {
         window.adminChatsTabSelect(window._adminActiveChatOrderId);
     }
@@ -1746,6 +1779,10 @@ function normalizeTicket(raw) {
     if (!raw) return null;
     const msgs = raw.messages || [];
     const meta = msgs.find(m => m.type === 'ticket_meta') || {};
+    // Tenta achar o avatar do requerente: primeiro no próprio metadata do
+    // chamado, depois no cache de usuários do admin (buscando pelo buyer_id).
+    const cachedUser = (window._adminUsersCache || []).find(u => u.id === raw.buyer_id);
+    const requesterAvatar = meta.requester_avatar || cachedUser?.avatar || null;
     return {
         id:              raw.id,
         category:        meta.category,
@@ -1755,6 +1792,7 @@ function normalizeTicket(raw) {
         requester_name:  raw.buyer_name,
         requester_email: meta.requester_email,
         requester_role:  meta.requester_role,
+        requester_avatar: normalizeImageUrl(requesterAvatar),
         order_id:        meta.related_order_id || null,
         messages:        msgs.filter(m => m.type !== 'ticket_meta')
     };
@@ -1797,6 +1835,7 @@ window.createSupportTicket = async function({ category, subject, message = null,
                 closed:            false,
                 requester_email:   overrideEmail || user?.email || null,
                 requester_role:    user?.tipo || null,
+                requester_avatar:  user?.avatar || null,
                 related_order_id:  orderId
             },
             {
@@ -1957,6 +1996,7 @@ window.showSupportRequestForm = function() {
     document.getElementById('supportChatView')?.classList.add('d-none');
     document.getElementById('supportModalDialog')?.classList.remove('modal-fullscreen');
     document.body.classList.remove('support-chat-fullscreen');
+    document.querySelector('#supportRequestModal .modal-header')?.classList.remove('d-none');
     const title = document.getElementById('supportModalTitle');
     if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Falar com o Suporte';
 };
@@ -1972,6 +2012,7 @@ window.showSupportChatLoading = function() {
     const container = document.getElementById('supportChatMessages');
     if (container) container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>';
     document.getElementById('supportChatInputBar')?.classList.add('d-none');
+    document.querySelector('#supportRequestModal .modal-header')?.classList.add('d-none');
 };
 
 /** Entra na etapa 2 (conversa) do modal de suporte, pro chamado indicado */
@@ -1984,6 +2025,7 @@ window.enterSupportChatMode = function(ticketId) {
     document.getElementById('supportChatView')?.classList.remove('d-none');
     document.getElementById('supportModalDialog')?.classList.add('modal-fullscreen');
     document.body.classList.add('support-chat-fullscreen');
+    document.querySelector('#supportRequestModal .modal-header')?.classList.add('d-none');
     const title = document.getElementById('supportModalTitle');
     if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Atendimento do Suporte';
     loadMySupportTicket(ticketId);
@@ -2003,6 +2045,43 @@ function startSupportChatPolling(ticketId) {
 function stopSupportChatPolling() {
     if (supportChatPollInterval) { clearInterval(supportChatPollInterval); supportChatPollInterval = null; }
 }
+
+/** Abre um modal listando as pessoas da conversa de suporte (igual ao
+ *  botão de participantes dos outros chats): o usuário que abriu o
+ *  chamado e a equipe de atendimento. */
+window.openSupportParticipants = async function() {
+    const ticketId = window._activeSupportTicketId;
+    const body = document.getElementById('supportParticipantsBody');
+    if (!ticketId || !body) return;
+    body.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div></div>';
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = normalizeTicket(result?.[0]);
+        if (!ticket) { body.innerHTML = '<p class="text-muted text-center">Chamado não encontrado.</p>'; }
+        else {
+            const requesterAvatar = ticket.requester_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
+            const roleLabel = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
+            body.innerHTML = `
+                <div class="chat-participant-row">
+                    <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
+                    <div class="chat-participant-info">
+                        <strong>${ticket.requester_name || 'Visitante'}</strong>
+                        <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel} • Quem abriu o chamado</small>
+                    </div>
+                </div>
+                <div class="chat-participant-row">
+                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40" referrerpolicy="no-referrer">
+                    <div class="chat-participant-info">
+                        <strong>Equipe de Suporte</strong>
+                        <small>Atendimento ao cliente • ElectroMarket</small>
+                    </div>
+                </div>`;
+        }
+    } catch (e) {
+        body.innerHTML = '<p class="text-muted text-center">Erro ao carregar participantes.</p>';
+    }
+    try { new bootstrap.Modal(document.getElementById('supportParticipantsModal')).show(); } catch (e) {}
+};
 
 /** Fecha o modal de suporte e para o polling — chamado pelo X do modal */
 window.closeSupportChatModal = function() {
@@ -2043,6 +2122,16 @@ async function loadMySupportTicket(ticketId, silent = false) {
                 : `<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>${SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado'}</span>`;
         }
 
+        const headerStatus = document.getElementById('supportChatHeaderStatus');
+        if (headerStatus) {
+            headerStatus.textContent = ticket.status === 'closed'
+                ? 'Atendimento encerrado'
+                : (SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Suporte ao cliente');
+        }
+
+        const ticketSummary = document.getElementById('supportChatTicketSummary');
+        if (ticketSummary) ticketSummary.classList.add('d-none');
+
         if (ticket.status === 'closed') {
             stopSupportChatPolling();
             try {
@@ -2068,6 +2157,11 @@ function supportMsgBubbleHtml(m, index) {
 
     const isMe = !m.isStaff;
     const senderLabel = m.isStaff ? (m.senderName || 'Suporte') : 'Você';
+
+    const supportUser = getSavedUser();
+    const myAvatarSrc = normalizeImageUrl(supportUser?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(supportUser?.nome || 'Você')}&background=22c98e&color=fff&size=40`;
+    const supportAvatarSrc = `https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40`;
+    const bubbleAvatar = isMe ? myAvatarSrc : supportAvatarSrc;
 
     if (m.deleted) {
         return `
@@ -2099,7 +2193,10 @@ function supportMsgBubbleHtml(m, index) {
         <div class="msg-row ${isMe ? 'is-me' : 'is-them'}">
             <div class="msg-bubble ${isMe ? 'is-me' : 'is-them is-staff'}">
                 <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
-                    <span class="msg-sender">${senderLabel}${m.isStaff ? ' <i class="bi bi-patch-check-fill"></i>' : ''}</span>
+                    <span class="d-flex align-items-center gap-1">
+                        <img src="${bubbleAvatar}" class="msg-avatar-inline" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=22c98e&color=fff&size=40'">
+                        <span class="msg-sender">${senderLabel}${m.isStaff ? ' <i class="bi bi-patch-check-fill"></i>' : ''}</span>
+                    </span>
                     <div class="dropdown">
                         <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -2365,7 +2462,10 @@ window.adminViewTicket = async function(ticketId) {
         if (!ticket) { showToast('Chamado não encontrado.', 'error'); adminRefreshCurrentView(); return; }
 
         const resolveSenderName = () => ticket.requester_name;
-        const msgsHtml = (ticket.messages || []).map(m => adminMsgBubbleHtml(m, resolveSenderName)).join('')
+        const adminUser = getSavedUser();
+        const myAvatar = normalizeImageUrl(adminUser?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminUser?.nome || 'Suporte')}&background=ffc107&color=1c1c1c&size=40`;
+        const requesterAvatar = ticket.requester_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
+        const msgsHtml = (ticket.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, myAvatar, requesterAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
 
         // Igual à aba "Chats": some com a navbar inferior e o resto do painel
@@ -2387,7 +2487,7 @@ window.adminViewTicket = async function(ticketId) {
                                     <i class="bi bi-arrow-left"></i>
                                 </button>
                                 <div class="chat-header-avatar-wrap">
-                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(ticket.requester_name || '?')}&background=e50914&color=fff" referrerpolicy="no-referrer">
+                                    <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
                                 </div>
                                 <div class="chat-header-info">
                                     <span class="chat-header-name">${ticket.requester_name || 'Visitante'}</span>
@@ -2414,7 +2514,7 @@ window.adminViewTicket = async function(ticketId) {
 
                             <div id="adminChatParticipants" class="chat-participants-panel d-none">
                                 <div class="chat-participant-row">
-                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(ticket.requester_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer">
+                                    <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.src='https://ui-avatars.com/api/?name=%3F&background=3483fa&color=fff&size=40'">
                                     <div class="chat-participant-info">
                                         <strong>${ticket.requester_name || 'Visitante'}</strong>
                                         <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel}</small>
@@ -2425,8 +2525,34 @@ window.adminViewTicket = async function(ticketId) {
                             <div id="adminChatMsgsBody" class="chat-messages">${msgsHtml}</div>
 
                             ${ticket.status !== 'closed' ? `
+                                <div id="adminTicketInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
+                                <div id="adminTicketAttachPanel" class="p-3 bg-light border-top d-none">
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setAdminTicketAttachType('image')">
+                                            <i class="bi bi-image me-1"></i>Imagem
+                                        </button>
+                                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminTicketAttachType('file')">
+                                            <i class="bi bi-file-earmark me-1"></i>Arquivo
+                                        </button>
+                                    </div>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                                        <input type="url" id="adminTicketAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
+                                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
+                                        </button>
+                                        <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmAdminTicketAttach()">
+                                            <i class="bi bi-send me-1"></i>Enviar
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="chat-input-bar">
                                     <div class="d-flex gap-2 align-items-center">
+                                        <button type="button" class="chat-icon-btn" onclick="window.toggleAdminTicketAttachPanel()" title="Anexar imagem ou arquivo">
+                                            <i class="bi bi-paperclip"></i>
+                                        </button>
                                         <input type="text" id="adminChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSendTicketMessage('${ticketId}');}">
                                         <button type="button" class="chat-send-btn" onclick="window.adminSendTicketMessage('${ticketId}')"><i class="bi bi-send-fill"></i></button>
@@ -2452,11 +2578,128 @@ window.adminViewTicketBack = function() {
     adminRefreshCurrentView();
 };
 
-/** Envia uma resposta da equipe de suporte dentro do chamado */
+// -------- Estado de resposta/edição no chamado de suporte (visão admin) --------
+let adminTicketReplyIndex = null;
+let adminTicketEditIndex  = null;
+let adminTicketAttachType = 'image';
+
+window.cancelAdminTicketReplyOrEdit = function() {
+    adminTicketReplyIndex = null;
+    adminTicketEditIndex  = null;
+    const preview = document.getElementById('adminTicketInputPreview');
+    if (preview) preview.classList.add('d-none');
+};
+
+window.startAdminTicketReply = async function(index) {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+    const msg = result?.[0]?.messages?.[index];
+    if (!msg) return;
+    adminTicketReplyIndex = index;
+    adminTicketEditIndex  = null;
+    const preview = document.getElementById('adminTicketInputPreview');
+    if (preview) {
+        preview.classList.remove('d-none');
+        preview.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="small text-truncate" style="max-width:85%;">
+                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usuário')}</strong>
+                    <span class="text-muted">${msg.text || (msg.image ? '[imagem]' : '')}</span>
+                </div>
+                <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelAdminTicketReplyOrEdit()"></i>
+            </div>`;
+    }
+    document.getElementById('adminChatInput')?.focus();
+};
+
+window.startAdminTicketEdit = async function(index) {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+    const msg = result?.[0]?.messages?.[index];
+    if (!msg) return;
+    adminTicketEditIndex  = index;
+    adminTicketReplyIndex = null;
+    const input = document.getElementById('adminChatInput');
+    if (input) input.value = msg.text || '';
+    const preview = document.getElementById('adminTicketInputPreview');
+    if (preview) {
+        preview.classList.remove('d-none');
+        preview.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="small"><strong class="text-warning">Editando mensagem...</strong></div>
+                <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelAdminTicketReplyOrEdit()"></i>
+            </div>`;
+    }
+    input?.focus();
+};
+
+window.copyAdminTicketMessageText = function(index) {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    supabaseFetch(`chats?id=eq.${ticketId}&limit=1`).then(r => {
+        const msg = r?.[0]?.messages?.[index];
+        if (msg?.text) { navigator.clipboard?.writeText(msg.text); showToast('Mensagem copiada.', 'success'); }
+    });
+};
+
+window.deleteAdminTicketMessage = async function(index) {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    if (!confirm('Apagar esta mensagem?')) return;
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) return;
+        const messages = (ticket.messages || []).map((m, i) => i === index ? { ...m, deleted: true, text: '', image: null, file: null } : m);
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        window.adminViewTicket(ticketId);
+    } catch (e) {
+        showToast('Erro ao apagar mensagem.', 'error');
+    }
+};
+
+window.toggleAdminTicketAttachPanel = function() {
+    document.getElementById('adminTicketAttachPanel')?.classList.toggle('d-none');
+};
+window.setAdminTicketAttachType = function(type) {
+    adminTicketAttachType = type;
+    document.querySelectorAll('#adminTicketAttachPanel .chat-attach-tab').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-attach-type') === type);
+    });
+};
+window.confirmAdminTicketAttach = async function() {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    const link = document.getElementById('adminTicketAttachLinkInput')?.value.trim();
+    if (!link) { showToast('Cole o link da imagem/arquivo.', 'warning'); return; }
+    const user = getSavedUser();
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) return;
+        const messages = ticket.messages || [];
+        if (adminTicketAttachType === 'image') {
+            messages.push({ senderId: user.id, senderName: `${user.nome} (Suporte)`, text: 'Imagem', image: link, timestamp: new Date().toISOString(), isStaff: true });
+        } else {
+            const nome = link.split('/').pop().split('?')[0] || 'Arquivo';
+            messages.push({ senderId: user.id, senderName: `${user.nome} (Suporte)`, text: `Arquivo: ${nome}`, type: 'file', file: { name: nome, url: link }, timestamp: new Date().toISOString(), isStaff: true });
+        }
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        document.getElementById('adminTicketAttachLinkInput').value = '';
+        document.getElementById('adminTicketAttachPanel')?.classList.add('d-none');
+        window.adminViewTicket(ticketId);
+    } catch (e) {
+        showToast('Erro ao enviar anexo.', 'error');
+    }
+};
+
+/** Envia uma resposta da equipe de suporte dentro do chamado (ou salva edição em andamento) */
 window.adminSendTicketMessage = async function(ticketId) {
     const input = document.getElementById('adminChatInput');
     const text  = input?.value.trim();
-    if (!text) return;
+    if (!text && adminTicketEditIndex === null) return;
     const user = getSavedUser();
 
     try {
@@ -2465,16 +2708,33 @@ window.adminSendTicketMessage = async function(ticketId) {
         if (!ticket) return;
 
         const messages = ticket.messages || [];
-        messages.push({
-            senderId:   user.id,
-            senderName: `${user.nome} (Suporte)`,
-            text,
-            timestamp:  new Date().toISOString(),
-            isStaff:    true
-        });
+
+        if (adminTicketEditIndex !== null) {
+            if (messages[adminTicketEditIndex]) {
+                messages[adminTicketEditIndex].text   = text;
+                messages[adminTicketEditIndex].edited = true;
+            }
+            adminTicketEditIndex = null;
+            adminTicketReplyIndex = null;
+        } else {
+            const replyTarget = (adminTicketReplyIndex !== null) ? messages[adminTicketReplyIndex] : null;
+            const newMsg = {
+                senderId:   user.id,
+                senderName: `${user.nome} (Suporte)`,
+                text,
+                timestamp:  new Date().toISOString(),
+                isStaff:    true
+            };
+            if (replyTarget) {
+                newMsg.replyTo = { senderName: replyTarget.senderName || (replyTarget.isStaff ? 'Suporte' : 'Usuário'), text: replyTarget.text || (replyTarget.image ? '[imagem]' : '') };
+            }
+            messages.push(newMsg);
+            adminTicketReplyIndex = null;
+        }
 
         await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         input.value = '';
+        window.cancelAdminTicketReplyOrEdit();
         window.adminViewTicket(ticketId);
     } catch (e) {
         showToast('Erro ao enviar mensagem.', 'error');

@@ -377,8 +377,19 @@ body.dark-theme .btn-search {
     color: #ffffff !important;
 }
 
+/* Alinha os cabeçalhos de seção (Games, Informática etc.) com os itens do
+   menu — o Bootstrap dá um padding padrão diferente, o que deixava os
+   títulos das categorias desalinhados em relação às subopções. */
+.dropdown-header {
+    padding: 8px 16px 4px;
+    margin: 0;
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+}
+
 .dropdown-divider {
     border-top-color: var(--border-light);
+    margin: 0.25rem 0;
 }
 
 /* ============================================ */
@@ -457,9 +468,11 @@ body.dark-theme .mobile-menu-header {
 .form-select,
 input,
 textarea,
-select {
+select,
+.form-control,
+.form-select {
     background-color: var(--input-bg);
-    color: var(--text-main);
+    color: #1c1c1c !important;
     border: 1px solid var(--border-light);
 }
 
@@ -468,9 +481,9 @@ select {
 input:focus,
 textarea:focus {
     background-color: var(--input-bg);
-    color: var(--text-main);
-    border-color: var(--market-color);
-    box-shadow: 0 0 0 0.2rem rgba(45, 204, 113, 0.25);
+    color: #1c1c1c !important;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 0.2rem rgba(52, 131, 250, 0.25);
 }
 
 .form-control::placeholder,
@@ -1340,6 +1353,7 @@ body.dark-theme .cart-item-img {
 }
 
 .profile-links-card {
+    position: relative;
     width: 100%;
     max-width: 460px;
     background: var(--card-bg, #fff);
@@ -1349,6 +1363,24 @@ body.dark-theme .cart-item-img {
     box-shadow: 0 20px 50px rgba(0,0,0,0.35);
     height: fit-content;
 }
+
+/* Botão de fechar DENTRO do próprio card (canto superior direito) */
+.profile-links-close-inside {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.06);
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+}
+.profile-links-close-inside:hover { background: #e50914; color: #fff; }
 
 .profile-links-avatar-wrap {
     position: relative;
@@ -1541,6 +1573,16 @@ body.dark-theme .cart-item-img {
     display: block;
 }
 
+.support-chat-header-icon {
+    font-size: 1.35rem;
+    color: var(--primary-blue, #0d6efd);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
 .chat-header-info {
     flex-grow: 1;
     min-width: 0;
@@ -1630,6 +1672,50 @@ body.dark-theme .cart-item-img {
     flex-shrink: 0;
 }
 
+/* Banner de identificação do chamado de suporte (estilo "Ticket"),
+   igual ao resumo de produto dos chats de pedido, mas na cor do suporte. */
+.chat-ticket-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #fff8e1;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+}
+.chat-ticket-summary .chat-ticket-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    color: #1c1c1c;
+    background: #ffc107;
+    flex-shrink: 0;
+}
+.chat-ticket-summary-info {
+    flex-grow: 1;
+    min-width: 0;
+    line-height: 1.25;
+}
+.chat-ticket-summary-title {
+    font-weight: 700;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    color: #222;
+}
+.chat-ticket-summary-id {
+    font-size: 0.68rem;
+    color: #888;
+    flex-shrink: 0;
+}
+}
+
 .chat-status-bar {
     background: #f7f7f7;
     border-bottom: 1px solid rgba(0,0,0,0.06);
@@ -1650,18 +1736,30 @@ body.support-chat-fullscreen .header-main {
 #supportModalDialog.modal-fullscreen {
     margin-top: var(--header-height, 92px) !important;
     height: calc(100% - var(--header-height, 92px)) !important;
+    /* Anula o efeito do .modal-dialog-centered (align-items:center /
+       min-height) que briga com a altura 100% definida acima e impede o
+       chat de ter altura fixa pros cabeçalhos ficarem travados. */
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
 }
 #supportModalDialog.modal-fullscreen .modal-content {
     display: flex;
     flex-direction: column;
     height: 100%;
+    max-height: 100%;
     border-radius: 0;
+    overflow: hidden;
 }
 #supportModalDialog.modal-fullscreen #supportChatView {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
+    height: 100%;
 }
 #supportModalDialog.modal-fullscreen .support-chat-messages {
     flex: 1 1 auto;
@@ -1671,6 +1769,14 @@ body.support-chat-fullscreen .header-main {
 .support-chat-messages {
     height: 360px;
     overflow-y: auto;
+}
+/* Cabeçalho, barra de status e barra de input do chat de suporte ficam
+   fixos (não rolam com as mensagens), igual aos outros chats: só a área
+   de mensagens no meio rola. */
+#supportModalDialog.modal-fullscreen #supportChatView .chat-header-pro,
+#supportModalDialog.modal-fullscreen #supportChatView .chat-status-bar,
+#supportModalDialog.modal-fullscreen #supportChatInputBar {
+    flex-shrink: 0;
 }
 
 /* ---------- Área de mensagens ---------- */
@@ -1702,6 +1808,15 @@ body.support-chat-fullscreen .header-main {
 .msg-avatar {
     width: 26px;
     height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.msg-avatar-inline {
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -2234,7 +2349,8 @@ body.admin-chat-fullscreen #productGridMain > .row > .col-12 {
 body.admin-chat-fullscreen #productsGrid,
 body.admin-chat-fullscreen .admin-dash,
 body.admin-chat-fullscreen .admin-main,
-body.admin-chat-fullscreen #admin-chats.admin-tab-panel.active {
+body.admin-chat-fullscreen #admin-chats.admin-tab-panel.active,
+body.admin-chat-fullscreen #admin-support.admin-tab-panel.active {
     flex: 1 1 auto;
     min-height: 0;
     height: 100%;
@@ -4767,7 +4883,7 @@ body.dark-theme .chat-participant-info small { color: var(--text-muted); }
 
 .admin-reports-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.25rem;
 }
 
@@ -4898,4 +5014,42 @@ body.dark-theme .chat-participant-info small { color: var(--text-muted); }
         opacity: 1;
         pointer-events: auto;
     }
+}
+
+/* ============================================
+   CARRINHO (offcanvas) — mais compacto, no
+   mesmo ritmo visual dos filtros da loja
+   ============================================ */
+#cartOffcanvas {
+    width: 340px;
+    max-width: 88vw;
+}
+#cartOffcanvas .offcanvas-header {
+    padding: 0.6rem 1rem;
+}
+#cartOffcanvas .offcanvas-title {
+    font-size: 1rem;
+}
+#cartOffcanvas .cart-item {
+    padding: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+}
+#cartOffcanvas .cart-item img {
+    width: 42px !important;
+    height: 42px !important;
+}
+#cartOffcanvas .cart-item .small {
+    font-size: 0.78rem;
+}
+#cartOffcanvas #cartFooter {
+    padding-top: 0.75rem !important;
+    margin-top: 0.5rem !important;
+}
+#cartOffcanvas #cartFooter h5 {
+    font-size: 1rem;
+}
+#cartOffcanvas #cartFooter .btn {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    font-size: 0.85rem;
 }

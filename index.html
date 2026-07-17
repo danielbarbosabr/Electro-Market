@@ -507,19 +507,14 @@
                         </select>
                     </div>
                 </div>
-                <p class="text-center small text-muted my-1 mb-1">ou</p>
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
-                    <input type="text" id="filterCEP" class="form-control" placeholder="Digite seu CEP" maxlength="9">
-                    <button class="btn btn-outline-primary" type="button" onclick="window.applyCepFilter()">Buscar</button>
-                </div>
-                <div id="filterCepStatus" class="small text-muted mt-1"></div>
             </div>
             <div class="filter-group mb-4">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="filterDelivery" onchange="applyFilters()">
-                    <label class="form-check-label small" for="filterDelivery">Somente com entrega</label>
-                </div>
+                <h6 class="fw-bold small text-uppercase">Forma de recebimento</h6>
+                <select id="filterDelivery" class="form-select form-select-sm mt-2" onchange="applyFilters()">
+                    <option value="all">Todos</option>
+                    <option value="delivery">Somente entrega</option>
+                    <option value="pickup">Somente retirada no local</option>
+                </select>
             </div>
             <div class="filter-group mb-4">
                 <h6 class="fw-bold small text-uppercase">Lojas</h6>
@@ -1126,8 +1121,27 @@
                 </form>
 
                 <!-- Etapa 2: chat do atendimento — ocupa a tela toda (ver #supportModalDialog.modal-fullscreen no CSS) -->
-                <div id="supportChatView" class="d-none">
+                <div id="supportChatView" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;">
+                    <div class="chat-header-pro">
+                        <button type="button" class="chat-header-close" onclick="window.closeSupportChatModal(); try { bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'))?.hide(); } catch(e){}" aria-label="Voltar" style="margin-right:4px;">
+                            <i class="bi bi-arrow-left"></i>
+                        </button>
+                        <div class="chat-header-avatar-wrap">
+                            <i class="bi bi-headset support-chat-header-icon"></i>
+                        </div>
+                        <div class="chat-header-info">
+                            <span class="chat-header-name">Atendimento do Suporte</span>
+                            <span class="chat-header-order-id" id="supportChatHeaderStatus">Suporte ao cliente</span>
+                        </div>
+                        <button type="button" class="chat-header-close" onclick="window.openSupportParticipants()" title="Ver pessoas da conversa" style="margin-left:4px;">
+                            <i class="bi bi-people-fill"></i>
+                        </button>
+                        <button type="button" class="chat-header-close" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()" aria-label="Fechar" style="margin-left:4px;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
                     <div id="supportChatStatusBar" class="chat-status-bar"></div>
+                    <div id="supportChatTicketSummary" class="chat-ticket-summary d-none"></div>
                     <div id="supportChatMessages" class="chat-messages support-chat-messages" style="padding:14px;"></div>
 
                     <!-- Barra de Preview (Responder/Editar) -->
@@ -1172,6 +1186,21 @@
         </div>
     </div>
 
+    <!-- Modal: Pessoas da conversa de suporte -->
+    <div class="modal fade" id="supportParticipantsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+                <div class="modal-header text-white" style="background-color: var(--primary-blue, #0d6efd);">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i> Pessoas da conversa</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-3" id="supportParticipantsBody">
+                    <div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Admin -->
     <div class="modal fade" id="adminDbModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -1208,11 +1237,11 @@
     <!-- Offcanvas Editar Perfil -->
     <!-- Tela de Edição de Perfil — estilo "link in bio" (cartão central, seções em pílulas empilhadas) -->
     <div id="profileEditScreen" class="profile-links-screen d-none">
-        <button type="button" class="profile-links-close" onclick="window.hideProfileEditScreen()" aria-label="Fechar">
-            <i class="bi bi-x-lg"></i>
-        </button>
-
         <form id="profileEditForm" class="profile-links-card">
+            <button type="button" class="profile-links-close profile-links-close-inside" onclick="window.hideProfileEditScreen()" aria-label="Fechar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
             <div class="profile-links-avatar-wrap">
                 <img id="profilePreview" src="https://placehold.co/100" referrerpolicy="no-referrer">
                 <button type="button" class="profile-links-avatar-edit" onclick="abrirUploadExterno()" title="Alterar foto">
@@ -1385,16 +1414,12 @@
                 <a href="#" class="nav-item role-admin d-none" data-page="admin-content" onclick="window.goToAdminTab('admin-content')">
                     <i class="bi bi-collection-fill"></i><span>Conteúdo</span>
                 </a>
-                <a href="#" class="nav-item role-admin d-none" data-page="admin-cats" onclick="window.goToAdminTab('admin-cats')">
-                    <i class="bi bi-tags-fill"></i><span>Categorias</span>
-                </a>
-                <a href="#" class="nav-item role-admin d-none" data-page="admin-chats" onclick="window.goToAdminTab('admin-chats')">
-                    <i class="bi bi-chat-dots-fill"></i><span>Chats</span>
-                    <span class="badge bg-danger rounded-pill dock-badge d-none" id="adminChatsBadgeDock">0</span>
-                </a>
                 <a href="#" class="nav-item role-admin d-none" data-page="admin-support" onclick="window.goToAdminTab('admin-support')">
                     <i class="bi bi-headset"></i><span>Suporte</span>
                     <span class="badge bg-danger rounded-pill dock-badge d-none" id="adminSupportBadgeDock">0</span>
+                </a>
+                <a href="#" class="nav-item role-admin d-none" data-page="admin-cats" onclick="window.goToAdminTab('admin-cats')">
+                    <i class="bi bi-tags-fill"></i><span>Categorias</span>
                 </a>
 
                 <a href="#" class="nav-item" data-page="mobileMenu" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu" onclick="updateMobileNavActive('mobileMenu')">

@@ -777,34 +777,6 @@ window.onFilterEstadoChange = async function(preSelectCity) {
     applyFilters();
 };
 
-/**
- * Permite filtrar direto pelo CEP: busca o endereço (ViaCEP) e já seleciona
- * automaticamente o Estado e a Cidade correspondentes no filtro.
- */
-window.applyCepFilter = async function() {
-    const input  = document.getElementById('filterCEP');
-    const status = document.getElementById('filterCepStatus');
-    const cepLimpo = (input?.value || '').replace(/\D/g, '');
-
-    if (cepLimpo.length !== 8) {
-        if (status) { status.textContent = 'Digite um CEP válido (8 dígitos).'; status.className = 'small text-danger mt-1'; }
-        return;
-    }
-
-    if (status) { status.textContent = 'Buscando...'; status.className = 'small text-muted mt-1'; }
-
-    const endereco = await buscarEnderecoPorCep(cepLimpo);
-    if (!endereco?.estado) {
-        if (status) { status.textContent = 'CEP não encontrado.'; status.className = 'small text-danger mt-1'; }
-        return;
-    }
-
-    document.getElementById('filterEstado').value = endereco.estado;
-    await window.onFilterEstadoChange(endereco.cidade);
-
-    if (status) { status.textContent = `Filtrando por ${endereco.cidade} - ${endereco.estado}`; status.className = 'small text-success mt-1'; }
-};
-
 function applyFilters() {
     const min      = parseFloat(document.getElementById('minPrice')?.value)  || 0;
     const max      = parseFloat(document.getElementById('maxPrice')?.value)  || Infinity;
@@ -812,14 +784,16 @@ function applyFilters() {
     const stores   = Array.from(document.querySelectorAll('.store-checkbox:checked')).map(cb => cb.value);
     const cidade   = document.getElementById('filterCidade')?.value || '';
     const categoria = document.getElementById('filterCategory')?.value || '';
-    const somenteEntrega = document.getElementById('filterDelivery')?.checked;
+    const deliveryMode = document.getElementById('filterDelivery')?.value || 'all';
 
     let filtered = allProductsCache.filter(p =>
         p.preco >= min && p.preco <= max &&
         (!stores.length || stores.includes(p.loja)) &&
         (!cidade || normalizeStr(p.cidade) === normalizeStr(cidade)) &&
         (!categoria || (p.categoria || '').startsWith(categoria)) &&
-        (!somenteEntrega || !!(p.realizaentrega ?? p.realiza_entrega ?? p.realizaEntrega))
+        (deliveryMode === 'all' ||
+            (deliveryMode === 'delivery' && !!(p.realizaentrega ?? p.realiza_entrega ?? p.realizaEntrega)) ||
+            (deliveryMode === 'pickup' && !(p.realizaentrega ?? p.realiza_entrega ?? p.realizaEntrega)))
     );
 
     if (sort === 'priceAsc')  filtered.sort((a, b) => a.preco - b.preco);
@@ -832,7 +806,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    ['minPrice', 'maxPrice', 'filterCEP'].forEach(id => {
+    ['minPrice', 'maxPrice'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -845,9 +819,7 @@ function clearFilters() {
     const cidade = document.getElementById('filterCidade');
     if (cidade) { cidade.innerHTML = '<option value="">Selecione o estado</option>'; cidade.disabled = true; }
     const delivery = document.getElementById('filterDelivery');
-    if (delivery) delivery.checked = false;
-    const status = document.getElementById('filterCepStatus');
-    if (status) status.textContent = '';
+    if (delivery) delivery.value = 'all';
     document.querySelectorAll('.store-checkbox').forEach(cb => cb.checked = true);
     renderGrid(allProductsCache);
 }
@@ -1030,7 +1002,7 @@ window.showDetail = async function(pid) {
                         <p class="small mb-1 fw-bold text-muted">Reputação do vendedor</p>
                         <div class="d-flex gap-1 mb-1" style="height:8px;">
                             ${[1,2,3,4,5].map(i => `
-                                <div class="flex-grow-1 rounded" style="background-color:${level>=i ? colors[i-1] : '#eee'}"></div>
+                                <div class="flex-grow-1 rounded" style="background-color:${level>=i ? '#FFC107' : '#eee'}"></div>
                             `).join('')}
                         </div>
                         <small class="text-muted">${sellerRatingCount > 0
@@ -1045,14 +1017,14 @@ window.showDetail = async function(pid) {
                         <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
                             <i class="bi bi-pencil me-2"></i>Editar Anúncio
                         </button>
-                        <button class="btn btn-ml-danger w-100" onclick="window.deleteProduct('${item.id}')">
+                        <button class="btn btn-ml-secondary w-100" onclick="window.deleteProduct('${item.id}')">
                             <i class="bi bi-trash me-2"></i>Excluir Anúncio
                         </button>
                     ` : isAdminViewing ? `
-                        <button class="btn btn-ml-secondary btn-lg w-100 mb-2" onclick="window.adminEditProduct('${item.id}')">
+                        <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.adminEditProduct('${item.id}')">
                             <i class="bi bi-pencil me-2"></i>Editar Anúncio (Admin)
                         </button>
-                        <button class="btn btn-ml-danger w-100" onclick="window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')">
+                        <button class="btn btn-ml-secondary w-100" onclick="window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')">
                             <i class="bi bi-trash me-2"></i>Excluir Produto (Admin)
                         </button>
                     ` : `
@@ -1071,7 +1043,7 @@ window.showDetail = async function(pid) {
                             <i class="bi bi-lightning me-2"></i>Solicitar Compra
                         </button>
                         ${item.preco > 0 ? `
-                        <button class="btn btn-ml-outline w-100 mb-2" onclick="window.openOfferModal('${pid}')">
+                        <button class="btn btn-ml-secondary w-100 mb-2" onclick="window.openOfferModal('${pid}')">
                             <i class="bi bi-tag me-2"></i>Fazer Oferta
                         </button>` : ''}
                         <button class="btn btn-ml-secondary w-100 mb-2" onclick="window.addToCart('${pid}', {qty:window._detailQty || 1});">

@@ -205,3 +205,105 @@
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* ============================================================
+   AJUSTES DE CHAT NA VERSÃO MOBILE
+   Cabeçalho, balões, barra de input e telas cheias (admin /
+   suporte) adaptados para telas estreitas (celular).
+   ============================================================ */
+@media (max-width: 768px) {
+    /* Cabeçalho do chat: menos padding/gap pra caber avatar + nome + botões */
+    .chat-header-pro {
+        gap: 8px;
+        padding: 10px 12px;
+    }
+    .chat-header-avatar-wrap {
+        width: 36px;
+        height: 36px;
+    }
+    .chat-header-name {
+        font-size: 0.92rem;
+    }
+    /* A sub-linha (ex: "Comprador ↔ Vendedor · #ABC123 · N mensagens") corta
+       com ellipsis em vez de estourar o cabeçalho em telas de 360px. */
+    .chat-header-order-id {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        display: block;
+    }
+    .chat-header-close {
+        width: 34px;
+        height: 34px;
+    }
+
+    /* Linhas da lista (pedidos / chamados) no mobile: texto de detalhe
+       corta com ellipsis em vez de empurrar os botões de ação p/ fora. */
+    .admin-row-info small {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    .admin-row .d-flex.gap-1 {
+        flex-shrink: 0;
+    }
+
+    /* Balões de mensagem: aproveita melhor a largura estreita */
+    .chat-messages {
+        padding: 0.65rem;
+    }
+    .chat-message {
+        max-width: 85%;
+    }
+
+    /* Barra de input: respiro no fundo p/ não colar no dock/home indicator */
+    .chat-input-bar,
+    #supportChatInputBar {
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    /* Tela cheia do chat de pedido (admin unificado / vendedor): some com o
+       dock e garante altura total. O seletor da aba agora é #admin-support. */
+    body.wa-locked .main-footer-dock,
+    body.admin-chat-fullscreen .main-footer-dock {
+        display: none !important;
+    }
+    body.admin-chat-fullscreen .admin-standalone-page {
+        padding: 0 !important;
+    }
+
+    /* Modal de suporte do usuário em tela cheia: desconta o header fixo e
+       afasta a input bar da borda inferior segura. */
+    body.support-chat-fullscreen {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        overflow: hidden;
+    }
+    body.support-chat-fullscreen .main-footer-dock {
+        display: none !important;
+    }
+    #supportModalDialog.modal-fullscreen {
+        margin-top: var(--header-height, 92px) !important;
+        height: calc(100% - var(--header-height, 92px)) !important;
+    }
+    /* Em mobile o header fixo é mais curto: reduz o --header-height pra o
+       modal de suporte não ficar com folga excessiva embaixo. */
+    :root {
+        --header-height: 64px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-messages { padding: 0.5rem; gap: 0.6rem; }
+    .chat-message { max-width: 90%; }
+    .chat-input-bar,
+    #supportChatInputBar { padding-top: 8px; }
+    /* Lista de contatos do chat cliente↔vendedor: nomes e avatares compactos */
+    .wa-side__item { padding: 8px 10px; }
+    .wa-side__avatar { width: 38px; height: 38px; }
+}
