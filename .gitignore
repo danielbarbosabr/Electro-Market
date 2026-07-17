@@ -1,0 +1,12 @@
+# O .env so serve pra rodar localmente com "vercel dev" (a Vercel CLI le
+# ele sozinha). Em producao, configure SUPABASE_URL e SUPABASE_KEY em
+# Project Settings -> Environment Variables no painel da Vercel.
+# Nao commitar o .env: e por isso que a chave deixou de ficar no codigo
+# do front-end.
+.env
+.env.local
+.vercel
+node_modules
+
+# Mantém a pasta api fora do GitHub (contém a config serverless do Supabase).
+api/
