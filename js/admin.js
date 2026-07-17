@@ -1038,11 +1038,20 @@ window.adminViewChat = async function(orderId) {
                                 </div>
                                 <div class="chat-header-info">
                                     <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
-                                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · ${msgCount} mensagens</span>
+                                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${orderId.slice(-6).toUpperCase()} · ${msgCount} mensagens${chat.closed ? ' · <i class="bi bi-lock-fill"></i> Encerrado' : ''}</span>
                                 </div>
                                 <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuários da conversa">
                                     <i class="bi bi-people-fill"></i>
                                 </button>
+                                <div class="dropdown">
+                                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        ${!chat.closed ? `<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.adminCloseChat('${orderId}')"><i class="bi bi-check-circle-fill me-2"></i>Encerrar Atendimento</a></li>` : ''}
+                                        <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminDeleteChat('${orderId}')"><i class="bi bi-trash me-2"></i>Apagar conversa e pedido</a></li>
+                                    </ul>
+                                </div>
                             </div>
 
                             <div id="adminChatParticipants" class="chat-participants-panel d-none">
@@ -1073,19 +1082,6 @@ window.adminViewChat = async function(orderId) {
                                     </div>
                                 </div>
                             ` : ''}
-
-                            <div class="chat-admin-actions">
-                                <button class="btn btn-ml-danger btn-sm" onclick="window.adminDeleteChat('${orderId}')">
-                                    <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
-                                </button>
-                                ${!chat.closed ? `
-                                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminCloseChat('${orderId}')">
-                                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Atendimento
-                                    </button>
-                                ` : `
-                                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>
-                                `}
-                            </div>
                         </div>
                     </section>
                 </div>
@@ -1290,26 +1286,26 @@ window.adminChatsModalSelect = async function(orderId) {
                 </div>
                 <div class="chat-header-info">
                     <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
-                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · ${msgCount} mensagens</span>
+                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${orderId.slice(-6).toUpperCase()} · ${msgCount} mensagens</span>
                 </div>
                 <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsModalParticipants')" title="Ver usuários da conversa">
                     <i class="bi bi-people-fill"></i>
                 </button>
+                <div class="dropdown">
+                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        ${!chat.closed ? `<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.adminChatsModalCloseChat('${orderId}')"><i class="bi bi-check-circle-fill me-2"></i>Encerrar Atendimento</a></li>` : ''}
+                        <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminChatsModalDelete('${orderId}')"><i class="bi bi-trash me-2"></i>Apagar conversa e pedido</a></li>
+                    </ul>
+                </div>
             </div>
 
-            <!-- Resumo do Produto + Status do Pedido, direto junto com o chat (mesmas informações do chat cliente ↔ vendedor) -->
-            <div class="chat-product-summary">
-                <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
-                <div class="chat-product-summary-info">
-                    <div class="chat-product-summary-title">${order?.product_title || 'Produto'}</div>
-                    <div class="chat-product-summary-price">${order ? formatPreco(order.total, {htmlGratis:false}) : '—'}</div>
-                </div>
-                <small class="chat-product-summary-id">#${orderId.slice(-6).toUpperCase()}</small>
-            </div>
             <div class="chat-status-bar">
                 <span class="badge ${st.class}">${st.text}</span>
-                ${order?.buyer_name ? `<span class="small text-muted ms-2"><i class="bi bi-bag-fill me-1"></i>${order.buyer_name}</span>` : ''}
-                ${order?.seller_name ? `<span class="small text-muted ms-2"><i class="bi bi-shop me-1"></i>${order.seller_name}</span>` : ''}
+                ${order ? `<span class="small fw-bold text-success ms-2">${formatPreco(order.total, {htmlGratis:false})}</span>` : ''}
+                ${chat.closed ? `<span class="small text-muted ms-2"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>` : ''}
             </div>
 
             <div id="adminChatsModalParticipants" class="chat-participants-panel d-none">
@@ -1339,20 +1335,7 @@ window.adminChatsModalSelect = async function(orderId) {
                         <button type="button" class="chat-send-btn" onclick="window.adminChatsModalSend('${orderId}')"><i class="bi bi-send-fill"></i></button>
                     </div>
                 </div>
-            ` : ''}
-
-            <div class="chat-admin-actions">
-                <button class="btn btn-ml-danger btn-sm" onclick="window.adminChatsModalDelete('${orderId}')">
-                    <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
-                </button>
-                ${!chat.closed ? `
-                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminChatsModalCloseChat('${orderId}')">
-                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Atendimento
-                    </button>
-                ` : `
-                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>
-                `}
-            </div>`;
+            ` : ''}`;
 
         const msgsBody = document.getElementById('adminChatsModalMsgsBody');
         if (msgsBody) msgsBody.scrollTop = msgsBody.scrollHeight;
@@ -1545,24 +1528,26 @@ window.adminChatsTabSelect = async function(orderId) {
                 </div>
                 <div class="chat-header-info">
                     <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
-                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · ${msgCount} mensagens</span>
+                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${orderId.slice(-6).toUpperCase()} · ${msgCount} mensagens</span>
                 </div>
                 <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsTabParticipants')" title="Ver usuários da conversa">
                     <i class="bi bi-people-fill"></i>
                 </button>
+                <div class="dropdown">
+                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        ${!closed ? `<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.adminChatsTabCloseChat('${orderId}')"><i class="bi bi-check-circle-fill me-2"></i>Encerrar Atendimento</a></li>` : ''}
+                        <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminChatsTabDelete('${orderId}')"><i class="bi bi-trash me-2"></i>Apagar conversa e pedido</a></li>
+                    </ul>
+                </div>
             </div>
 
-            <!-- Resumo do Produto + Status do Pedido, igual ao chat cliente ↔ vendedor -->
-            <div class="chat-product-summary">
-                <img src="${order?.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20'}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
-                <div class="chat-product-summary-info">
-                    <div class="chat-product-summary-title">${order?.product_title || 'Produto'}</div>
-                    <div class="chat-product-summary-price">${order ? formatPreco(order.total, {htmlGratis:false}) : '—'}</div>
-                </div>
-                <small class="chat-product-summary-id">#${orderId.slice(-6).toUpperCase()}</small>
-            </div>
             <div class="chat-status-bar">
                 <span class="badge ${st.class}">${st.text}</span>
+                ${order ? `<span class="small fw-bold text-success ms-2">${formatPreco(order.total, {htmlGratis:false})}</span>` : ''}
+                ${closed ? `<span class="small text-muted ms-2"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>` : ''}
             </div>
 
             <div id="adminChatsTabParticipants" class="chat-participants-panel d-none">
@@ -1618,20 +1603,7 @@ window.adminChatsTabSelect = async function(orderId) {
                         <button type="button" class="chat-send-btn" onclick="window.adminChatsTabSend('${orderId}')"><i class="bi bi-send-fill"></i></button>
                     </div>
                 </div>
-            ` : ''}
-
-            <div class="chat-admin-actions">
-                <button class="btn btn-ml-danger btn-sm" onclick="window.adminChatsTabDelete('${orderId}')">
-                    <i class="bi bi-trash me-1"></i>Apagar conversa e pedido
-                </button>
-                ${!closed ? `
-                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminChatsTabCloseChat('${orderId}')">
-                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Atendimento
-                    </button>
-                ` : `
-                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>
-                `}
-            </div>`;
+            ` : ''}`;
 
         const msgsBody = document.getElementById('adminChatsTabMsgsBody');
         if (msgsBody) msgsBody.scrollTop = msgsBody.scrollHeight;
@@ -2401,26 +2373,43 @@ window.adminViewTicket = async function(ticketId) {
         document.body.classList.add('wa-locked', 'admin-chat-fullscreen');
 
         grid.className = 'admin-panel-active';
+        const msgCount   = (ticket.messages || []).filter(m => m.type !== 'system').length;
+        const roleLabel  = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
+        const reasonLabel = SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado';
+
         grid.innerHTML = `
             <div class="admin-standalone-page">
-                <div class="d-flex align-items-center gap-2 mb-3 admin-chat-back-bar">
-                    <button class="btn btn-sm btn-ml-secondary" onclick="window.adminViewTicketBack()"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
-                    <h5 class="fw-bold mb-0">Chamado de Suporte <span class="admin-row-badge ${ticket.status === 'closed' ? 'badge-muted' : 'badge-open'} ms-1">${ticket.status === 'closed' ? 'Encerrado' : 'Aberto'}</span></h5>
-                </div>
                 <div class="wa-main admin-chat-main" style="margin:0;">
                     <section class="wa-chat" style="flex-grow:1;">
                         <div class="chat-container" style="height:100%;">
                             <div class="chat-header-pro">
+                                <button type="button" class="chat-header-close" onclick="window.adminViewTicketBack()" style="margin-right:4px;" title="Voltar para a lista">
+                                    <i class="bi bi-arrow-left"></i>
+                                </button>
                                 <div class="chat-header-avatar-wrap">
                                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(ticket.requester_name || '?')}&background=e50914&color=fff" referrerpolicy="no-referrer">
                                 </div>
                                 <div class="chat-header-info">
-                                    <span class="chat-header-name">${SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado'}</span>
-                                    <span class="chat-header-order-id">${ticket.requester_name || 'Visitante'}${ticket.order_id ? ' · Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''}</span>
+                                    <span class="chat-header-name">${ticket.requester_name || 'Visitante'}</span>
+                                    <span class="chat-header-order-id">${roleLabel} · ${reasonLabel}${ticket.order_id ? ' · Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''} · ${msgCount} mensagens</span>
                                 </div>
                                 <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuário do chamado">
                                     <i class="bi bi-people-fill"></i>
                                 </button>
+                                <div class="dropdown">
+                                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        ${ticket.status !== 'closed' ? `<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.adminCloseTicket('${ticketId}')"><i class="bi bi-check-circle-fill me-2"></i>Encerrar Chamado</a></li>` : ''}
+                                        <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminDeleteTicket('${ticketId}')"><i class="bi bi-trash me-2"></i>Apagar chamado</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="chat-status-bar">
+                                <span class="admin-row-badge ${ticket.status === 'closed' ? 'badge-muted' : 'badge-open'}">${ticket.status === 'closed' ? 'Encerrado' : 'Aberto'}</span>
+                                ${ticket.status === 'closed' ? `<span class="small text-muted ms-2"><i class="bi bi-lock-fill me-1"></i>Chamado encerrado</span>` : ''}
                             </div>
 
                             <div id="adminChatParticipants" class="chat-participants-panel d-none">
@@ -2428,7 +2417,7 @@ window.adminViewTicket = async function(ticketId) {
                                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(ticket.requester_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer">
                                     <div class="chat-participant-info">
                                         <strong>${ticket.requester_name || 'Visitante'}</strong>
-                                        <small>${ticket.requester_email || 'E-mail não informado'} ${ticket.requester_role ? '• ' + (ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente')) : ''}</small>
+                                        <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel}</small>
                                     </div>
                                 </div>
                             </div>
@@ -2444,19 +2433,6 @@ window.adminViewTicket = async function(ticketId) {
                                     </div>
                                 </div>
                             ` : ''}
-
-                            <div class="chat-admin-actions">
-                                <button class="btn btn-ml-danger btn-sm" onclick="window.adminDeleteTicket('${ticketId}')">
-                                    <i class="bi bi-trash me-1"></i>Apagar chamado
-                                </button>
-                                ${ticket.status !== 'closed' ? `
-                                    <button class="btn btn-warning btn-sm fw-bold" onclick="window.adminCloseTicket('${ticketId}')">
-                                        <i class="bi bi-check-circle-fill me-1"></i>Encerrar Chamado
-                                    </button>
-                                ` : `
-                                    <span class="text-muted small d-flex align-items-center"><i class="bi bi-lock-fill me-1"></i>Chamado encerrado</span>
-                                `}
-                            </div>
                         </div>
                     </section>
                 </div>

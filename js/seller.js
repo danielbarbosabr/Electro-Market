@@ -373,8 +373,14 @@ window.showChat = async function(orderId) {
     if (currentChat !== orderId) lastChatSignature = null;
     currentChat = orderId;
 
-    const otherId = user.id === order.buyer_id ? order.seller_id : order.buyer_id;
-    const otherName = user.id === order.buyer_id ? order.seller_name : order.buyer_name;
+    // Antes isso assumia que quem não é o comprador é sempre o vendedor — o que
+    // fazia um terceiro (ex: administrador) que caísse nesta tela ser tratado
+    // como se fosse o vendedor do pedido. Agora identificamos os dois papéis
+    // explicitamente pelo id.
+    const isBuyerHere  = user.id === order.buyer_id;
+    const isSellerHere = user.id === order.seller_id;
+    const otherId   = isBuyerHere ? order.seller_id   : (isSellerHere ? order.buyer_id   : null);
+    const otherName = isBuyerHere ? order.seller_name : (isSellerHere ? order.buyer_name  : `${order.buyer_name || 'Comprador'} ↔ ${order.seller_name || 'Vendedor'}`);
     document.getElementById('chatPartnerNameHeader').textContent = otherName || 'Chat';
 
     const avatarEl = document.getElementById('chatPartnerAvatar');
@@ -382,10 +388,12 @@ window.showChat = async function(orderId) {
     avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`; // placeholder enquanto busca a foto real
     dotEl?.classList.remove('online', 'offline');
     try {
-        const partnerData = await supabaseFetch(`users?select=avatar,last_seen&id=eq.${otherId}&limit=1`);
-        const realAvatar = normalizeImageUrl(partnerData?.[0]?.avatar);
-        if (realAvatar) avatarEl.src = realAvatar;
-        if (dotEl) dotEl.classList.add(isRecentlyOnline(partnerData?.[0]?.last_seen) ? 'online' : 'offline');
+        if (otherId) {
+            const partnerData = await supabaseFetch(`users?select=avatar,last_seen&id=eq.${otherId}&limit=1`);
+            const realAvatar = normalizeImageUrl(partnerData?.[0]?.avatar);
+            if (realAvatar) avatarEl.src = realAvatar;
+            if (dotEl) dotEl.classList.add(isRecentlyOnline(partnerData?.[0]?.last_seen) ? 'online' : 'offline');
+        }
     } catch (e) {}
 
     // Popula resumo do produto
@@ -525,6 +533,10 @@ async function loadChatMessages(orderId, silent = false) {
 
         const myAvatar = normalizeImageUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome||'Você')}&background=22c98e&color=fff&size=40`;
         const partnerAvatarSrc = document.getElementById('chatPartnerAvatar')?.src || '';
+        // Avatar fixo pra mensagens da equipe de suporte (admin) — nunca deve usar
+        // o avatar do vendedor/comprador (partnerAvatarSrc), senão a mensagem do
+        // admin aparece com a cara da outra parte e parece ter sido ela quem falou.
+        const supportAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40`;
 
         container.innerHTML = chat.messages.map((msg, index) => {
             if (msg.type === 'system' || msg.senderId === 'system') {
@@ -536,15 +548,21 @@ async function loadChatMessages(orderId, silent = false) {
             }
 
             const isMe = msg.senderId === user.id;
+            // Mensagens injetadas pelo admin/suporte (ver adminChatsTabSend/adminSendChatMessage
+            // em admin.js) vêm marcadas com isStaff — nunca são nem "eu" nem a outra parte do
+            // pedido, então precisam de um estilo e avatar próprios, senão ficam indistinguíveis
+            // da mensagem do vendedor (mesma bolha "is-them", mesmo avatar da outra parte).
+            const isStaff = !!msg.isStaff;
+            const avatarForThem = isStaff ? supportAvatar : partnerAvatarSrc;
             // Agrupamento estilo WhatsApp: some com o nome/margem quando a mensagem
             // anterior é da mesma pessoa em sequência.
             const prevMsg = chat.messages[index - 1];
-            const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system';
+            const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system' && !!prevMsg.isStaff === isStaff;
 
             if (msg.deleted) {
                 return `
                 <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" style="${isGrouped ? 'margin-top:-4px;' : ''}">
-                    ${!isMe ? `<img class="msg-avatar" src="${partnerAvatarSrc}" referrerpolicy="no-referrer">` : ''}
+                    ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer">` : ''}
                     <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted">
                         <i class="bi bi-slash-circle me-1"></i><em>Mensagem apagada</em>
                     </div>
@@ -573,11 +591,11 @@ async function loadChatMessages(orderId, silent = false) {
 
             return `
             <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" style="${isGrouped ? 'margin-top:-4px;' : ''}">
-                ${!isMe ? `<img class="msg-avatar" src="${partnerAvatarSrc}" referrerpolicy="no-referrer">` : ''}
-                <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}">
+                ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer">` : ''}
+                <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''}">
 
                     <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
-                        ${!isGrouped ? `<span class="msg-sender">${isMe ? 'Você' : (msg.senderName || 'Usuário')}</span>` : '<span></span>'}
+                        ${!isGrouped ? `<span class="msg-sender">${isMe ? 'Você' : (msg.senderName || 'Usuário')}${isStaff ? ' <i class="bi bi-patch-check-fill" title="Suporte"></i>' : ''}</span>` : '<span></span>'}
                         <div class="dropdown">
                             <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">

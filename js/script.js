@@ -2054,6 +2054,10 @@ function bootstrapApp() {
         document.addEventListener('DOMContentLoaded', start);
     }
 })();
+// OBS: esse bloco de inicialização estava duplicado no final do arquivo,
+// fazendo bootstrapApp() (e todos os listeners que ele registra, incluindo
+// o de publicar/editar produto) rodar duas vezes — por isso os produtos
+// saíam duplicados ao publicar. A segunda cópia foi removida.
 
 // ============================================
 // UTILITÁRIOS
@@ -2808,22 +2812,3 @@ window.closeMobileMenu = () =>
  * sair e voltar pra essa aba manualmente.
  */
 
-// window.CONFIG e carregado de forma assincrona (fetch em /api/config ou,
-// no dev local com Live Server, fallback em js/config.local.js — ver o
-// loader inline em index.html). Por isso esperamos a Promise
-// window._configReady terminar antes de inicializar o app, garantindo que
-// CONFIG.SUPABASE_URL/KEY ja estejam definidos quando o app comecar a
-// fazer chamadas pro Supabase. Se a config falhar, o proprio loader ja
-// mostra uma tela de erro, entao nem tentamos inicializar o app.
-(function startWhenReady() {
-    function start() {
-        Promise.resolve(window._configReady).then(function () {
-            if (window.CONFIG) bootstrapApp();
-        });
-    }
-    if (document.readyState !== 'loading') {
-        start();
-    } else {
-        document.addEventListener('DOMContentLoaded', start);
-    }
-})();
