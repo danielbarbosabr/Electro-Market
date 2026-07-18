@@ -71,14 +71,12 @@ O sistema foi construído com foco em:
 ## 📁 Estrutura do Projeto
 
 ```
-
 electromarket/
 ├── index.html          # Página principal (única - SPA)
 ├── style.css           # Estilos customizados e temas
 ├── script.js           # Lógica completa do front-end
 ├── products.json       # Dados de exemplo (fallback)
 └── README.md           # Documentação do projeto
-
 ```
 
 ---
@@ -156,7 +154,7 @@ CREATE TABLE IF NOT EXISTS chats (
 );
 ```
 
-2. Habilitar RLS e políticas públicas (desenvolvimento)
+### 2. Habilitar RLS e políticas públicas (desenvolvimento)
 
 ```sql
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -170,7 +168,7 @@ CREATE POLICY "all_orders" ON orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "all_chats" ON chats FOR ALL USING (true) WITH CHECK (true);
 ```
 
-3. Configurar credenciais no script.js
+### 3. Configurar credenciais
 
 ```javascript
 const SUPABASE_URL = 'https://SEU_PROJETO.supabase.co';
@@ -179,7 +177,7 @@ const SUPABASE_KEY = 'SUA_CHAVE_ANON';
 
 ---
 
-🖥️ Como Executar Localmente
+## 🖥️ Como Executar Localmente
 
 1. Clone o repositório:
 
@@ -188,41 +186,41 @@ git clone https://github.com/seuusuario/electromarket.git
 cd electromarket
 ```
 
-1. Abra o arquivo index.html em seu navegador ou utilize a extensão Live Server no VS Code.
-2. Certifique-se de que as credenciais do Supabase estão configuradas corretamente no arquivo script.js.
+2. Abra o arquivo `index.html` em seu navegador ou utilize a extensão **Live Server** no VS Code.
+
+3. Certifique-se de que as credenciais do Supabase estão configuradas corretamente.
 
 ---
 
-🌐 Demonstração Online
+## 🌐 Demonstração Online
 
-O projeto está disponível em: https://eletromarket-pi.vercel.app/ (substitua pelo seu link)
-
----
-
-👥 Equipe
-
-Nome Função
-Daniel Barbosa de Lima Desenvolvedor Full Stack
-Colega 1 Documentação / Testes
-Colega 2 Design / UI/UX
+O projeto está disponível em: [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
 
 ---
 
-📄 Licença
+## 👥 Equipe
+
+| Nome | Função |
+|------|--------|
+| Daniel Barbosa de Lima | Desenvolvedor Full Stack |
+| Colega 1 | Documentação / Testes |
+| Colega 2 | Design / UI/UX |
+
+---
+
+## 📄 Licença
 
 Este projeto é parte de um trabalho acadêmico e está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
 
 ---
 
-🙏 Agradecimentos
+## 🙏 Agradecimentos
 
-· Supabase pelo backend gratuito
-· GSAP pelas animações
-· ViaCEP pela API de CEP
-· CodePen pelo SVG do Yeti original
+- [Supabase](https://supabase.com/) pelo backend gratuito
+- [GSAP](https://gsap.com/) pelas animações
+- [ViaCEP](https://viacep.com.br/) pela API de CEP
+- CodePen pelo SVG do Yeti original
 
 ---
 
 Feito com 💚 para a disciplina de Projeto Integrador
-
-```
