@@ -152,6 +152,7 @@ window.exitWaOrdersView = function() {
     document.getElementById('whatsappOrdersView')?.classList.add('d-none');
     document.getElementById('productGridMain')?.classList.remove('d-none');
     document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
+    document.body.style.overflow = '';
     if (typeof window.closeWaChat === 'function') window.closeWaChat();
 };
 
@@ -240,7 +241,7 @@ async function loadPage(query = 'eletronicos', forceRefresh = false) {
             document.getElementById('gridTitle').textContent = 'Recomendados para você';
         }
 
-        renderStorefrontBanner(matchedStores);
+        await renderStorefrontBanner(matchedStores);
         renderGrid(products);
         updateStoreFilterUI();
         updateCategoryFilterUI();
@@ -452,17 +453,17 @@ function renderCard(item) {
         <div class="card product-card-ml" onclick="window.showDetail('${pid}')">
             ${temOferta ? `<div class="offer-badge-ml">${descontoPct}% OFF</div>` : ''}
             <div class="overlay">
-                <button class="btn btn-action" onclick="event.stopPropagation();window.shareProduct('${pid}')" title="Compartilhar">
-                    <i class="bi bi-share"></i>
-                </button>
                 <button class="btn btn-action" onclick="event.stopPropagation();window.toggleLike('${pid}')" title="Curtir">
                     <i class="bi ${isLiked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
+                </button>
+                <button class="btn btn-action" onclick="event.stopPropagation();window.shareProduct('${pid}')" title="Compartilhar">
+                    <i class="bi bi-share"></i>
                 </button>
             </div>
             <div class="product-card-img-container">
                 ${thumb
                     ? `<img src="${thumb}" alt="${item.titulo}" loading="lazy" referrerpolicy="no-referrer"
-                           onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:2.5rem;\\'></i>'">`
+                           onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:2.5rem;\\'></i>'">`
                     : `<i class="bi bi-box-seam text-secondary" style="font-size:2.5rem;"></i>`
                 }
             </div>
@@ -555,21 +556,37 @@ function updateCategoryFilterUI() {
  * quando o termo digitado bate com o nome de um ou mais vendedores — igual ao
  * atalho de loja que aparece na busca do Mercado Livre/Shopee.
  */
-function renderStorefrontBanner(stores) {
+async function renderStorefrontBanner(stores) {
     const container = document.getElementById('storefrontBanner');
     if (!container) return;
     if (!stores || stores.length === 0) { container.innerHTML = ''; return; }
 
-    container.innerHTML = stores.map(s => `
+    // Busca banner de cada loja a partir do campo avatar (array [avatar, banner])
+    const storeIds = stores.map(s => s.vendedor_id).join(',');
+    let bannersMap = {};
+    try {
+        const usersData = await supabaseFetch(`users?select=id,avatar&id=in.(${storeIds})`);
+        if (usersData) {
+            usersData.forEach(u => {
+                const { banner } = splitAvatarField(u.avatar);
+                if (banner) bannersMap[u.id] = banner;
+            });
+        }
+    } catch(e) {}
+
+    container.innerHTML = stores.map(s => {
+        const banner = bannersMap[s.vendedor_id] || '';
+        return `
         <div class="storefront-banner" onclick="window.showSellerProfile('${s.vendedor_id}', '${(s.loja||'').replace(/'/g,"\\'")}')">
+            ${banner ? `<div class="storefront-banner-thumb"><img src="${banner}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'"></div>` : ''}
             <div class="storefront-banner-icon"><i class="bi bi-shop"></i></div>
             <div class="storefront-banner-info">
                 <strong>${s.loja}</strong>
                 <small>Ver todos os anúncios desta loja</small>
             </div>
             <i class="bi bi-chevron-right storefront-banner-arrow"></i>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 /**
@@ -612,6 +629,8 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
         const ratingCount = parseInt(seller.rating_count) || 0;
         const localizacao = [seller.cidade, seller.estado].filter(Boolean).join(' - ');
         const membroDesde = seller.created_at ? new Date(seller.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '';
+        const { avatar: sellerAvatar, banner: sellerBanner } = splitAvatarField(seller.avatar);
+        const heroBg = sellerBanner ? `background-image:url('${sellerBanner}');background-size:cover;background-position:center;` : (sellerAvatar ? `background-image:url('${sellerAvatar}');background-size:cover;background-position:center;` : '');
 
         grid.innerHTML = `
             <div class="seller-profile-page">
@@ -619,18 +638,20 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
                     <i class="bi bi-arrow-left"></i> Voltar
                 </button>
 
-                <div class="seller-profile-hero">
-                    <img src="${seller.avatar?.startsWith('http') ? seller.avatar : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(nome)}" class="seller-profile-avatar" referrerpolicy="no-referrer">
-                    <div class="seller-profile-info">
-                        <h4 class="fw-bold mb-1">${nome}</h4>
-                        <div class="mb-1">
-                            ${ratingCount > 0
-                                ? `<span class="fw-bold">${ratingAvg.toFixed(1)}</span> <i class="bi bi-star-fill text-warning"></i> <span class="text-muted small">(${ratingCount} avaliaç${ratingCount === 1 ? 'ão' : 'ões'})</span>`
-                                : `<span class="text-muted small">Ainda sem avaliações</span>`}
+                <div class="seller-profile-hero"${sellerBanner || sellerAvatar ? ` style="${heroBg}"` : ''}>
+                    <div class="seller-profile-hero-overlay${sellerBanner || sellerAvatar ? '' : ' no-banner'}">
+                        <img src="${sellerAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(nome)}" class="seller-profile-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
+                        <div class="seller-profile-info">
+                            <h4 class="fw-bold mb-1">${nome}</h4>
+                            <div class="mb-1">
+                                ${ratingCount > 0
+                                    ? `<span class="fw-bold">${ratingAvg.toFixed(1)}</span> <i class="bi bi-star-fill text-warning"></i> <span class="text-muted small">(${ratingCount} avaliaç${ratingCount === 1 ? 'ão' : 'ões'})</span>`
+                                    : `<span class="text-muted small">Ainda sem avaliações</span>`}
+                            </div>
+                            <small class="text-muted d-block">${localizacao ? `<i class="bi bi-geo-alt me-1"></i>${localizacao}` : ''}</small>
+                            ${membroDesde ? `<small class="text-muted d-block"><i class="bi bi-calendar3 me-1"></i>No ElectroMarket desde ${membroDesde}</small>` : ''}
+                            <small class="text-muted d-block"><i class="bi bi-box-seam me-1"></i>${products.length} anúncio${products.length === 1 ? '' : 's'} ativo${products.length === 1 ? '' : 's'}</small>
                         </div>
-                        <small class="text-muted d-block">${localizacao ? `<i class="bi bi-geo-alt me-1"></i>${localizacao}` : ''}</small>
-                        ${membroDesde ? `<small class="text-muted d-block"><i class="bi bi-calendar3 me-1"></i>No ElectroMarket desde ${membroDesde}</small>` : ''}
-                        <small class="text-muted d-block"><i class="bi bi-box-seam me-1"></i>${products.length} anúncio${products.length === 1 ? '' : 's'} ativo${products.length === 1 ? '' : 's'}</small>
                     </div>
                 </div>
 
@@ -932,19 +953,25 @@ window.showDetail = async function(pid) {
     grid.className = 'product-detail-active';
     grid.style.display = 'block';
 
+    const precoNum = parseFloat(item.preco) || 0;
+    const installmentValue = precoNum / 3;
+    const installmentStr = installmentValue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const totalSold = item.vendas || 0;
+
     grid.innerHTML = `
         <div class="detail-page">
             <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
                 <i class="bi bi-arrow-left"></i> Voltar
             </button>
-            <div class="row g-0 g-md-4">
-                <div class="col-md-7 border-end pe-md-4">
-                    <div class="text-center mb-3 bg-light rounded p-3 d-flex align-items-center justify-content-center position-relative${hasMultipleImgs ? ' product-3d-img' : ''}"
+
+            <div class="ml-panel">
+                <div class="ml-panel-left">
+                    <div class="text-center bg-light rounded p-3 d-flex align-items-center justify-content-center position-relative${hasMultipleImgs ? ' product-3d-img' : ''}"
                          style="min-height:260px;" data-pid="${pid}" data-idx="0"
                          ${hasMultipleImgs ? `onmousemove="window.tiltDetailImage(event, this)" onmouseleave="window.resetDetailImage(this)"` : ''}>
                         ${mainImg
                             ? `<img id="mainDetailImg" src="${mainImg}" class="img-fluid" style="max-height:420px;object-fit:contain;transition:transform 0.15s ease-out, opacity 0.15s ease;" referrerpolicy="no-referrer"
-                                   onerror="this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
+                                   onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:4rem;\\'></i>'">`
                             : `<i class="bi bi-box-seam text-secondary" style="font-size:4rem;"></i>`
                         }
                         ${hasMultipleImgs ? `
@@ -953,116 +980,117 @@ window.showDetail = async function(pid) {
                             <div class="card-img-dots">${images.map((_, i) => `<span class="card-img-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>
                         ` : ''}
                     </div>
-                    <div class="mt-3">
-                        <h5 class="fw-bold">Descrição</h5>
-                        <p class="text-muted" style="line-height:1.7">${item.descricao || 'Sem descrição detalhada.'}</p>
-                    </div>
                 </div>
-                <div class="col-md-5 pt-3 pt-md-0">
-                    <span class="badge bg-secondary mb-2 small">${item.categoria || 'Geral'}</span>
-                    <h4 class="fw-bold">${item.titulo}</h4>
 
-                    <div class="my-3" style="overflow-wrap:anywhere;word-break:break-word;">
-                        ${item.preco_original && parseFloat(item.preco_original) > parseFloat(item.preco) ? `
-                            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                                <span class="text-muted text-decoration-line-through">R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                                <span class="offer-pct-inline">${Math.round(100 - (item.preco / parseFloat(item.preco_original)) * 100)}% OFF</span>
-                            </div>` : ''
-                        }
-                        ${item.preco === 0
-                            ? `<span class="fs-1 fw-bold text-success">GRÁTIS</span>`
-                            : `<span class="fs-1 fw-bold">R$ ${Math.floor(item.preco || 0).toLocaleString('pt-BR')}</span>
-                               <span class="fs-5">,${((item.preco % 1).toFixed(2)).slice(1)}</span>`
-                        }
-                    </div>
+                <div class="ml-panel-right">
+                    <div class="ml-condition">${item.categoria || 'Produto'}${totalSold > 0 ? ` | ${totalSold} vendido${totalSold > 1 ? 's' : ''}` : ''}</div>
 
-                    <div class="card bg-light border-0 p-3 mb-3" style="border-radius:10px;">
-                        ${realizaEntrega ? `
-                            <p class="mb-1 text-success fw-bold"><i class="bi bi-truck me-2"></i> Entrega disponível</p>
-                            <small class="text-muted">Entrega em <strong>${regiaoEntrega}</strong></small>
-                        ` : `
-                            <p class="mb-1 fw-bold" style="color:#e67e22;"><i class="bi bi-geo-alt me-2"></i> Retirada no local</p>
-                            <small class="text-muted"><strong>Local:</strong> ${sellerAddress}</small>
-                        `}
-                    </div>
-
-                    <div class="mb-3" id="detailLikesBar">
-                        <p class="small mb-1 fw-bold text-muted">Interesse no produto</p>
-                        <div class="d-flex gap-1 mb-1" style="height:8px;">
-                            ${[1,2,3,4,5].map(i => `
-                                <div class="flex-grow-1 rounded" style="background-color:${likesLevel>=i ? colors[i-1] : '#eee'}"></div>
-                            `).join('')}
+                    <div class="ml-title-row">
+                        <h1 class="ml-title">${item.titulo}</h1>
+                        <div class="ml-like-share">
+                            <i class="bi bi-heart${likedProducts.includes(pid) ? '-fill text-danger' : ''} ml-heart" onclick="window.toggleLike('${pid}')" title="Curtir"></i>
+                            <i class="bi bi-share ml-share-icon" onclick="window.shareProduct('${pid}')" title="Compartilhar"></i>
                         </div>
-                        <small class="text-muted" id="detailLikesText">${likesCount > 0
-                            ? `<i class="bi bi-heart-fill" style="color:#ff4d6d;"></i> ${likesCount} curtida${likesCount === 1 ? '' : 's'}`
-                            : 'Ainda sem curtidas'}</small>
                     </div>
 
-                    <div class="mb-3">
-                        <p class="small mb-1 fw-bold text-muted">Reputação do vendedor</p>
-                        <div class="d-flex gap-1 mb-1" style="height:8px;">
-                            ${[1,2,3,4,5].map(i => `
-                                <div class="flex-grow-1 rounded" style="background-color:${level>=i ? '#FFC107' : '#eee'}"></div>
-                            `).join('')}
+
+                    <div class="ml-price-card">
+                        <div class="ml-price">
+                            ${precoNum === 0
+                                ? `<span class="ml-price-gratis">GRÁTIS</span>`
+                                : `R$ <span class="ml-price-int">${Math.floor(precoNum).toLocaleString('pt-BR')}</span><span class="ml-price-cents">,${((precoNum % 1).toFixed(2)).slice(1)}</span>`
+                            }
                         </div>
-                        <small class="text-muted">${sellerRatingCount > 0
-                            ? `${sellerRatingAvg.toFixed(1)} <i class="bi bi-star-fill text-warning"></i> · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}`
-                            : 'Ainda sem avaliações'}</small>
+                        ${item.preco_original && parseFloat(item.preco_original) > precoNum ? `
+                            <div class="ml-old-price">R$ ${parseFloat(item.preco_original).toLocaleString('pt-BR', {minimumFractionDigits:2})} <span class="ml-discount">${Math.round(100 - (precoNum / parseFloat(item.preco_original)) * 100)}% OFF</span></div>
+                        ` : ''}
+                        ${precoNum > 0 ? `<div class="ml-installments">em <strong>3x de R$ ${installmentStr}</strong> sem juros</div>` : ''}
                     </div>
 
-                    <p class="mb-1"><strong>Vendedor:</strong> <a href="#" class="fw-bold text-decoration-none" style="color:var(--primary-blue);" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">${item.loja || 'Não informado'}</a> <i class="bi bi-shop text-muted"></i></p>
-                    <p class="mb-3"><strong>Estoque:</strong> ${item.quantidade || 1} ${item.quantidade === 1 ? 'unidade' : 'unidades'}</p>
+                    <div class="ml-stock-status">Estoque disponível</div>
 
-                    ${isOwner ? `
-                        <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.prepareEditProduct('${item.id}')">
-                            <i class="bi bi-pencil me-2"></i>Editar Anúncio
-                        </button>
-                        <button class="btn btn-ml-secondary w-100" onclick="window.deleteProduct('${item.id}')">
-                            <i class="bi bi-trash me-2"></i>Excluir Anúncio
-                        </button>
-                    ` : isAdminViewing ? `
-                        <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.adminEditProduct('${item.id}')">
-                            <i class="bi bi-pencil me-2"></i>Editar Anúncio (Admin)
-                        </button>
-                        <button class="btn btn-ml-secondary w-100" onclick="window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')">
-                            <i class="bi bi-trash me-2"></i>Excluir Produto (Admin)
-                        </button>
+                    ${realizaEntrega ? `
+                    <div class="ml-shipping-card">
+                        <i class="bi bi-truck ml-shipping-check" style="color:#3483fa;"></i>
+                        <div>
+                            <span class="ml-shipping-title">Entrega disponível</span>
+                            <span class="ml-shipping-detail">Entrega em <strong>${regiaoEntrega}</strong></span>
+                        </div>
+                    </div>
                     ` : `
-                        <div class="ml-qty-picker mb-3" id="mlQtyPicker">
-                            <button type="button" class="ml-qty-picker-btn" onclick="window.toggleQtyDropdown(event)">
-                                <span>Quantidade: <strong id="detailQtyValue">1</strong> <span class="ml-qty-picker-avail">(${item.quantidade || 1} disponíve${item.quantidade === 1 ? 'l' : 'is'})</span></span>
-                                <i class="bi bi-chevron-down"></i>
-                            </button>
-                            <div class="ml-qty-dropdown" id="qtyDropdownList">
-                                ${Array.from({ length: Math.max(1, item.quantidade || 1) }, (_, i) => i + 1).map(n => `
-                                    <div class="ml-qty-option" onclick="window.selectDetailQty(${n})">${n}</div>
-                                `).join('')}
-                            </div>
+                    <div class="ml-shipping-card ml-shipping-pickup">
+                        <i class="bi bi-geo-alt-fill" style="color:#e67e22;font-size:1.3rem;"></i>
+                        <div>
+                            <span class="ml-shipping-title" style="color:#e67e22;">Retirada no local</span>
+                            <span class="ml-shipping-detail">${sellerAddress}</span>
                         </div>
-                        <button class="btn btn-ml-primary btn-lg w-100 mb-2" onclick="window.addToCart('${pid}', {openCart:false, silent:true, qty:window._detailQty || 1});window.buyItem(cart.length-1);">
-                            <i class="bi bi-lightning me-2"></i>Solicitar Compra
+                    </div>
+                    `}
+
+                    ${!isOwner && !isAdminViewing ? `
+                    <div class="ml-qty-picker mb-3" id="mlQtyPicker" style="margin-top:12px;">
+                        <button type="button" class="ml-qty-picker-btn" onclick="window.toggleQtyDropdown(event)">
+                            <span>Quantidade: <strong id="detailQtyValue">1</strong> <span class="ml-qty-picker-avail">(${item.quantidade || 1} disponíve${item.quantidade === 1 ? 'l' : 'is'})</span></span>
+                            <i class="bi bi-chevron-down"></i>
                         </button>
-                        ${item.preco > 0 ? `
-                        <button class="btn btn-ml-secondary w-100 mb-2" onclick="window.openOfferModal('${pid}')">
+                        <div class="ml-qty-dropdown" id="qtyDropdownList">
+                            ${Array.from({ length: Math.max(1, item.quantidade || 1) }, (_, i) => i + 1).map(n => `
+                                <div class="ml-qty-option" onclick="window.selectDetailQty(${n})">${n}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="ml-actions">
+                        <button class="ml-btn ml-btn-primary" onclick="window.addToCart('${pid}', {openCart:false, silent:true, qty:window._detailQty || 1});window.buyItem(cart.length-1);">
+                            <i class="bi bi-lightning me-2"></i>Comprar agora
+                        </button>
+                        ${precoNum > 0 ? `
+                        <button class="ml-btn ml-btn-outline" onclick="window.openOfferModal('${pid}')">
                             <i class="bi bi-tag me-2"></i>Fazer Oferta
                         </button>` : ''}
-                        <button class="btn btn-ml-secondary w-100 mb-2" onclick="window.addToCart('${pid}', {qty:window._detailQty || 1});">
-                            <i class="bi bi-cart-plus me-2"></i>Adicionar ao Carrinho
-                        </button>
-                    `}
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-link text-decoration-none flex-grow-1 text-muted small" onclick="window.shareProduct('${pid}')">
-                            <i class="bi bi-share me-2"></i>Compartilhar
-                        </button>
-                        <button id="detailLikeBtn" class="btn btn-link text-decoration-none flex-grow-1 small ${likedProducts.includes(pid) ? 'text-danger' : 'text-muted'}" onclick="window.toggleLike('${pid}')">
-                            <i class="bi ${likedProducts.includes(pid) ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${likedProducts.includes(pid) ? 'Curtido' : 'Curtir'}
+                        <button class="ml-btn ml-btn-outline" onclick="window.addToCart('${pid}', {qty:window._detailQty || 1});">
+                            <i class="bi bi-cart-plus me-2"></i>Adicionar ao carrinho
                         </button>
                     </div>
+                    ` : isOwner ? `
+                    <div class="ml-actions">
+                        <button class="ml-btn ml-btn-primary" onclick="window.prepareEditProduct('${item.id}')"><i class="bi bi-pencil me-2"></i>Editar Anúncio</button>
+                        <button class="ml-btn ml-btn-danger" onclick="window.deleteProduct('${item.id}')"><i class="bi bi-trash me-2"></i>Excluir</button>
+                    </div>
+                    ` : `
+                    <div class="ml-actions">
+                        <button class="ml-btn ml-btn-primary" onclick="window.adminEditProduct('${item.id}')"><i class="bi bi-pencil me-2"></i>Editar (Admin)</button>
+                        <button class="ml-btn ml-btn-danger" onclick="window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')"><i class="bi bi-trash me-2"></i>Excluir</button>
+                    </div>
+                    `}
+
+                    <div class="ml-seller-section">
+                        <h4 class="ml-seller-title">Reputação do vendedor</h4>
+                        <p class="ml-seller-name"><strong>${item.loja || 'Vendedor'}</strong></p>
+                        <div class="ml-reputation-stars">${sellerRatingCount > 0
+                            ? `${sellerRatingAvg.toFixed(1)} <i class="bi bi-star-fill text-warning"></i> · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}`
+                            : 'Ainda sem avaliações'}</div>
+                        <a href="javascript:void(0)" class="ml-more-link" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">Ver mais dados do vendedor</a>
+                    </div>
                 </div>
+
+                <div class="ml-panel-desc">
+                    <h5 class="fw-bold">Descrição</h5>
+                    <p class="text-muted" style="line-height:1.7;white-space:pre-line;">${item.descricao || 'Sem descrição detalhada.'}</p>
+                </div>
+            </div>
+
+            <div class="product-opinions-section">
+                <div class="product-opinions-header">
+                    <h5 class="fw-bold mb-0">Opiniões do produto</h5>
+                    <span class="text-muted small" id="opinionsCount"></span>
+                </div>
+                <div id="productReviewsList" class="text-muted small">Carregando avaliações...</div>
             </div>
         </div>`;
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Carrega avaliações do produto
+    window.loadProductReviews(pid);
 };
 
 /** Fecha a página de detalhes em tela cheia e restaura exatamente a tela anterior
@@ -1228,13 +1256,13 @@ function updateUI() {
 
         if (mobileTrigger) {
             mobileTrigger.innerHTML = hasAvatar
-                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/100'">`
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/100'">`
                 : `<i class="bi bi-person-circle fs-5 text-white"></i>`;
         }
 
         if (mobileMenuAvatar) {
             mobileMenuAvatar.innerHTML = hasAvatar
-                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/100'">`
+                ? `<img src="${userAvatarLink}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/100'">`
                 : user.nome ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:bold;color:var(--primary-blue);">${user.nome.charAt(0).toUpperCase()}</div>`
                 : `<i class="bi bi-person-fill fs-3" style="color: var(--primary-blue);"></i>`;
         }
@@ -1370,16 +1398,16 @@ function renderCart() {
         total += (item.preco || 0) * (item.qtd || 1);
         const thumb = safeParseImages(item.img)[0];
         return `
-        <div class="cart-item border rounded p-2 mb-2">
-            <div class="d-flex gap-2 align-items-center">
-                <img src="${thumb || 'https://placehold.co/60'}" style="width:50px;height:50px;object-fit:contain;border-radius:6px;" loading="lazy">
-                <div class="flex-grow-1">
-                    <div class="small fw-bold text-truncate">${item.titulo}</div>
-                    <div class="text-success fw-bold small">${(item.preco || 0) === 0 ? 'GRÁTIS' : `R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}`}</div>
-                    <div class="d-flex align-items-center gap-2 mt-1">
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, -1)">−</button>
+        <div class="cart-item">
+            <div class="d-flex gap-2 align-items-start">
+                <img src="${thumb || 'https://placehold.co/60'}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/60/e9ecef/6c757d?text=%20'">
+                <div class="flex-grow-1" style="min-width:0">
+                    <div class="cart-item-title text-truncate">${item.titulo}</div>
+                    <div class="cart-item-price">${(item.preco || 0) === 0 ? 'GRÁTIS' : `R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}`}</div>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <button class="btn btn-outline-secondary" onclick="window.updateCartQty(${i}, -1)">−</button>
                         <span class="small fw-bold">${item.qtd || 1}</span>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.updateCartQty(${i}, +1)">+</button>
+                        <button class="btn btn-outline-secondary" onclick="window.updateCartQty(${i}, +1)">+</button>
                     </div>
                 </div>
             </div>
@@ -1387,7 +1415,7 @@ function renderCart() {
                 <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="removeFromCart(${i})">
                     <i class="bi bi-trash"></i>
                 </button>
-                <button class="btn btn-sm btn-ml-primary flex-grow-1" onclick="buyItem(${i})">
+                <button class="btn btn-sm btn-outline-primary flex-grow-1" onclick="buyItem(${i})">
                     Solicitar Compra
                 </button>
             </div>
@@ -1437,7 +1465,19 @@ document.addEventListener('click', (evt) => {
     }
 });
 
+document.getElementById('cartOffcanvas')?.addEventListener('show.bs.offcanvas', function(e) {
+    if (!getSavedUser()) {
+        e.preventDefault();
+        window.showAuthScreen?.();
+        showToast('Faça login para acessar o carrinho!', 'warning');
+    }
+});
+
 window.addToCart = function(productId, options = {}) {
+    if (!getSavedUser()) {
+        window.showAuthScreen?.();
+        return showToast('Faça login para adicionar ao carrinho!', 'warning');
+    }
     const { openCart = true, silent = false, qty = 1 } = options;
     const p = allProductsCache.find(x => x.id === productId);
     if (!p) return;
@@ -1927,10 +1967,24 @@ function bootstrapApp() {
             estado:    document.getElementById('editEstado').value,
             pagamento: document.getElementById('editPagamento').value,
             tipo:      novoTipo,
-            avatar:    novoAvatar || user.avatar
+            avatar:    JSON.stringify([
+                normalizeImageUrl(document.getElementById('editAvatarLink')?.value.trim()) || '',
+                normalizeImageUrl(document.getElementById('editBannerLink')?.value.trim()) || ''
+            ].filter(Boolean))
         };
+        // Se ambos estiverem vazios, mantém o avatar original
+        if (JSON.parse(updated.avatar).length === 0) {
+            updated.avatar = user.avatar;
+        }
 
-        await supabaseFetch(`users?id=eq.${user.id}`, { method: 'PATCH', body: JSON.stringify(updated) });
+        try {
+            await supabaseFetch(`users?id=eq.${user.id}`, { method: 'PATCH', body: JSON.stringify(updated) });
+        } catch (err) {
+            console.error('Erro ao salvar perfil:', err);
+            showToast('Erro ao salvar. Verifique se a coluna "banner" existe no banco.', 'error');
+            if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'SALVAR ALTERAÇÕES'; }
+            return;
+        }
         localStorage.setItem('electroUser', JSON.stringify(updated));
         window.hideProfileEditScreen();
         updateUI();
@@ -2098,6 +2152,15 @@ function normalizeImageUrl(url) {
 window.abrirUploadExterno = function() {
     window.open('https://imgur.com/upload', '_blank');
 };
+
+/**
+ * Extrai foto de perfil e banner do campo avatar (que pode ser string única
+ * ou array JSON com [avatarUrl, bannerUrl]).
+ */
+function splitAvatarField(avatar) {
+    const arr = safeParseImages(avatar);
+    return { avatar: arr[0] || '', banner: arr[1] || '' };
+}
 
 // ============================================
 // SISTEMA DE AUTOMAÇÃO - CPF, CEP E VALIDAÇÕES
@@ -2325,20 +2388,42 @@ window.showProfileEdit = () => {
 
     const linkInput = document.getElementById('editAvatarLink');
     if (linkInput) {
-        const avatarLinks = safeParseImages(user.avatar);
-        linkInput.value = avatarLinks.length > 0 ? avatarLinks[0] : '';
+        const { avatar: avatarUrl } = splitAvatarField(user.avatar);
+        linkInput.value = avatarUrl;
+    }
+
+    const bannerInput = document.getElementById('editBannerLink');
+    if (bannerInput) {
+        const { banner: bannerUrl } = splitAvatarField(user.avatar);
+        bannerInput.value = bannerUrl;
     }
 
     const preview = document.getElementById('profilePreview');
     if (preview) {
-        preview.src = user.avatar?.startsWith('http') ? user.avatar : 'https://placehold.co/100';
+        const { avatar: avatarUrl } = splitAvatarField(user.avatar);
+        preview.src = avatarUrl || 'https://placehold.co/100';
     }
 
     document.getElementById('profileLinksName').textContent = user.nome || 'Meu Perfil';
-    document.getElementById('profileLinksTypeBadge').textContent =
+    const badgeEl = document.getElementById('profileLinksTypeBadge');
+    badgeEl.textContent =
         user.tipo === 'ADMIN' ? 'Administrador' : (user.tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
+    badgeEl.className = 'profile-links-badge tipo-' + (user.tipo === 'ADMIN' ? 'admin' : (user.tipo === 'VENDEDOR' ? 'vendedor' : 'cliente'));
     document.getElementById('profileEditScreen').classList.remove('d-none');
     document.body.style.overflow = 'hidden';
+
+    // Banner como fundo da tela de edição
+    const screen = document.getElementById('profileEditScreen');
+    const { banner: editBanner } = splitAvatarField(user.avatar);
+    if (screen) {
+        if (editBanner) {
+            screen.style.setProperty('--banner-bg', `url('${editBanner}')`);
+            screen.classList.add('has-banner');
+        } else {
+            screen.style.removeProperty('--banner-bg');
+            screen.classList.remove('has-banner');
+        }
+    }
 };
 
 window.hideProfileEditScreen = function() {
@@ -2481,6 +2566,16 @@ window.mlCadNextStep = function() {
     for (const id of requiredIds) {
         const el = document.getElementById(id);
         if (el && !el.reportValidity()) return;
+    }
+    // Valida CPF antes de avançar
+    const cpfInput = document.getElementById('v2CadCPF');
+    if (cpfInput) {
+        const cpf = cpfInput.value.replace(/\D/g, '');
+        if (!validarCPF(cpf)) {
+            showToast('CPF inválido! Verifique os números.', 'error');
+            cpfInput.focus();
+            return;
+        }
     }
     window.mlCadGoToStep(2);
     setTimeout(() => document.getElementById('v2CadCEP')?.focus(), 250);
@@ -2648,6 +2743,13 @@ document.addEventListener('submit', async (e) => {
             inputAvatar.value = avatarUrl;
         }
 
+        const inputBanner = document.getElementById('v2CadBannerLink');
+        let bannerUrl = '';
+        if (inputBanner && inputBanner.value.trim()) {
+            bannerUrl = normalizeImageUrl(inputBanner.value.trim());
+            inputBanner.value = bannerUrl;
+        }
+
         const payload = {
             id:       crypto.randomUUID(),
             tipo:     document.getElementById('v2CadTipo').value,
@@ -2660,7 +2762,7 @@ document.addEventListener('submit', async (e) => {
             cep:      document.getElementById('v2CadCEP').value.replace(/\D/g, ''),
             cidade:   document.getElementById('v2CadCid').value,
             estado:   document.getElementById('v2CadUF').value,
-            avatar:   avatarUrl,
+            avatar:   JSON.stringify([avatarUrl, bannerUrl].filter(Boolean)),
             pagamento: document.getElementById('v2CadPagamento').value
         };
 
@@ -2783,4 +2885,349 @@ window.closeMobileMenu = () =>
  * um pedido enquanto esta tela está aberta, ela atualiza sozinha, sem precisar
  * sair e voltar pra essa aba manualmente.
  */
+
+/** Inicia transcrição por voz usando Web Speech API */
+window.startVoiceInput = function(inputId) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        showToast('Seu navegador não suporta transcrição por voz.', 'warning');
+        return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const btn = document.querySelector(`[data-voice-input="${inputId}"]`);
+    if (btn) {
+        btn.classList.add('recording');
+        btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+    }
+
+    recognition.onresult = function(event) {
+        const transcript = Array.from(event.results)
+            .map(r => r[0].transcript)
+            .join('');
+        input.value = transcript;
+        if (btn && event.results[event.results.length - 1].isFinal) {
+            btn.classList.remove('recording');
+            btn.innerHTML = '<i class="bi bi-mic"></i>';
+            input.dispatchEvent(new Event('input'));
+        }
+    };
+
+    recognition.onerror = function() {
+        if (btn) { btn.classList.remove('recording'); btn.innerHTML = '<i class="bi bi-mic"></i>'; }
+        showToast('Erro ao acessar o microfone.', 'error');
+    };
+
+    recognition.onend = function() {
+        if (btn) { btn.classList.remove('recording'); btn.innerHTML = '<i class="bi bi-mic"></i>'; }
+    };
+
+    try { recognition.start(); } catch (e) {
+        showToast('Permissão do microfone negada.', 'error');
+    }
+};
+
+/**
+ * Função unificada de renderização de bolha de mensagem — usada em TODOS os
+ * chats (cliente↔vendedor, admin, suporte). Garante o mesmo visual e
+ * comportamento em qualquer lugar.
+ *
+ * @param {Object} msg       – objeto da mensagem
+ * @param {number} index     – índice no array de mensagens (para ações)
+ * @param {Object} opts
+ * @param {string} opts.userId          – ID do usuário logado (pra saber se é "eu")
+ * @param {string} opts.myAvatar        – URL do avatar do usuário logado
+ * @param {string} opts.partnerAvatar   – URL do avatar da outra parte
+ * @param {string} [opts.supportAvatar] – URL do avatar da equipe de suporte
+ * @param {Function} [opts.resolveSenderName] – fn(msg) → nome do remetente
+ * @param {Object} [opts.actions] – mapeamento de nomes de ação → nome da função
+ *   ex: { reply:'startReply', copy:'copyMessageText', edit:'startEdit', delete:'deleteMessage' }
+ *   Passe false para ocultar ações.
+ * @param {boolean} [opts.useDropdown=true] – true=dropdown ▾, false=ícones visíveis
+ * @param {boolean} [opts.enableGrouping=false] – agrupa msgs seguidas do mesmo remetente
+ * @param {Array} [opts.allMessages] – array completo de mensagens (pra agrupamento)
+ */
+window.renderMsgBubble = function(msg, index, opts = {}) {
+    const {
+        userId, myAvatar, partnerAvatar,
+        supportAvatar = 'https://ui-avatars.com/api/?name=Suporte&background=ffc107&color=1c1c1c&size=40',
+        resolveSenderName,
+        actions = { reply:'startReply', copy:'copyMessageText', edit:'startEdit', delete:'deleteMessage' },
+        useDropdown = true, enableGrouping = false, allMessages = []
+    } = opts;
+
+    if (msg.type === 'system' || msg.senderId === 'system') {
+        return `<div class="text-center my-3"><span class="system-chip"><i class="bi bi-info-circle-fill"></i>${window.stripLegacyEmoji?.(msg.text) ?? msg.text}</span></div>`;
+    }
+
+    if (msg.type === 'review') {
+        const lines = (msg.text || '').split('\n');
+        const ratingLine = lines.find(l => l.includes('/5'));
+        const rating = ratingLine ? parseInt(ratingLine.match(/(\d+)\/5/)?.[1] || 0) : 0;
+        const starsHtml = rating > 0 ? Array.from({length:5}, (_,i) => `<i class="bi ${i < rating ? 'bi-star-fill text-warning' : 'bi-star text-muted'} me-1"></i>`).join('') : '';
+        const commentText = lines.filter(l => !l.startsWith('Nota:') && !l.startsWith('Avaliação') && !l.startsWith('—')).join('\n').trim();
+        const isMe = msg.senderId === userId;
+        return `
+        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}">
+            ${!isMe ? `<img class="msg-avatar" src="${partnerAvatar || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}" style="background:${isMe ? '#d9fdd3' : '#fff5f5'};border:1px solid #ffd1d1;">
+                <div class="d-flex align-items-center gap-1 mb-1">
+                    <i class="bi bi-patch-check-fill" style="color:#22c98e;font-size:1rem;"></i>
+                    <span class="fw-bold small" style="color:#22c98e;">Avaliação ${isMe ? 'enviada' : 'recebida'}</span>
+                </div>
+                <div class="mb-1">${starsHtml}</div>
+                ${commentText ? `<p class="mb-1 small" style="white-space:pre-wrap;">${window.formatLinks?.(commentText) ?? commentText}</p>` : ''}
+                ${msg.image ? `<img src="${msg.image}" class="img-fluid rounded mb-1" referrerpolicy="no-referrer" style="max-width:200px;cursor:pointer;" onclick="window.openImageFull('${msg.image}')" onerror="this.onerror=null;this.style.display='none'">` : ''}
+                ${msg.reviewImages && msg.reviewImages.length > 1 ? `<div class="small text-muted">+${msg.reviewImages.length - 1} foto${msg.reviewImages.length > 2 ? 's' : ''}</div>` : ''}
+                ${msg.reviewVideo ? `<a href="${msg.reviewVideo}" target="_blank" class="small text-decoration-none d-block"><i class="bi bi-play-circle-fill me-1" style="color:#ff0000;"></i>Ver vídeo</a>` : ''}
+                <div class="msg-time">${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+        ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+    </div>`;
+    }
+
+    const isMe = msg.senderId === userId;
+    const isStaff = !!msg.isStaff;
+    const senderLabel = msg.senderName || (resolveSenderName?.(msg) ?? '') || (isStaff ? 'Suporte' : 'Usuário');
+    const avatarForThem = isStaff ? supportAvatar : (partnerAvatar || '');
+    const prevMsg = enableGrouping && allMessages[index - 1];
+    const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system' && !!prevMsg.isStaff === isStaff;
+
+    if (msg.deleted) {
+        return `
+        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}"${isGrouped ? ' style="margin-top:-4px;"' : ''}>
+            ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted">
+                <i class="bi bi-slash-circle me-1"></i><em>Mensagem apagada</em>
+            </div>
+            ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+        </div>`;
+    }
+
+    const cleanText = window.stripLegacyEmoji?.(msg.text || '') ?? (msg.text || '');
+    const replyHtml = msg.replyTo ? `
+        <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-10'} small border-start border-4 border-info">
+            <div class="fw-bold" style="font-size: 0.7rem;">${msg.replyTo.senderName}</div>
+            <div class="text-truncate chat-reply-preview">${window.stripLegacyEmoji?.(msg.replyTo.text) ?? msg.replyTo.text}</div>
+        </div>` : '';
+
+    const fileChipHtml = (msg.type === 'file' && msg.file) ? `
+        <a href="${msg.file.url}" target="_blank" rel="noopener" class="chat-file-chip mb-2">
+            <i class="bi bi-file-earmark-arrow-down-fill"></i>
+            <span class="chat-file-name">${cleanText.replace(/^Arquivo:\s*/, '') || msg.file.name || 'Arquivo'}</span>
+        </a>` : '';
+
+    const showTextCaption = cleanText && !(msg.image && cleanText === 'Imagem') && !(msg.type === 'file' && msg.file);
+
+    // Reação
+    const reaction = msg.reaction || null;
+    const reactionBadgeHtml = reaction ? `<span class="msg-reaction-badge" onclick="window.toggleReaction(${index}, ${isMe}, '${reaction}')">${reaction}</span>` : '';
+
+    // Ações
+    const buildActions = () => {
+        if (!actions) return '';
+        const a = actions;
+        if (useDropdown) {
+            return `
+                <div class="dropdown">
+                    <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size:0.8rem;"></i>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="event.stopPropagation();window.reactToMessage(${index}, ${isMe})"><i class="bi bi-emoji-smile me-2"></i>Reagir</a></li>
+                        ${a.reply ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.reply}(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>` : ''}
+                        ${a.copy ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.copy}(${index})"><i class="bi bi-clipboard me-2"></i>Copiar</a></li>` : ''}
+                        ${a.edit && isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.edit}(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
+                        ${a.delete && isMe ? `<li><a class="dropdown-item py-1 small text-danger" href="javascript:void(0)" onclick="window.${a.delete}(${index})"><i class="bi bi-trash me-2"></i>Apagar</a></li>` : ''}
+                    </ul>
+                </div>`;
+        }
+        return `
+            <div class="msg-actions-visible">
+                <i class="bi bi-emoji-smile" onclick="event.stopPropagation();window.showReactionPicker(event, ${index}, ${isMe})" title="Reagir"></i>
+                ${a.reply ? `<i class="bi bi-reply" onclick="window.${a.reply}(${index})" title="Responder"></i>` : ''}
+                ${a.copy ? `<i class="bi bi-clipboard" onclick="window.${a.copy}(${index})" title="Copiar"></i>` : ''}
+                ${a.edit && (isMe || isStaff) ? `<i class="bi bi-pencil" onclick="window.${a.edit}(${index})" title="Editar"></i>` : ''}
+                ${a.delete && (isMe || isStaff) ? `<i class="bi bi-trash text-danger" onclick="window.${a.delete}(${index})" title="Apagar"></i>` : ''}
+            </div>`;
+    };
+
+    return `
+    <div class="msg-row ${isMe ? 'is-me' : 'is-them'}"${isGrouped ? ' style="margin-top:-4px;"' : ''}>
+        ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+        <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''}" style="margin-bottom:${reaction ? '10px' : '0'}">
+            <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+                ${!isGrouped ? `<span class="msg-sender">${senderLabel}${isStaff ? ' <i class="bi bi-patch-check-fill" title="Suporte"></i>' : ''}</span>` : '<span></span>'}
+                ${buildActions()}
+            </div>
+            ${replyHtml}
+            ${msg.image ? `
+                <img src="${msg.image}" class="img-fluid rounded mb-2" referrerpolicy="no-referrer"
+                     style="max-width:220px;cursor:pointer;"
+                     onclick="window.openImageFull('${msg.image}')" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${fileChipHtml}
+            ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${window.formatLinks?.(cleanText) ?? cleanText}</div>` : ''}
+            <div class="msg-time">
+                ${isMe ? `<span class="msg-status me-1">${msg.visto ? '<span class="text-info"><i class="bi bi-check-all"></i> Visto</span>' : '<span class="text-muted"><i class="bi bi-check"></i> Entregue</span>'}</span>` : ''}
+                ${msg.edited ? '<span>(editada)</span>' : ''}
+                ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
+            </div>
+            ${reactionBadgeHtml}
+        </div>
+            ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+        </div>`;
+};
+
+/* ---------- Reactions ---------- */
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉', '💯', '😍', '🤣', '😡', '👏', '💀', '🥰', '🤔', '😎', '✨', '💪', '🤡'];
+
+window.reactToMessage = function(msgIndex, isMe) {
+    const btn = document.querySelector(`.msg-row:nth-child(${msgIndex + 1}) .dropdown [data-bs-toggle="dropdown"]`);
+    if (btn) {
+        const rect = btn.getBoundingClientRect();
+        showReactionPickerAt(rect.left, rect.top, msgIndex, isMe);
+    }
+};
+
+window.showReactionPicker = function(e, msgIndex, isMe) {
+    e.stopPropagation();
+    const rect = e.target.getBoundingClientRect();
+    showReactionPickerAt(rect.left, rect.top, msgIndex, isMe);
+};
+
+function showReactionPickerAt(x, y, msgIndex, isMe) {
+    const old = document.querySelector('.reaction-picker');
+    if (old) old.remove();
+
+    const picker = document.createElement('div');
+    picker.className = 'reaction-picker';
+    picker.innerHTML = REACTION_EMOJIS.map(e => `<span data-emoji="${e}">${e}</span>`).join('');
+
+    picker.style.top = (y - 50) + 'px';
+    picker.style.left = Math.max(8, Math.min(x, window.innerWidth - 240)) + 'px';
+
+    picker.querySelectorAll('span').forEach(el => {
+        el.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            const emoji = this.dataset.emoji;
+            picker.remove();
+            window.__toggleReaction(msgIndex, isMe, emoji);
+        });
+    });
+
+    document.body.appendChild(picker);
+
+    setTimeout(() => {
+        document.addEventListener('click', function dismiss(e) {
+            if (!e.target.closest('.reaction-picker')) {
+                const p = document.querySelector('.reaction-picker');
+                if (p) p.remove();
+                document.removeEventListener('click', dismiss);
+            }
+        });
+    }, 0);
+}
+
+window.toggleReaction = function(msgIndex, isMe, currentEmoji) {
+    window.__toggleReaction(msgIndex, isMe, currentEmoji, true);
+};
+
+window.__toggleReaction = function(msgIndex, isMe, emoji, isRemove = false) {
+    const data = window.__getActiveChatData?.();
+    if (!data) return;
+    const { chat, save, render } = data;
+    if (!chat || !chat.messages?.[msgIndex]) return;
+
+    const msg = chat.messages[msgIndex];
+    if (isRemove && msg.reaction === emoji) {
+        delete msg.reaction;
+    } else {
+        msg.reaction = (msg.reaction === emoji) ? null : emoji;
+    }
+
+    save(chat);
+    render();
+};
+
+window.__setupReactionHooks = function(chat, saveFn, renderFn) {
+    window.__getActiveChatData = () => ({ chat, save: saveFn, render: renderFn });
+};
+
+/* ---------- Product Reviews ---------- */
+window.loadProductReviews = async function(productId) {
+    const container = document.getElementById('productReviewsList');
+    if (!container) return;
+    try {
+        const orders = await supabaseFetch(`orders?product_id=eq.${productId}&status=eq.finished&select=id`);
+        if (!orders || orders.length === 0) {
+            container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Nenhuma opinião ainda.</p></div>';
+            const countEl = document.getElementById('opinionsCount');
+            if (countEl) countEl.textContent = '';
+            return;
+        }
+        const orderIds = orders.map(o => o.id);
+        const avaliacoes = await supabaseFetch(`avaliacoes?order_id=in.(${orderIds.join(',')})&order=created_at.desc&limit=20`);
+        if (!avaliacoes || avaliacoes.length === 0) {
+            container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Nenhuma opinião ainda.</p></div>';
+            const countEl = document.getElementById('opinionsCount');
+            if (countEl) countEl.textContent = '';
+            return;
+        }
+        const countEl = document.getElementById('opinionsCount');
+        if (countEl) countEl.textContent = `(${avaliacoes.length})`;
+
+        // Sumário geral: média + distribuição de estrelas
+        const total = avaliacoes.length;
+        const avg = (avaliacoes.reduce((s, a) => s + (a.rating || 0), 0) / total).toFixed(1);
+        const dist = [0,0,0,0,0];
+        avaliacoes.forEach(a => { const r = Math.round(a.rating || 0); if (r >= 1 && r <= 5) dist[r-1]++; });
+
+        let summaryHtml = `
+            <div class="opinions-summary">
+                <div class="opinions-summary-score">
+                    <span class="opinions-avg">${avg}</span>
+                    <div class="opinions-avg-stars">${Array.from({length:5}, (_,i) => `<i class="bi ${i < Math.round(parseFloat(avg)) ? 'bi-star-fill' : 'bi-star'}" style="color:#3483fa;"></i>`).join('')}</div>
+                    <span class="opinions-total">${total} opini${total === 1 ? 'ão' : 'ões'}</span>
+                </div>
+                <div class="opinions-summary-bars">
+                    ${[5,4,3,2,1].map(n => {
+                        const pct = total > 0 ? Math.round((dist[n-1] / total) * 100) : 0;
+                        return `
+                            <div class="opinions-bar-row">
+                                <span class="opinions-bar-label">${n}</span>
+                                <div class="opinions-bar-track"><div class="opinions-bar-fill" style="width:${pct}%"></div></div>
+                                <span class="opinions-bar-pct">${pct}%</span>
+                            </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+
+        container.innerHTML = summaryHtml + avaliacoes.map(a => {
+            const stars = Array.from({length:5}, (_,i) => `<i class="bi ${i < (a.rating || 0) ? 'bi-star-fill' : 'bi-star'}" style="color:#3483fa;font-size:0.85rem;"></i>`).join('');
+            const images = a.images && Array.isArray(a.images) && a.images.length > 0
+                ? `<div class="opinion-images">${a.images.slice(0,4).map(url => `<img src="${url}" referrerpolicy="no-referrer" onclick="window.openImageFull('${url}')" onerror="this.onerror=null;this.style.display='none'">`).join('')}</div>` : '';
+            const video = a.videos && Array.isArray(a.videos) && a.videos[0]
+                ? `<a href="${a.videos[0]}" target="_blank" class="opinion-video-link"><i class="bi bi-play-circle-fill me-1" style="color:#ff0000;"></i>Ver vídeo</a>` : '';
+            const date = new Date(a.created_at).toLocaleDateString('pt-BR');
+            return `
+                <div class="opinion-card">
+                    <div class="opinion-card-header">
+                        <span class="opinion-author">${a.avaliador_nome || 'Anônimo'}</span>
+                        <span class="opinion-stars">${stars}</span>
+                    </div>
+                    <div class="opinion-date">${date}</div>
+                    ${a.comment ? `<p class="opinion-comment">${a.comment}</p>` : ''}
+                    ${images}
+                    ${video}
+                </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Erro ao carregar avaliações:', e);
+        container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Erro ao carregar opiniões.</p></div>';
+    }
+};
 

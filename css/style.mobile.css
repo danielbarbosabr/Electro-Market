@@ -29,6 +29,32 @@
         border-radius: 0;
         padding: 10px;
     }
+    .ml-panel {
+        grid-template-columns: 1fr !important;
+        grid-template-areas:
+            "left"
+            "right"
+            "desc" !important;
+    }
+    .ml-panel-left {
+        border-right: none !important;
+        padding-bottom: 0 !important;
+    }
+    .ml-panel-desc {
+        border-right: none !important;
+        border-top: 1px solid var(--border-light);
+        padding-top: 16px !Important;
+    }
+    .ml-panel-right {
+        padding: 20px !important;
+    }
+    .ml-title {
+        font-size: 18px !important;
+    }
+    .ml-price {
+        font-size: 1.6rem !important;
+    }
+}
 }
 @media (max-width: 480px) {
     .profile-links-screen { padding: 24px 10px 50px; }
@@ -158,7 +184,7 @@
     .ml-auth-close { border-radius: 0; top: 4px; right: 4px; }
 }
 @media (max-width: 768px) {
-    body.dark-theme .wa-side { background: var(--card-bg); }
+    body.dark-theme .wa-side { background: #111b14; }
 }
 @media (max-width: 576px) {
     .admin-stats-row {
@@ -234,7 +260,7 @@
         display: block;
     }
     .chat-header-close {
-        width: 34px;
+        width: 38px;
         height: 34px;
     }
 
@@ -268,8 +294,10 @@
 
     /* Tela cheia do chat de pedido (admin unificado / vendedor): some com o
        dock e garante altura total. O seletor da aba agora é #admin-support. */
-    body.wa-locked .main-footer-dock,
     body.admin-chat-fullscreen .main-footer-dock {
+        display: none !important;
+    }
+    body.wa-locked .main-footer-dock {
         display: none !important;
     }
     body.admin-chat-fullscreen .admin-standalone-page {

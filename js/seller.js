@@ -61,7 +61,7 @@ async function renderOrdersListSilently(type) {
 
             return `
             <div class="wa-contact" data-order-id="${order.id}" onclick="${!isPending && order.status !== 'cancelled' ? `window.showChat('${order.id}')` : ''}" style="${isPending || order.status === 'cancelled' ? 'cursor:default;' : ''}">
-                <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
+                <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
                     <div class="wa-contact-text">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
@@ -87,7 +87,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
         return window.renderSellerRequests();
     }
 
-    const grid  = document.getElementById('productsGrid');
+    const grid = document.getElementById('productsGrid');
     const hero  = document.getElementById('heroSection');
     const gridMain = document.getElementById('productGridMain');
     const waView = document.getElementById('whatsappOrdersView');
@@ -148,7 +148,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
             return `
             <div class="wa-contact" data-order-id="${order.id}" onclick="${!isPending && order.status !== 'cancelled' ? `window.showChat('${order.id}')` : ''}" style="${isPending || order.status === 'cancelled' ? 'cursor:default;' : ''}">
-                <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/45'">
+                <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
                     <div class="wa-contact-text">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
@@ -211,7 +211,7 @@ window.renderSellerRequests = async function() {
                 <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius:14px;${isOffer ? 'border:1.5px solid #3483fa !important;' : ''}">
                     ${isOffer ? `<span class="badge bg-primary align-self-start mb-2" style="font-size:0.68rem;"><i class="bi bi-tag-fill me-1"></i>OFERTA DO CLIENTE</span>` : ''}
                     <div class="d-flex gap-3">
-                        <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/70'"
+                        <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/70'"
                              style="width:70px;height:70px;object-fit:cover;border-radius:10px;flex-shrink:0;">
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-1">${order.product_title || 'Produto'}</h6>
@@ -390,18 +390,20 @@ window.showChat = async function(orderId) {
     try {
         if (otherId) {
             const partnerData = await supabaseFetch(`users?select=avatar,last_seen&id=eq.${otherId}&limit=1`);
-            const realAvatar = normalizeImageUrl(partnerData?.[0]?.avatar);
+            const realAvatar = normalizeImageUrl(safeParseImages(partnerData?.[0]?.avatar)[0]);
             if (realAvatar) avatarEl.src = realAvatar;
             if (dotEl) dotEl.classList.add(isRecentlyOnline(partnerData?.[0]?.last_seen) ? 'online' : 'offline');
         }
     } catch (e) {}
 
-    // Popula resumo do produto
-    document.getElementById('chatProdImg').src = order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20';
-    document.getElementById('chatProdTitle').textContent = order.product_title || 'Produto';
-    document.getElementById('chatProdPrice').textContent = formatPreco(order.total, {htmlGratis:false});
-    document.getElementById('chatOrderIdDisplay').textContent = `#${order.id.slice(-6).toUpperCase()}`;
-    document.getElementById('chatOrderIdDisplayHeader').textContent = `#${order.id.slice(-6).toUpperCase()}`;
+    // Popula resumo do produto inline no cabeçalho
+    const prodImg = document.getElementById('chatProdImgInline');
+    if (prodImg) prodImg.src = order.product_img || '';
+    const prodTitle = document.getElementById('chatProdTitleInline');
+    if (prodTitle) prodTitle.textContent = order.product_title || 'Produto';
+    const prodPrice = document.getElementById('chatProdPriceInline');
+    if (prodPrice) prodPrice.textContent = formatPreco(order.total, {htmlGratis:false});
+    document.getElementById('chatOrderIdDisplayHeader').innerHTML = `<i class="bi bi-hash"></i>${order.id.slice(-6).toUpperCase()} · ${order.buyer_name || order.seller_name || '—'}`;
 
     // Abre o painel de chat inline (estilo WhatsApp Web), sem modal
     document.getElementById('waEmptyState')?.classList.add('d-none');
@@ -518,6 +520,26 @@ async function loadChatMessages(orderId, silent = false) {
             return;
         }
 
+        // Hooks para reações
+        window.__setupReactionHooks(chat,
+            (c) => supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }),
+            () => loadChatMessages(orderId, true)
+        );
+
+        // Marca como visto mensagens do outro participante
+        let changed = false;
+        const otherSenderIds = chat.participants.filter(id => id !== user.id);
+        chat.messages.forEach(msg => {
+            if (msg.senderId && otherSenderIds.includes(msg.senderId) && !msg.visto) {
+                msg.visto = true;
+                changed = true;
+            }
+        });
+        if (changed) {
+            supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) })
+                .catch(() => {});
+        }
+
         // Evita re-renderizar (e perder a posição do scroll/seleção) quando nada mudou
         const signature = JSON.stringify(chat.messages);
         if (silent && signature === lastChatSignature) {
@@ -531,7 +553,7 @@ async function loadChatMessages(orderId, silent = false) {
         // já estava perto do fim (ou se não é uma atualização silenciosa).
         const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
 
-        const myAvatar = normalizeImageUrl(user.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome||'Você')}&background=22c98e&color=fff&size=40`;
+        const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome||'Você')}&background=22c98e&color=fff&size=40`;
         const partnerAvatarSrc = document.getElementById('chatPartnerAvatar')?.src || '';
         // Avatar fixo pra mensagens da equipe de suporte (admin) — nunca deve usar
         // o avatar do vendedor/comprador (partnerAvatarSrc), senão a mensagem do
@@ -539,90 +561,17 @@ async function loadChatMessages(orderId, silent = false) {
         const supportAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40`;
 
         container.innerHTML = chat.messages.map((msg, index) => {
-            if (msg.type === 'system' || msg.senderId === 'system') {
-                return `<div class="text-center my-3">
-                    <span class="system-chip">
-                        <i class="bi bi-info-circle-fill"></i>${stripLegacyEmoji(msg.text)}
-                    </span>
-                </div>`;
-            }
-
-            const isMe = msg.senderId === user.id;
-            // Mensagens injetadas pelo admin/suporte (ver adminChatsTabSend/adminSendChatMessage
-            // em admin.js) vêm marcadas com isStaff — nunca são nem "eu" nem a outra parte do
-            // pedido, então precisam de um estilo e avatar próprios, senão ficam indistinguíveis
-            // da mensagem do vendedor (mesma bolha "is-them", mesmo avatar da outra parte).
-            const isStaff = !!msg.isStaff;
-            const avatarForThem = isStaff ? supportAvatar : partnerAvatarSrc;
-            // Agrupamento estilo WhatsApp: some com o nome/margem quando a mensagem
-            // anterior é da mesma pessoa em sequência.
-            const prevMsg = chat.messages[index - 1];
-            const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system' && !!prevMsg.isStaff === isStaff;
-
-            if (msg.deleted) {
-                return `
-                <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" style="${isGrouped ? 'margin-top:-4px;' : ''}">
-                    ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer">` : ''}
-                    <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted">
-                        <i class="bi bi-slash-circle me-1"></i><em>Mensagem apagada</em>
-                    </div>
-                    ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer">` : ''}
-                </div>`;
-            }
-
-            const cleanText = stripLegacyEmoji(msg.text);
-            const replyHtml = msg.replyTo ? `
-                <div class="p-2 mb-2 rounded ${isMe ? 'bg-white bg-opacity-25' : 'bg-secondary bg-opacity-10'} small border-start border-4 border-info">
-                    <div class="fw-bold" style="font-size: 0.7rem;">${msg.replyTo.senderName}</div>
-                    <div class="text-truncate chat-reply-preview">${stripLegacyEmoji(msg.replyTo.text)}</div>
-                </div>
-            ` : '';
-
-            // Anexo de arquivo: mostra um "chip" clicável com ícone, em vez de texto cru
-            const fileChipHtml = (msg.type === 'file' && msg.file) ? `
-                <a href="${msg.file.url}" target="_blank" rel="noopener" class="chat-file-chip mb-2">
-                    <i class="bi bi-file-earmark-arrow-down-fill"></i>
-                    <span class="chat-file-name">${cleanText.replace(/^Arquivo:\s*/, '') || msg.file.name || 'Arquivo'}</span>
-                </a>
-            ` : '';
-
-            // Some a legenda redundante quando é só uma imagem ou arquivo sem comentário adicional
-            const showTextCaption = cleanText && !(msg.image && cleanText === 'Imagem') && !(msg.type === 'file' && msg.file);
-
-            return `
-            <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" style="${isGrouped ? 'margin-top:-4px;' : ''}">
-                ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer">` : ''}
-                <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''}">
-
-                    <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
-                        ${!isGrouped ? `<span class="msg-sender">${isMe ? 'Você' : (msg.senderName || 'Usuário')}${isStaff ? ' <i class="bi bi-patch-check-fill" title="Suporte"></i>' : ''}</span>` : '<span></span>'}
-                        <div class="dropdown">
-                            <i class="bi bi-chevron-down cursor-pointer opacity-50" data-bs-toggle="dropdown" style="font-size: 0.8rem;"></i>
-                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startReply(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>
-                                <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.copyMessageText(${index})"><i class="bi bi-clipboard me-2"></i>Copiar</a></li>
-                                ${isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.startEdit(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
-                                ${isMe ? `<li><a class="dropdown-item py-1 small text-danger" href="javascript:void(0)" onclick="window.deleteMessage(${index})"><i class="bi bi-trash me-2"></i>Apagar</a></li>` : ''}
-                            </ul>
-                        </div>
-                    </div>
-
-                    ${replyHtml}
-
-                    ${msg.image ? `
-                        <img src="${msg.image}" class="img-fluid rounded mb-2" referrerpolicy="no-referrer"
-                             style="max-width:220px;cursor:pointer;"
-                             onclick="window.openImageFull('${msg.image}')">
-                    ` : ''}
-                    ${fileChipHtml}
-                    ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${formatLinks(cleanText)}</div>` : ''}
-                    <div class="msg-time">
-                        ${msg.edited ? '<span>(editada)</span>' : ''}
-                        ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
-                    </div>
-                </div>
-                ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer">` : ''}
-            </div>`;
+            return window.renderMsgBubble(msg, index, {
+                userId: user.id,
+                myAvatar,
+                partnerAvatar: partnerAvatarSrc,
+                supportAvatar,
+                resolveSenderName: () => msg.senderName || '',
+                actions: { reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage' },
+                useDropdown: true,
+                enableGrouping: true,
+                allMessages: chat.messages
+            });
         }).join('');
 
         if (wasNearBottom) {
@@ -661,6 +610,7 @@ function stripLegacyEmoji(text) {
         .replace(/[ \t]{2,}/g, ' ')
         .trim();
 }
+window.stripLegacyEmoji = stripLegacyEmoji;
 
 function formatLinks(text) {
     if (!text) return '';
@@ -669,6 +619,7 @@ function formatLinks(text) {
         `<a href="${url}" target="_blank" class="text-info text-decoration-underline small"><i class="bi bi-link-45deg"></i>${url.substring(0,40)}${url.length>40?'...':''}</a>`
     );
 }
+window.formatLinks = formatLinks;
 
 function updateChatLogistics(order, user) {
     const logisticsArea    = document.getElementById('logisticsAgreementArea');
@@ -767,7 +718,7 @@ function updateChatLogistics(order, user) {
 }
 
 window.sendChatMessage = async function(event) {
-    event.preventDefault();
+    if (event?.preventDefault) event.preventDefault();
     const input = document.getElementById('chatMessageInput');
     const text  = input?.value?.trim();
     const user  = getSavedUser();
@@ -910,7 +861,7 @@ window.confirmChatAttach = async function() {
 window.openImageFull = function(src) {
     const modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
-    modal.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;">`;
+    modal.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;" onerror="this.onerror=null;this.style.display='none'">`;
     modal.onclick = () => modal.remove();
     document.body.appendChild(modal);
 };
@@ -988,7 +939,7 @@ window.viewChatPartnerProfile = async function() {
         partner = r?.[0];
     } catch (e) {}
 
-    const avatar = normalizeImageUrl(partner?.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}&background=random&size=100`;
+    const avatar = normalizeImageUrl(safeParseImages(partner?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}&background=random&size=100`;
     const rating = partner?.vendedor_rating ? parseFloat(partner.vendedor_rating).toFixed(1) : '—';
     const ratingCount = partner?.rating_count || 0;
     const memberSince = partner?.created_at ? new Date(partner.created_at).toLocaleDateString('pt-BR', {month:'long', year:'numeric'}) : '—';
@@ -1008,7 +959,7 @@ window.viewChatPartnerProfile = async function() {
                 <div class="modal-body text-center p-4">
                     <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
                     <div class="position-relative d-inline-block mb-3">
-                        <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer">
+                        <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=80'">
                         <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
                     </div>
                     <h5 class="fw-bold mb-1">${partner?.nome || partnerName || 'Usuário'}</h5>
@@ -1191,6 +1142,14 @@ window.submitReview = async function() {
     if (!currentReviewRating) { showToast('Escolha de 1 a 5 estrelas antes de enviar.', 'warning'); return; }
     if (!user || !targetId) return;
 
+    const comment = document.getElementById('reviewComment')?.value.trim() || '';
+    const img1 = document.getElementById('reviewImage1')?.value.trim() || '';
+    const img2 = document.getElementById('reviewImage2')?.value.trim() || '';
+    const img3 = document.getElementById('reviewImage3')?.value.trim() || '';
+    const video = document.getElementById('reviewVideo')?.value.trim() || '';
+    const reviewImages = [img1, img2, img3].filter(Boolean);
+    const reviewVideo = video || '';
+
     try {
         // Salva o registro individual da avaliação (histórico, separado das curtidas de produto)
         await supabaseFetch('avaliacoes', {
@@ -1203,7 +1162,9 @@ window.submitReview = async function() {
                 avaliador_nome: user.nome,
                 avaliado_id:    targetId,
                 rating:         currentReviewRating,
-                comentario:     null,
+                comment:        comment || null,
+                images:         reviewImages.length > 0 ? reviewImages : null,
+                videos:         reviewVideo ? [reviewVideo] : null,
                 created_at:     new Date().toISOString()
             })
         });
@@ -1233,12 +1194,56 @@ window.submitReview = async function() {
         const cachedOrder = ordersCache.find(o => o.id === orderId);
         if (cachedOrder) cachedOrder[reviewedField] = true;
 
+        // Envia a avaliação como mensagem no chat
+        try {
+            const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+            const chat = chatData?.[0];
+            if (chat) {
+                const targetName = isSellerRatingBuyer ? (chat.buyer_name || 'Comprador') : (chat.seller_name || 'Vendedor');
+                const stars = '★'.repeat(currentReviewRating) + '☆'.repeat(5 - currentReviewRating);
+                let reviewText = isSellerRatingBuyer ? `Avaliação do vendedor` : `Avaliação do comprador`;
+                reviewText += `\nNota: ${currentReviewRating}/5\n\n`;
+                if (comment) reviewText += `${comment}\n\n`;
+                reviewText += `— ${user.nome || 'Usuário'}`;
+                const newMsg = {
+                    senderId:   user.id,
+                    senderName: user.nome || 'Usuário',
+                    text:       reviewText,
+                    timestamp:  new Date().toISOString(),
+                    type:       'review'
+                };
+                if (reviewImages.length > 0) {
+                    newMsg.image = reviewImages[0];
+                    newMsg.reviewImages = reviewImages;
+                }
+                if (reviewVideo) {
+                    newMsg.reviewVideo = reviewVideo;
+                }
+                chat.messages = chat.messages || [];
+                chat.messages.push(newMsg);
+                await supabaseFetch(`chats?order_id=eq.${orderId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ messages: chat.messages })
+                });
+            }
+        } catch (e) {
+            console.error('Erro ao enviar avaliação pro chat:', e);
+        }
+
         bootstrap.Modal.getInstance(document.getElementById('reviewModal'))?.hide();
         showToast(isSellerRatingBuyer ? 'Obrigado por avaliar o comprador!' : 'Obrigado por avaliar o vendedor!', 'success');
 
         if (currentChat === orderId) {
+            loadChatMessages(orderId, true);
             updateChatLogistics(cachedOrder || { id: orderId, status: 'finished', [reviewedField]: true }, user);
         }
+
+        // Limpa campos do modal
+        document.getElementById('reviewComment').value = '';
+        document.getElementById('reviewImage1').value = '';
+        document.getElementById('reviewImage2').value = '';
+        document.getElementById('reviewImage3').value = '';
+        document.getElementById('reviewVideo').value = '';
     } catch (e) {
         console.error('Erro ao enviar avaliação:', e);
         showToast('Erro ao enviar avaliação. Tente novamente.', 'error');

@@ -13,7 +13,9 @@ alter table public.orders
   add column if not exists agree_seller         boolean     default false,
   add column if not exists logistics_type       text,
   add column if not exists logistics_method     text,
-  add column if not exists updated_at           timestamptz default now();
+  add column if not exists updated_at           timestamptz default now(),
+  add column if not exists buyer_reviewed       boolean     default false,
+  add column if not exists seller_reviewed      boolean     default false;
 
 -- ---------- CHATS: garante colunas usadas pelo chamado ----------
 alter table public.chats
@@ -34,6 +36,8 @@ create table if not exists public.users (
   endereco        text,
   vendedor_rating numeric     default 0,
   rating_count    integer     default 0,
+  comprador_rating      numeric     default 0,
+  comprador_rating_count integer     default 0,
   created_at      timestamptz  default now(),
   updated_at      timestamptz  default now()
 );
@@ -61,6 +65,8 @@ create table if not exists public.avaliacoes (
   created_at     timestamptz default now()
 );
 alter table public.avaliacoes add column if not exists avaliado_id uuid;
+alter table public.avaliacoes add column if not exists images jsonb default '[]'::jsonb;
+alter table public.avaliacoes add column if not exists videos jsonb default '[]'::jsonb;
 
 -- ---------- ÍNDICES ----------
 create index if not exists idx_users_email        on public.users (email);

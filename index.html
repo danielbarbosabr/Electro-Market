@@ -89,7 +89,7 @@
                     <nav class="nav-links d-flex gap-4">
                         <a href="#" class="text-white text-decoration-none role-client" onclick="window.goHome()"><i class="bi bi-house-door me-1"></i> Início</a>
                         <div class="dropdown role-client">
-                            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-list me-1"></i> Categorias</a>
+                            <a href="#" class="text-white text-decoration-none" data-bs-toggle="dropdown"><i class="bi bi-list me-1"></i> Categorias <i class="bi bi-chevron-down" style="font-size:0.6rem;"></i></a>
                             <ul class="dropdown-menu border-0 shadow" style="max-height: 600px; overflow-y: auto; min-width: 320px;">
                                 <li><h6 class="dropdown-header text-uppercase fw-bold text-primary">Games</h6></li>
                                 <li><a class="dropdown-item" href="#" onclick="loadPage('Games > Consoles')">Consoles</a></li>
@@ -447,6 +447,11 @@
                             </div>
                         </div>
 
+                        <div class="ml-field mb-2">
+                            <input type="url" id="v2CadBannerLink" placeholder=" ">
+                            <label for="v2CadBannerLink">Banner (opcional)</label>
+                        </div>
+
                         <div class="d-flex gap-2 mt-2">
                             <button type="button" class="ml-btn-outline flex-grow-1" onclick="window.mlCadPrevStep()">Voltar</button>
                             <button type="submit" class="ml-btn-primary flex-grow-1">Criar conta</button>
@@ -464,7 +469,7 @@
     <!-- Offcanvas Filtros -->
     <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="filterOffcanvas">
         <div class="offcanvas-header">
-            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-filter-left me-2" style="color: var(--market-color);"></i> Filtros de Busca</h5>
+            <h5 class="offcanvas-title"><i class="bi bi-filter-left me-2"></i>Filtros de Busca</h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body">
@@ -485,7 +490,7 @@
                     <span>-</span>
                     <input type="number" id="maxPrice" class="form-control form-control-sm" placeholder="Máx">
                 </div>
-                <button class="btn btn-ml-primary btn-sm w-100 mt-2 fw-bold" onclick="applyFilters()">Aplicar</button>
+                <button class="ml-btn ml-btn-primary" style="width:100%;justify-content:center;margin-top:0.5rem;font-size:0.85rem;" onclick="applyFilters()">Aplicar</button>
             </div>
             <div class="filter-group mb-4">
                 <h6 class="fw-bold small text-uppercase">Categoria</h6>
@@ -520,14 +525,14 @@
                 <h6 class="fw-bold small text-uppercase">Lojas</h6>
                 <div id="storeFilters" class="mt-2"></div>
             </div>
-            <button class="btn btn-ml-secondary btn-sm w-100 fw-bold mt-2" onclick="clearFilters()">Limpar Filtros</button>
+            <button class="ml-btn ml-btn-outline" style="width:100%;justify-content:center;margin-top:0.5rem;font-size:0.85rem;" onclick="clearFilters()">Limpar Filtros</button>
         </div>
     </div>
 
     <!-- Offcanvas Carrinho -->
     <div class="offcanvas offcanvas-start themed-modal" tabindex="-1" id="cartOffcanvas">
         <div class="offcanvas-header">
-            <h5 class="offcanvas-title fw-bold" style="color: var(--primary-blue);"><i class="bi bi-cart-check me-2" style="color: var(--market-color);"></i>Meu Carrinho</h5>
+            <h5 class="offcanvas-title"><i class="bi bi-cart-check me-2"></i>Meu Carrinho</h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column">
@@ -537,10 +542,10 @@
                     <h5 class="mb-0 fw-bold">Total:</h5>
                     <h5 class="mb-0 fw-bold text-success" id="cartTotalValue">R$ 0,00</h5>
                 </div>
-                <button class="btn btn-ml-primary w-100 py-3 fw-bold" onclick="alert('Finalizando compra...')">
+                <button class="ml-btn ml-btn-primary" style="width:100%;justify-content:center;font-size:0.95rem;" onclick="alert('Finalizando compra...')">
                     <i class="bi bi-bag-check-fill me-2"></i>FINALIZAR TUDO
                 </button>
-                <button class="btn btn-ml-secondary w-100 py-2 fw-bold mt-2" onclick="window.esvaziarCarrinho()">
+                <button class="ml-btn ml-btn-outline" style="width:100%;justify-content:center;margin-top:0.5rem" onclick="window.esvaziarCarrinho()">
                     <i class="bi bi-trash3 me-2"></i>ESVAZIAR CARRINHO
                 </button>
             </div>
@@ -564,6 +569,21 @@
                         <i class="bi bi-star review-star" data-value="3" onclick="window.setReviewStars(3)"></i>
                         <i class="bi bi-star review-star" data-value="4" onclick="window.setReviewStars(4)"></i>
                         <i class="bi bi-star review-star" data-value="5" onclick="window.setReviewStars(5)"></i>
+                    </div>
+                    <div class="text-start mb-3">
+                        <label class="small text-muted fw-bold mb-1">Comentário <span class="text-muted fw-normal">(opcional)</span></label>
+                        <textarea id="reviewComment" class="form-control form-control-sm" rows="3" placeholder="Conte sua experiência com o produto..."></textarea>
+                    </div>
+                    <div class="text-start mb-3">
+                        <label class="small text-muted fw-bold mb-1">Imagens do produto <span class="text-muted fw-normal">(opcional — cole links)</span></label>
+                        <input type="url" id="reviewImage1" class="form-control form-control-sm mb-1" placeholder="https://i.imgur.com/...">
+                        <input type="url" id="reviewImage2" class="form-control form-control-sm mb-1" placeholder="https://i.imgur.com/...">
+                        <input type="url" id="reviewImage3" class="form-control form-control-sm" placeholder="https://i.imgur.com/...">
+                        <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i><a href="https://imgur.com/upload" target="_blank" class="text-decoration-none">Upload no Imgur</a> e cole o link direto</small>
+                    </div>
+                    <div class="text-start mb-3">
+                        <label class="small text-muted fw-bold mb-1">Vídeo <span class="text-muted fw-normal">(opcional — link do YouTube)</span></label>
+                        <input type="url" id="reviewVideo" class="form-control form-control-sm" placeholder="https://youtube.com/watch?v=...">
                     </div>
                     <input type="hidden" id="reviewOrderId">
                     <input type="hidden" id="reviewTargetId">
@@ -761,7 +781,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
-                        <img id="offerProductImg" src="" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/60'"
+                        <img id="offerProductImg" src="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/60'"
                              style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-1" id="offerProductTitle"></h6>
@@ -948,12 +968,17 @@
                         <i class="bi bi-arrow-left"></i>
                     </button>
                     <div class="chat-header-avatar-wrap">
-                        <img id="chatPartnerAvatar" src="" onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                        <img id="chatPartnerAvatar" src="" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=User'">
                         <span id="chatPartnerStatusDot" class="presence-dot"></span>
                     </div>
-                    <div class="chat-header-info">
+                    <div class="chat-header-info" style="min-width:0;flex:1;">
                         <span id="chatPartnerNameHeader" class="chat-header-name">Conversa</span>
-                        <span id="chatOrderIdDisplayHeader" class="chat-header-order-id"></span>
+                        <span id="chatOrderIdDisplayHeader" class="chat-header-order-id" style="display:block;font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                        <div id="chatProductSummaryInline" style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                            <img id="chatProdImgInline" src="" style="width:18px;height:18px;border-radius:4px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
+                            <span id="chatProdTitleInline" style="font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Produto</span>
+                            <span id="chatProdPriceInline" style="font-size:0.65rem;font-weight:600;color:#00A884;flex-shrink:0;">R$ 0,00</span>
+                        </div>
                     </div>
                     <div class="dropdown">
                         <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções" style="margin-right:4px;">
@@ -966,16 +991,6 @@
                     </div>
                 </div>
 
-                <!-- Resumo do Produto (fixo no topo) -->
-                <div id="chatProductSummary" class="chat-product-summary">
-                    <img id="chatProdImg" src="" referrerpolicy="no-referrer"
-                         onerror="this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
-                    <div class="chat-product-summary-info">
-                        <div id="chatProdTitle" class="chat-product-summary-title">Produto</div>
-                        <div id="chatProdPrice" class="chat-product-summary-price">R$ 0,00</div>
-                    </div>
-                    <small id="chatOrderIdDisplay" class="chat-product-summary-id">#000000</small>
-                </div>
                 <!-- Barra de Status do Pedido -->
                 <div id="orderStatusBar" class="chat-status-bar"></div>
 
@@ -1016,7 +1031,7 @@
 
                 <!-- Input de Mensagem -->
                 <div class="chat-input-bar">
-                    <form id="chatMessageForm" onsubmit="return window.sendChatMessage(event)" class="d-flex gap-2 align-items-center">
+                    <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="chat-icon-btn"
                                 onclick="window.toggleChatAttachPanel()" title="Anexar imagem ou arquivo">
                             <i class="bi bi-paperclip"></i>
@@ -1025,12 +1040,17 @@
                                 onclick="window.toggleChatActions()" title="Opções do pedido">
                             <i class="bi bi-plus-circle"></i>
                         </button>
+                        <button type="button" class="chat-icon-btn" data-voice-input="chatMessageInput"
+                                onclick="window.startVoiceInput('chatMessageInput')" title="Gravar áudio">
+                            <i class="bi bi-mic"></i>
+                        </button>
                         <input type="text" id="chatMessageInput" class="chat-text-input"
-                               placeholder="Digite sua mensagem..." autocomplete="off">
-                        <button type="submit" class="chat-send-btn">
+                               placeholder="Digite sua mensagem..." autocomplete="off"
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();window.sendChatMessage(event)}">
+                        <button type="button" class="chat-send-btn" onclick="window.sendChatMessage(event)">
                             <i class="bi bi-send-fill"></i>
                         </button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1176,6 +1196,10 @@
                             <button type="button" class="chat-icon-btn" onclick="window.toggleSupportAttachPanel()" title="Anexar imagem ou arquivo">
                                 <i class="bi bi-paperclip"></i>
                             </button>
+                            <button type="button" class="chat-icon-btn" data-voice-input="supportChatInput"
+                                    onclick="window.startVoiceInput('supportChatInput')" title="Gravar áudio">
+                                <i class="bi bi-mic"></i>
+                            </button>
                             <input type="text" id="supportChatInput" class="chat-text-input" placeholder="Digite sua mensagem..." autocomplete="off"
                                    onkeypress="if(event.key==='Enter'){event.preventDefault(); window.sendMySupportMessage();}">
                             <button type="button" class="chat-send-btn" onclick="window.sendMySupportMessage()"><i class="bi bi-send-fill"></i></button>
@@ -1238,7 +1262,7 @@
     <!-- Tela de Edição de Perfil — estilo "link in bio" (cartão central, seções em pílulas empilhadas) -->
     <div id="profileEditScreen" class="profile-links-screen d-none">
         <form id="profileEditForm" class="profile-links-card">
-            <button type="button" class="profile-links-close profile-links-close-inside" onclick="window.hideProfileEditScreen()" aria-label="Fechar">
+            <button type="button" class="ml-auth-close" onclick="window.hideProfileEditScreen()">
                 <i class="bi bi-x-lg"></i>
             </button>
 
@@ -1253,6 +1277,9 @@
 
             <div class="profile-links-avatar-fields">
                 <input type="url" class="form-control form-control-sm" id="editAvatarLink" placeholder="Ou cole o link da imagem aqui">
+            </div>
+            <div class="profile-links-avatar-fields">
+                <input type="url" class="form-control form-control-sm" id="editBannerLink" placeholder="Banner (opcional)">
             </div>
 
             <!-- Seção: Dados Pessoais -->
@@ -1362,10 +1389,10 @@
             <button type="submit" class="btn btn-ml-primary w-100 py-3 fw-bold">
                 <i class="bi bi-check-lg me-2"></i>SALVAR ALTERAÇÕES
             </button>
-            <button type="button" class="btn btn-ml-secondary w-100 py-3 fw-bold mt-2" onclick="logout()">
+            <button type="button" class="ml-btn ml-btn-outline" style="width:100%;justify-content:center;margin-top:0.5rem" onclick="logout()">
                 <i class="bi bi-box-arrow-right me-2"></i>SAIR DA CONTA
             </button>
-            <button type="button" class="btn btn-outline-danger w-100 py-2 fw-bold mt-2" onclick="window.deleteAccount()">
+            <button type="button" class="ml-btn ml-btn-outline-danger" style="width:100%;justify-content:center;margin-top:0.5rem" onclick="window.deleteAccount()">
                 <i class="bi bi-trash me-2"></i>EXCLUIR MINHA CONTA
             </button>
         </form>
@@ -1436,7 +1463,7 @@
                     <a href="https://github.com/danielbarbosabr" target="_blank" class="text-white"><i class="bi bi-github fs-5"></i></a>
                     <a href="https://vercel.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="20" title="Vercel" style="filter: invert(1) brightness(2);"></a>
                     <a href="https://supabase.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="20" title="Supabase"></a>
-                    <a href="https://www.deepseek.com/" target="_blank"><img src="https://www.deepseek.com/favicon.ico" width="20" title="DeepSeek AI" style="border-radius: 4px; filter: none !important;"></a>
+                    <a href="https://opencode.ai/" target="_blank"><img src="https://opencode.ai/favicon.ico" width="20" title="OpenCode AI" style="border-radius: 4px; filter: none !important;" onerror="this.onerror=null;this.style.display='none'"></a>
                 </div>
 
                 <span class="text-white-50 d-md-none" style="font-size: 0.6rem;">© 2026 ElectroMarket</span>
