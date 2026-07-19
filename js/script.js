@@ -461,6 +461,13 @@ window.refreshDetailLikeBtn = function(pid) {
 
 const colorScale = ['#F23D35', '#FF8900', '#FFE600', '#ADE07E', '#00A650'];
 
+function formatSoldCount(count) {
+    if (count >= 100000) return '+100 mil';
+    if (count >= 10000) return `+${Math.floor(count / 1000)} mil`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1).replace('.0', '')} mil`;
+    return count.toString();
+}
+
 function renderCard(item) {
     if (!item?.titulo) return '';
     const preco    = item.preco || 0;
@@ -1558,7 +1565,21 @@ window.showDetail = async function(pid) {
     const precoNum = parseFloat(item.preco) || 0;
     const installmentValue = precoNum / 3;
     const installmentStr = installmentValue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-    const totalSold = item.vendas || 0;
+    // Total de vendas: prioriza o campo do produto (vendas/soldCount) e, se
+    // não houver, conta os pedidos deste product_id (qualquer status de venda
+    // concluída/andamento, exceto cancelado/disputa).
+    let totalSold = parseInt(item.vendas ?? item.soldCount ?? 0) || 0;
+    if (!totalSold && item.id) {
+        try {
+            const rows = await supabaseFetch(`orders?product_id=eq.${encodeURIComponent(item.id)}&select=status`);
+            const soldStatuses = new Set(['finished', 'accepted', 'agreement', 'shipping', 'awaiting_pickup', 'offer_pending']);
+            totalSold = Array.isArray(rows) ? rows.filter(o => soldStatuses.has(o.status)).length : 0;
+            // Persiste no produto para próximas aberturas (campo opcional)
+            if (totalSold > 0) {
+                supabaseFetch(`products?id=eq.${encodeURIComponent(item.id)}`, { method: 'PATCH', body: JSON.stringify({ vendas: totalSold }) }).catch(() => {});
+            }
+        } catch (e) { totalSold = 0; }
+    }
 
     grid.innerHTML = `
         <div class="detail-page">
@@ -1585,12 +1606,13 @@ window.showDetail = async function(pid) {
                 </div>
 
                 <div class="ml-panel-right">
+                    <div class="ml-category">${item.categoria || 'Produto'}</div>
                     <div class="ml-condition">
                     ${(() => {
                         const cm = (item.descricao || '').match(REGEX_CONDICAO);
                         return cm ? `<span class="ml-cond-badge ml-cond-${condToClass(cm[1])} me-2">${cm[1]}</span>` : '';
                     })()}
-                    ${item.categoria || 'Produto'}${totalSold > 0 ? ` | ${totalSold} vendido${totalSold > 1 ? 's' : ''}` : ''}
+                    ${totalSold > 0 ? `<span class="ml-meta-sep">|</span> <span class="ml-sold-count">${formatSoldCount(totalSold)} vendidos</span>` : ''}
                 </div>
 
                     <div class="ml-title-row">
@@ -1677,8 +1699,7 @@ window.showDetail = async function(pid) {
                         <div class="ml-reputation-stars">${sellerRatingCount > 0
                             ? `${renderRatingStars(sellerRatingAvg)} <span style="margin-left:6px;font-size:0.85em;">${sellerRatingAvg.toFixed(1)} · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}</span>`
                             : 'Ainda sem avaliações'}</div>
-                        <div class="ml-seller-sales"><i class="bi bi-bag-check" style="margin-right:4px;"></i>${sellerSalesCount} venda${sellerSalesCount === 1 ? '' : 's'} concluída${sellerSalesCount === 1 ? '' : 's'}</div>
-                        <a href="javascript:void(0)" class="ml-more-link" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">Ver mais dados do vendedor</a>
+                         <a href="javascript:void(0)" class="ml-more-link" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">Ver mais dados do vendedor</a>
                     </div>
                 </div>
 

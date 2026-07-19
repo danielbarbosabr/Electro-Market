@@ -4019,6 +4019,23 @@ body.sign-up-js .second-content .second-column {
     margin-bottom: 4px;
     letter-spacing: 0.2px;
 }
+
+/* Categoria acima da condição (estilo Mercado Livre) */
+.ml-category {
+    font-size: 0.72rem;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+/* Quantidade de vendidos no card de detalhe (estilo Mercado Livre) */
+.ml-meta-sep,
+.ml-sold-count {
+    font-size: 0.72rem;
+    color: #666;
+}
+.ml-meta-sep {
+    margin: 0 6px;
+}
 .ml-cond-novo {
     background-color: #e0f5e9;
     color: #00a650;
