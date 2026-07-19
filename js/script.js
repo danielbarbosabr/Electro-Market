@@ -1612,7 +1612,7 @@ window.showDetail = async function(pid) {
                         const cm = (item.descricao || '').match(REGEX_CONDICAO);
                         return cm ? `<span class="ml-cond-badge ml-cond-${condToClass(cm[1])} me-2">${cm[1]}</span>` : '';
                     })()}
-                    ${totalSold > 0 ? `<span class="ml-meta-sep">|</span> <span class="ml-sold-count">${formatSoldCount(totalSold)} vendidos</span>` : ''}
+                    <span class="ml-meta-sep">|</span> <span class="ml-sold-count">${totalSold > 0 ? `${formatSoldCount(totalSold)} vendidos` : 'Nenhum vendido'}</span>
                 </div>
 
                     <div class="ml-title-row">

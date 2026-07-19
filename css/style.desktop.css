@@ -4022,7 +4022,7 @@ body.sign-up-js .second-content .second-column {
 
 /* Categoria acima da condição (estilo Mercado Livre) */
 .ml-category {
-    font-size: 0.72rem;
+    font-size: 14px;
     color: #666;
     margin-bottom: 4px;
 }
@@ -4030,7 +4030,7 @@ body.sign-up-js .second-content .second-column {
 /* Quantidade de vendidos no card de detalhe (estilo Mercado Livre) */
 .ml-meta-sep,
 .ml-sold-count {
-    font-size: 0.72rem;
+    font-size: 14px;
     color: #666;
 }
 .ml-meta-sep {
