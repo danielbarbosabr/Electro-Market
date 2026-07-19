@@ -1717,6 +1717,10 @@ window.filterAdminSupportContacts = function(query) {
 
 window.adminSupportSelect = async function(id, type) {
     window._adminActiveSupportId = id;
+    // Garante que nenhuma classe de modal de suporte do USUÁRIO fique
+    // ativa por engano (evita o chat abrir "dentro de outro modal").
+    document.body.classList.remove('support-chat-fullscreen');
+    document.body.classList.add('wa-locked', 'admin-chat-fullscreen');
     const adminUser = getSavedUser();
 
     // Update active state in sidebar
@@ -2011,8 +2015,8 @@ window.openAdminSupportFullscreen = async function() {
 
         grid.innerHTML = `
             <div id="adminSupportFullscreen" style="height:100%;display:flex;flex-direction:column;">
-                <div class="wa-main admin-chat-main" style="margin:0;flex:1;min-height:0;height:auto;border-radius:10px;">
-                    <section class="wa-side" style="width:340px;min-width:280px;">
+                <div class="wa-main admin-chat-main" style="margin:0;flex:1;min-height:0;height:auto;border-radius:0;">
+                    <section class="wa-side">
                         <div class="wa-side__header">
                             <h6 class="mb-0">Suporte</h6>
                             <span class="small text-muted ms-auto me-2" id="adminSupportSidebarCount"></span>
@@ -3660,18 +3664,24 @@ window.adminDeleteTicket = async function(ticketId) {
 // ============================================
 
 window.shareProduct = function(pid) {
-    const item = allProductsCache.find(x => x.id === pid || x.id == pid);
-    if (!item) return;
-    // Link direto e estático para o produto (não recarrega do zero ao abrir)
-    const base = window.location.origin + window.location.pathname;
-    const url  = `${base}#/produto/${pid}`;
-    const text = `Confira: ${item.titulo} no ElectroMarket!`;
+    const doShare = (item) => {
+        if (!item) { showToast('Produto não encontrado.', 'error'); return; }
+        const base = window.location.origin + window.location.pathname;
+        const url  = `${base}#/produto/${pid}`;
+        const text = `Confira: ${item.titulo} no ElectroMarket!`;
 
-    if (navigator.share) {
-        navigator.share({ title: 'ElectroMarket', text, url }).catch(console.error);
-    } else {
-        navigator.clipboard.writeText(url).then(() => showToast('Link do produto copiado!', 'success', 2000));
-    }
+        if (navigator.share) {
+            navigator.share({ title: 'ElectroMarket', text, url }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(url).then(() => showToast('Link do produto copiado!', 'success', 2000));
+        }
+    };
+    const item = (window.allProductsCache || []).find(x => x.id === pid || x.id == pid);
+    if (item) { doShare(item); return; }
+    // Se não achou no cache, busca direto no banco
+    supabaseFetch(`products?id=eq.${encodeURIComponent(pid)}&limit=1`).then(rows => {
+        doShare(rows && rows.length ? rows[0] : null);
+    }).catch(() => doShare(null));
 };
 
 /** Compartilha o perfil público de um vendedor (loja) via link direto */

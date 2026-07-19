@@ -692,12 +692,8 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
                                             : `<div class="ml-store-avatar-placeholder"><i class="bi bi-shop"></i></div>`
                                         }
                                     </div>
-                                    <div class="ml-store-brand-info">
-                                        <h1 class="ml-store-name">${nome}</h1>
-                                        <div class="ml-store-id-row">
-                                            <span class="ml-store-id-badge"><i class="bi bi-shop me-1"></i>Vendedor</span>
-                                            <span class="ml-store-id-code">ID: ${sellerId.slice(-8).toUpperCase()}</span>
-                                        </div>
+                                        <div class="ml-store-brand-info">
+                                            <h1 class="ml-store-name">${nome}</h1>
                                         <div class="ml-store-badge">
                                             ${ratingCount > 0
                                                 ? `${renderRatingStars(ratingAvg)} <span style="font-size:0.7rem;opacity:0.7;margin-left:4px;">${ratingAvg.toFixed(1)} (${ratingCount})</span>`
