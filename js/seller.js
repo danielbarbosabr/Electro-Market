@@ -678,10 +678,10 @@ function updateChatLogistics(order, user) {
     } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
         if (isBuyer) {
             buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button>
-                <button class="btn btn-link btn-sm w-100 text-muted" onclick="window.reportOrderProblem('${order.id}','produto_nao_recebido')"><i class="bi bi-exclamation-triangle me-1"></i>Não recebi o produto</button>`;
+                <button class="btn btn-outline-danger w-100 rounded-pill fw-bold mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
         } else {
             buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div>
-                <button class="btn btn-link btn-sm w-100 text-muted" onclick="window.reportOrderProblem('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-exclamation-triangle me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
+                <button class="btn btn-outline-danger w-100 rounded-pill fw-bold mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
         }
     } else if (order.status === 'finished') {
         if (isBuyer) {
@@ -1074,6 +1074,39 @@ window.confirmReceipt = async function(orderId) {
         loadChatMessages(orderId);
         window.openReviewModal(orderId, 'buyer_rates_seller');
     } catch { showToast('Erro ao confirmar recebimento.', 'error'); }
+};
+
+/** Abre um chamado de suporte direto para o pedido, sem modal — marca como disputa
+ *  e cria o ticket vinculado. O chat continua o mesmo, mas aparece no suporte do admin. */
+window.requestOrderSupport = async function(orderId, category) {
+    if (!confirm('Abrir um chamado de suporte para este pedido?')) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'dispute', updated_at: new Date().toISOString() })
+        });
+
+        const labels = { produto_nao_recebido: 'Não recebi o produto', entrega_sem_confirmacao: 'Entreguei, mas o comprador não confirmou' };
+        const ticketId = await window.createSupportTicket({
+            category,
+            subject: labels[category] || 'Problema com o pedido',
+            orderId
+        });
+
+        if (ticketId) {
+            const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+            const chat = chatData[0];
+            if (chat) {
+                chat.messages.push({ senderId: 'system', text: `Chamado de suporte aberto (#${ticketId.slice(-6).toUpperCase()}). A equipe de suporte foi notificada.`, timestamp: new Date().toISOString(), type: 'system' });
+                await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+            }
+            showToast('Chamado de suporte aberto!', 'success');
+            loadChatMessages(orderId);
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Erro ao abrir chamado de suporte.', 'error');
+    }
 };
 
 // ============================================

@@ -1003,6 +1003,30 @@ window.confirmAdminChatsTabAttach = async function(orderId) {
     }
 };
 
+window.sendAdminChatsTabLocation = async function(orderId) {
+    const user = getSavedUser();
+    const addr = user?.endereco || user?.cidade;
+    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    try {
+        const result = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        messages.push({
+            senderId: user.id, senderName: `${user.nome} (Suporte)`,
+            text: `📍 ${addr}\n${mapsUrl}`,
+            timestamp: new Date().toISOString(), type: 'location', isStaff: true
+        });
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        document.getElementById('adminChatsTabAttachPanel')?.classList.add('d-none');
+        window.adminChatsTabSelect(orderId);
+        showToast('Localização enviada!', 'success');
+    } catch (e) {
+        showToast('Erro ao enviar localização.', 'error');
+    }
+};
+
 /**
  * Visão total do administrador: abre qualquer conversa de pedido do site,
  * no MESMO layout usado no chat entre cliente e vendedor — ver usuários,
@@ -1317,6 +1341,7 @@ window.adminChatsModalSelect = async function(orderId) {
                         <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminChatsModalDelete('${orderId}')"><i class="bi bi-trash me-2"></i>Apagar conversa e pedido</a></li>
                     </ul>
                 </div>
+                <button type="button" class="ml-auth-close" aria-label="Fechar" data-bs-dismiss="modal" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;margin-left:4px;"><i class="bi bi-x-lg"></i></button>
             </div>
 
             <div class="chat-status-bar">
@@ -1345,8 +1370,40 @@ window.adminChatsModalSelect = async function(orderId) {
             <div id="adminChatsModalMsgsBody" class="chat-messages" style="flex-grow:1; overflow-y:auto;">${msgsHtml}</div>
 
             ${!chat.closed ? `
+                <div id="adminChatsModalInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
+
+                <!-- Painel de Anexo (mesmo padrão do chat cliente ↔ vendedor / suporte) -->
+                <div id="adminChatsModalAttachPanel" class="p-3 bg-light border-top d-none">
+                    <div class="d-flex gap-2 mb-2">
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setAdminChatsModalAttachType('image')">
+                            <i class="bi bi-image me-1"></i>Imagem
+                        </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminChatsModalAttachType('file')">
+                            <i class="bi bi-file-earmark me-1"></i>Arquivo
+                        </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminChatsModalLocation('${orderId}')">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
+                        </button>
+                    </div>
+                    <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                        <input type="url" id="adminChatsModalAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmAdminChatsModalAttach('${orderId}')">
+                            <i class="bi bi-send me-1"></i>Enviar
+                        </button>
+                    </div>
+                </div>
+
                 <div class="chat-input-bar">
                     <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="chat-icon-btn" onclick="window.toggleAdminChatsModalAttachPanel()" title="Anexar imagem ou arquivo">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
                         <button type="button" class="chat-icon-btn" data-voice-input="adminChatsModalInput" onclick="window.startVoiceInput('adminChatsModalInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
                         <input type="text" id="adminChatsModalInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminChatsModalSend('${orderId}');}">
@@ -1366,6 +1423,88 @@ window.adminChatsModalSelect = async function(orderId) {
 /** No mobile, volta da conversa aberta pra lista lateral sem fechar o modal */
 window.adminChatsModalBack = function() {
     document.getElementById('adminChatsModalMain')?.classList.remove('wa-chat-open');
+};
+
+// -------- Anexo de imagem/arquivo/localização na Central de Conversas (mesmo padrão do chat cliente ↔ vendedor) --------
+
+let adminChatsModalAttachType = 'image'; // 'image' | 'file'
+
+window.toggleAdminChatsModalAttachPanel = function() {
+    const panel = document.getElementById('adminChatsModalAttachPanel');
+    if (!panel) return;
+    panel.classList.toggle('d-none');
+    if (!panel.classList.contains('d-none')) {
+        document.getElementById('adminChatsModalAttachLinkInput')?.focus();
+    }
+};
+
+window.setAdminChatsModalAttachType = function(type) {
+    adminChatsModalAttachType = type;
+    document.querySelectorAll('#adminChatsModalAttachPanel .chat-attach-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.attachType === type);
+    });
+    const input = document.getElementById('adminChatsModalAttachLinkInput');
+    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem...' : 'Cole o link do arquivo...';
+};
+
+window.confirmAdminChatsModalAttach = async function(orderId) {
+    const input = document.getElementById('adminChatsModalAttachLinkInput');
+    const url   = input?.value?.trim();
+    if (!url || !url.startsWith('http')) {
+        showToast('Cole um link válido (começando com http).', 'warning');
+        return;
+    }
+    const user = getSavedUser();
+    try {
+        const result = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        if (adminChatsModalAttachType === 'image') {
+            messages.push({
+                senderId: user.id, senderName: `${user.nome} (Suporte)`,
+                text: 'Imagem', image: normalizeImageUrl(url),
+                timestamp: new Date().toISOString(), type: 'image', isStaff: true
+            });
+        } else {
+            messages.push({
+                senderId: user.id, senderName: `${user.nome} (Suporte)`,
+                text: `Arquivo: ${url.split('/').pop()}`,
+                file: { name: 'Arquivo Externo', url, size: 0 },
+                timestamp: new Date().toISOString(), type: 'file', isStaff: true
+            });
+        }
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        document.getElementById('adminChatsModalAttachPanel')?.classList.add('d-none');
+        window.adminChatsModalSelect(orderId);
+    } catch (e) {
+        showToast('Erro ao enviar anexo.', 'error');
+    }
+};
+
+window.sendAdminChatsModalLocation = async function(orderId) {
+    const user = getSavedUser();
+    const addr = user?.endereco || user?.cidade;
+    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    try {
+        const result = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        messages.push({
+            senderId: user.id, senderName: `${user.nome} (Suporte)`,
+            text: `📍 ${addr}\n${mapsUrl}`,
+            timestamp: new Date().toISOString(), type: 'location', isStaff: true
+        });
+        await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        document.getElementById('adminChatsModalAttachPanel')?.classList.add('d-none');
+        window.adminChatsModalSelect(orderId);
+        showToast('Localização enviada!', 'success');
+    } catch (e) {
+        showToast('Erro ao enviar localização.', 'error');
+    }
 };
 
 /** Envia uma mensagem como membro da equipe de suporte, dentro do modal de conversas do admin */
@@ -1648,6 +1787,7 @@ window.adminSupportSelect = async function(id, type) {
                             <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminSupportDelete('${id}', 'order')"><i class="bi bi-trash me-2"></i>Apagar conversa e pedido</a></li>
                         </ul>
                     </div>
+                    <button type="button" class="ml-auth-close" aria-label="Fechar" onclick="window.adminSupportCloseFullscreen()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;margin-left:4px;"><i class="bi bi-x-lg"></i></button>
                 </div>
 
                 <div class="chat-status-bar">
@@ -1684,6 +1824,9 @@ window.adminSupportSelect = async function(id, type) {
                         </button>
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminSupportAttachType('file')">
                             <i class="bi bi-file-earmark me-1"></i>Arquivo
+                        </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminSupportLocation()">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
                         </button>
                     </div>
                     <div class="input-group input-group-sm mb-2">
@@ -1763,6 +1906,7 @@ window.adminSupportSelect = async function(id, type) {
                             <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminSupportDelete('${id}', 'ticket')"><i class="bi bi-trash me-2"></i>Apagar chamado</a></li>
                         </ul>
                     </div>
+                    <button type="button" class="ml-auth-close" aria-label="Fechar" onclick="window.adminSupportCloseFullscreen()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;margin-left:4px;"><i class="bi bi-x-lg"></i></button>
                 </div>
 
                 <div class="chat-status-bar">
@@ -1791,6 +1935,9 @@ window.adminSupportSelect = async function(id, type) {
                         </button>
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminSupportAttachType('file')">
                             <i class="bi bi-file-earmark me-1"></i>Arquivo
+                        </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminSupportLocation()">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
                         </button>
                     </div>
                     <div class="input-group input-group-sm mb-2">
@@ -2143,6 +2290,34 @@ window.confirmAdminSupportAttach = async function() {
     } catch(e) { showToast('Erro ao enviar anexo.', 'error'); }
 };
 
+window.sendAdminSupportLocation = async function() {
+    const id = window._adminActiveSupportId;
+    if (!id) return;
+    const data = window._adminSupportData;
+    const isOrder = data?.chats?.some(c => c.order_id === id);
+    const type = isOrder ? 'order' : 'ticket';
+    const user = getSavedUser();
+    const addr = user?.endereco || user?.cidade;
+    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    try {
+        const endpoint = type === 'order' ? `chats?order_id=eq.${id}` : `chats?id=eq.${id}`;
+        const result = await supabaseFetch(endpoint + '&limit=1');
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        messages.push({
+            senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
+            text: `📍 ${addr}\n${mapsUrl}`,
+            timestamp: new Date().toISOString(), type: 'location', isStaff: true
+        });
+        await supabaseFetch(endpoint, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        document.getElementById('adminSupportAttachPanel')?.classList.add('d-none');
+        window.adminSupportSelect(id, type);
+        showToast('Localização enviada!', 'success');
+    } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
+};
+
 /** Seleciona e carrega uma conversa específica dentro da aba "Chats" do admin — abre em tela cheia no lugar da lista */
 window.adminChatsTabSelect = async function(orderId) {
     window._adminActiveChatOrderId = orderId;
@@ -2208,6 +2383,7 @@ window.adminChatsTabSelect = async function(orderId) {
                         <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminChatsTabDelete('${orderId}')"><i class="bi bi-trash me-2"></i>Apagar conversa e pedido</a></li>
                     </ul>
                 </div>
+                <button type="button" class="ml-auth-close" aria-label="Fechar" onclick="window.adminChatsTabBack()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;margin-left:4px;"><i class="bi bi-x-lg"></i></button>
             </div>
 
             <div class="chat-status-bar">
@@ -2247,12 +2423,18 @@ window.adminChatsTabSelect = async function(orderId) {
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminChatsTabAttachType('file')">
                             <i class="bi bi-file-earmark me-1"></i>Arquivo
                         </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminChatsTabLocation('${orderId}')">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
+                        </button>
                     </div>
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
                         <input type="url" id="adminChatsTabAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
                     </div>
                     <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmAdminChatsTabAttach('${orderId}')">
                             <i class="bi bi-send me-1"></i>Enviar
                         </button>
@@ -3120,6 +3302,7 @@ window.adminViewTicket = async function(ticketId) {
                                         <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.adminDeleteTicket('${ticketId}')"><i class="bi bi-trash me-2"></i>Apagar chamado</a></li>
                                     </ul>
                                 </div>
+                                <button type="button" class="ml-auth-close" aria-label="Fechar" onclick="window.adminViewTicketBack()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;margin-left:4px;"><i class="bi bi-x-lg"></i></button>
                             </div>
 
                             <div class="chat-status-bar">
@@ -3148,6 +3331,9 @@ window.adminViewTicket = async function(ticketId) {
                                         </button>
                                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminTicketAttachType('file')">
                                             <i class="bi bi-file-earmark me-1"></i>Arquivo
+                                        </button>
+                                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminTicketLocation()">
+                                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
                                         </button>
                                     </div>
                                     <div class="input-group input-group-sm mb-2">
@@ -3273,6 +3459,32 @@ window.deleteAdminTicketMessage = async function(index) {
         window.adminViewTicket(ticketId);
     } catch (e) {
         showToast('Erro ao apagar mensagem.', 'error');
+    }
+};
+
+window.sendAdminTicketLocation = async function() {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) return;
+    const user = getSavedUser();
+    const addr = user?.endereco || user?.cidade;
+    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) return;
+        const messages = ticket.messages || [];
+        messages.push({
+            senderId: user.id, senderName: `${user.nome} (Suporte)`,
+            text: `📍 ${addr}\n${mapsUrl}`,
+            timestamp: new Date().toISOString(), type: 'location', isStaff: true
+        });
+        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        document.getElementById('adminTicketAttachPanel')?.classList.add('d-none');
+        window.adminViewTicket(ticketId);
+        showToast('Localização enviada!', 'success');
+    } catch (e) {
+        showToast('Erro ao enviar localização.', 'error');
     }
 };
 

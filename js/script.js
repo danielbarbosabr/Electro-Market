@@ -55,6 +55,15 @@ function renderCondicoesOptions(selected) {
     return h;
 }
 
+function renderRatingStars(level) {
+    const r = Math.max(0, Math.min(5, Math.round(level || 0)));
+    let s = '';
+    for (let i = 1; i <= 5; i++) {
+        s += `<i class="bi bi-star${i <= r ? '-fill' : ''}" style="color:#FFC107;font-size:inherit;"></i>`;
+    }
+    return s;
+}
+
 // ============================================
 // SISTEMA DE TOAST (substitui alerts)
 // ============================================
@@ -585,11 +594,11 @@ async function renderStorefrontBanner(stores) {
     const storeIds = stores.map(s => s.vendedor_id).join(',');
     let usersMap = {};
     try {
-        const usersData = await supabaseFetch(`users?select=id,avatar&id=in.(${storeIds})`);
+        const usersData = await supabaseFetch(`users?select=id,avatar,vendedor_rating,rating_count&id=in.(${storeIds})`);
         if (usersData) {
             usersData.forEach(u => {
                 const { avatar, banner } = splitAvatarField(u.avatar);
-                usersMap[u.id] = { avatar, banner };
+                usersMap[u.id] = { avatar, banner, rating: parseFloat(u.vendedor_rating) || 0, ratingCount: parseInt(u.rating_count) || 0 };
             });
         }
     } catch(e) {}
@@ -598,6 +607,8 @@ async function renderStorefrontBanner(stores) {
         const user   = usersMap[s.vendedor_id] || {};
         const banner = user.banner || '';
         const avatar = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((s.loja||'L').slice(0,2))}&background=2dcc71&color=fff&size=80`;
+        const rating = user.rating || 0;
+        const ratingCount = user.ratingCount || 0;
         return `
         <div class="storefront-banner" onclick="window.showSellerProfile('${s.vendedor_id}', '${(s.loja||'').replace(/'/g,"\\'")}')">
             ${banner ? `<div class="storefront-banner-bg"><img src="${banner}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'"></div>` : ''}
@@ -605,7 +616,7 @@ async function renderStorefrontBanner(stores) {
                 <img src="${avatar}" class="storefront-banner-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=2dcc71&color=fff&size=80'">
                 <div class="storefront-banner-info">
                     <strong class="storefront-banner-name">${s.loja}</strong>
-                    <span class="storefront-banner-badge">Loja Oficial</span>
+                    <span class="storefront-banner-badge">${ratingCount > 0 ? renderRatingStars(rating) : 'Sem avaliações'}</span>
                 </div>
                 <div class="storefront-banner-actions">
                     <span class="storefront-banner-visit-btn">Visitar Loja <i class="bi bi-arrow-right"></i></span>
@@ -645,9 +656,10 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border" style="color:var(--market-color);"></div><p class="mt-2">Carregando loja...</p></div>';
 
     try {
-        const [sellerData, products] = await Promise.all([
+        const [sellerData, products, salesData] = await Promise.all([
             supabaseFetch(`users?select=nome,avatar,cidade,estado,vendedor_rating,rating_count,created_at&id=eq.${sellerId}&limit=1`),
-            supabaseFetch(`products?select=*&vendedor_id=eq.${sellerId}&order=created_at.desc`)
+            supabaseFetch(`products?select=*&vendedor_id=eq.${sellerId}&order=created_at.desc`),
+            supabaseFetch(`orders?select=id&seller_id=eq.${sellerId}&status=eq.finished`)
         ]);
         const seller = sellerData?.[0] || {};
         const nome = seller.nome || sellerNameFallback || 'Loja';
@@ -655,6 +667,7 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
         const ratingCount = parseInt(seller.rating_count) || 0;
         const localizacao = [seller.cidade, seller.estado].filter(Boolean).join(' - ');
         const membroDesde = seller.created_at ? new Date(seller.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '';
+        const totalVendas = salesData?.length || 0;
         const { avatar: sellerAvatar, banner: sellerBanner } = splitAvatarField(seller.avatar);
 
         grid.innerHTML = `
@@ -676,11 +689,15 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
                                     </div>
                                     <div class="ml-store-brand-info">
                                         <h1 class="ml-store-name">${nome}</h1>
-                                        <div class="ml-store-badge">Loja Oficial</div>
+                                        <div class="ml-store-badge">
+                                            ${ratingCount > 0
+                                                ? `${renderRatingStars(ratingAvg)} <span style="font-size:0.7rem;opacity:0.7;margin-left:4px;">${ratingAvg.toFixed(1)} (${ratingCount})</span>`
+                                                : '<span style="font-size:0.7rem;opacity:0.7;">Sem avaliações</span>'}
+                                        </div>
                                         <div class="ml-store-meta">
-                                            <span><i class="bi bi-star-fill text-warning"></i> ${ratingCount > 0 ? `${ratingAvg.toFixed(1)} (${ratingCount})` : 'Sem avaliações'}</span>
                                             <span><i class="bi bi-geo-alt"></i> ${localizacao || 'Brasil'}</span>
                                             <span><i class="bi bi-calendar3"></i> ${membroDesde ? `Desde ${membroDesde}` : ''}</span>
+                                            <span><i class="bi bi-bag-check"></i> ${totalVendas} venda${totalVendas === 1 ? '' : 's'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -979,7 +996,7 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
     const grid = document.getElementById('productsGrid');
     if (!grid) return;
 
-    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active') && !grid.classList.contains('create-ad-active')) {
+    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active') && !grid.classList.contains('create-ad-active') && !grid.classList.contains('offer-page-active')) {
         window._preDetailState = {
             html: grid.innerHTML,
             gridClass: grid.className,
@@ -1478,8 +1495,12 @@ window.showDetail = async function(pid) {
     let sellerCidade = '';
     let sellerRatingAvg = 0;
     let sellerRatingCount = 0;
+    let sellerSalesCount = 0;
     try {
-        const sellerInfo = await supabaseFetch(`users?select=endereco,cidade,estado,vendedor_rating,rating_count&id=eq.${item.vendedor_id}`);
+        const [sellerInfo, salesData] = await Promise.all([
+            supabaseFetch(`users?select=endereco,cidade,estado,vendedor_rating,rating_count&id=eq.${item.vendedor_id}`),
+            supabaseFetch(`orders?select=id&seller_id=eq.${item.vendedor_id}&status=eq.finished`)
+        ]);
         if (sellerInfo?.length > 0) {
             const s = sellerInfo[0];
             sellerAddressRaw = s.endereco || '';
@@ -1488,6 +1509,7 @@ window.showDetail = async function(pid) {
             sellerRatingAvg   = parseFloat(s.vendedor_rating) || 0;
             sellerRatingCount = parseInt(s.rating_count) || 0;
         }
+        sellerSalesCount = salesData?.length || 0;
     } catch (e) {}
 
     const realizaEntrega  = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
@@ -1648,8 +1670,9 @@ window.showDetail = async function(pid) {
                         <h4 class="ml-seller-title">Reputação do vendedor</h4>
                         <p class="ml-seller-name"><strong>${item.loja || 'Vendedor'}</strong></p>
                         <div class="ml-reputation-stars">${sellerRatingCount > 0
-                            ? `${sellerRatingAvg.toFixed(1)} <i class="bi bi-star-fill text-warning"></i> · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}`
+                            ? `${renderRatingStars(sellerRatingAvg)} <span style="margin-left:6px;font-size:0.85em;">${sellerRatingAvg.toFixed(1)} · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}</span>`
                             : 'Ainda sem avaliações'}</div>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:6px 0 0 0;"><i class="bi bi-bag-check" style="margin-right:4px;"></i>${sellerSalesCount} venda${sellerSalesCount === 1 ? '' : 's'} realizadas</p>
                         <a href="javascript:void(0)" class="ml-more-link" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">Ver mais dados do vendedor</a>
                     </div>
                 </div>
@@ -2419,27 +2442,107 @@ window.buyItem = async function(i) {
 // Pendentes" pra ser aceito ou recusado)
 // ============================================
 
-/** Abre o modal de oferta já preenchido com os dados do produto */
-window.openOfferModal = function(pid) {
+/** Abre a página fullscreen de fazer oferta (mesmo estilo do Criar Anúncio) */
+window.showOfferPage = function(pid) {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active') && !grid.classList.contains('create-ad-active') && !grid.classList.contains('offer-page-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
+
+    grid.className = 'offer-page-active';
+    grid.style.display = 'block';
+
     const user = getSavedUser();
-    if (!user) { showToast('Faça login para enviar uma oferta!', 'warning'); return; }
+    if (!user) { showToast('Faça login para enviar uma oferta!', 'warning'); window.closeProductDetail(); return; }
 
     const item = allProductsCache.find(x => x.id == pid || x.id === pid);
-    if (!item) { showToast('Produto não encontrado.', 'error'); return; }
-    if (user.id === item.vendedor_id) { showToast('Você não pode fazer uma oferta no seu próprio anúncio.', 'warning'); return; }
+    if (!item) { showToast('Produto não encontrado.', 'error'); window.closeProductDetail(); return; }
+    if (user.id === item.vendedor_id) { showToast('Você não pode fazer uma oferta no seu próprio anúncio.', 'warning'); window.closeProductDetail(); return; }
 
     const preco = parseFloat(item.preco) || 0;
-    document.getElementById('offerForm').dataset.pid = pid;
-    document.getElementById('offerProductTitle').textContent = item.titulo;
-    document.getElementById('offerProductImg').src = safeParseImages(item.img)[0] || 'https://placehold.co/60';
-    document.getElementById('offerProductPrice').innerHTML = `Preço anunciado: <strong>${formatPreco(preco)}</strong>`;
-    document.getElementById('offerAmount').value = '';
-    document.getElementById('offerAmount').max = preco > 0 ? preco - 0.01 : '';
-    document.getElementById('offerQty').value = 1;
-    document.getElementById('offerQty').max = Math.max(1, item.quantidade || 1);
 
-    new bootstrap.Modal(document.getElementById('makeOfferModal')).show();
+    grid.innerHTML = `
+    <div class="detail-page">
+        <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+
+        <div class="create-ad-wrap">
+            <div class="create-ad-header">
+                <div>
+                    <h4>Fazer Oferta</h4>
+                    <p class="text-muted small mb-0">Proponha um valor para este produto</p>
+                </div>
+            </div>
+
+            <form id="offerForm" class="create-ad-form" onsubmit="window.submitOffer(event)">
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title">
+                        <i class="bi bi-box-seam-fill"></i>
+                        <span>Produto</span>
+                    </div>
+                    <div class="create-ad-section-body">
+                        <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
+                            <img id="offerProductImg" src="${safeParseImages(item.img)[0] || 'https://placehold.co/60'}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/60'"
+                                 style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">
+                            <div class="flex-grow-1">
+                                <h6 class="fw-bold mb-1">${item.titulo}</h6>
+                                <small class="text-muted">Preço anunciado: <strong>${formatPreco(preco)}</strong></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title">
+                        <i class="bi bi-tag-fill"></i>
+                        <span>Sua Oferta</span>
+                    </div>
+                    <div class="create-ad-section-body">
+                        <div class="mb-3">
+                            <label class="create-ad-label">Seu valor (R$) <span class="text-danger">*</span></label>
+                            <input type="number" class="create-ad-input" id="offerAmount" step="0.01" min="0.01"${preco > 0 ? ` max="${preco - 0.01}"` : ''} placeholder="Ex: 150.00" required>
+                            <small class="text-muted">O valor deve ser menor que o preço anunciado.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="create-ad-label">Quantidade <span class="text-danger">*</span></label>
+                            <input type="number" class="create-ad-input" id="offerQty" min="1" value="1" max="${Math.max(1, item.quantidade ?? 9999)}" required>
+                        </div>
+                        <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i>O vendedor pode aceitar ou recusar sua oferta em até alguns dias. Você será avisado assim que ele responder.</p>
+                    </div>
+                </div>
+
+                <div class="create-ad-footer">
+                    <button type="button" class="ml-btn ml-btn-outline" onclick="window.closeProductDetail()">
+                        <i class="bi bi-x-lg me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" class="ml-btn ml-btn-primary">
+                        <i class="bi bi-send me-2"></i>Enviar Oferta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+
+    document.getElementById('offerForm').dataset.pid = pid;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+window.openOfferModal = function(pid) { window.showOfferPage(pid); };
 
 /** Envia a oferta como um pedido com status especial (offer_pending), reaproveitando
  *  toda a estrutura de pedidos/chat já existente — o vendedor decide em "Solicitações
@@ -2512,7 +2615,7 @@ window.submitOffer = async function(event) {
         });
 
         ordersCache.push(order);
-        bootstrap.Modal.getInstance(document.getElementById('makeOfferModal'))?.hide();
+        window.closeProductDetail();
 
         createPersistentNotification(`Oferta enviada para "${item.titulo}"!`, 'success');
         showToast('Oferta enviada ao vendedor!', 'success');

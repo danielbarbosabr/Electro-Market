@@ -837,7 +837,7 @@ body.dark-theme .ml-dispatch-tag {
 
 /* Price card */
 .ml-price-card {
-    margin-top: 8px;
+    margin-top: -16px;
     display: flex;
     flex-direction: column;
 }
@@ -846,6 +846,7 @@ body.dark-theme .ml-dispatch-tag {
     font-size: 2.2rem;
     font-weight: 300;
     color: var(--text-main);
+    line-height: 1.1;
 }
 
 .ml-price-int {
@@ -5760,7 +5761,7 @@ body.dark-theme .admin-chart-card .admin-card-title {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    background: var(--market-color);
+    background: rgba(255,255,255,0.2);
     color: #fff;
     padding: 2px 7px;
     border-radius: 3px;
@@ -5781,15 +5782,15 @@ body.dark-theme .admin-chart-card .admin-card-title {
     border-radius: 6px;
     font-size: 0.82rem;
     font-weight: 600;
-    background: var(--market-color);
+    background: var(--primary-action);
     color: #fff;
     transition: all .15s ease;
     white-space: nowrap;
 }
 
 .storefront-banner:hover .storefront-banner-visit-btn {
-    background: #25a35a;
-    box-shadow: 0 2px 8px rgba(45,204,113,0.3);
+    filter: brightness(1.15);
+    box-shadow: 0 2px 8px rgba(0,74,173,0.3);
 }
 
 body.dark-theme .storefront-banner:hover {

@@ -798,42 +798,6 @@
         </div>
     </div>
 
-    <!-- Modal Fazer Oferta (estilo eBay: comprador propõe um valor ao vendedor) -->
-    <div class="modal fade" id="makeOfferModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0">
-                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-tag me-2"></i>Fazer Oferta</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
-                        <img id="offerProductImg" src="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/60'"
-                             style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">
-                        <div class="flex-grow-1">
-                            <h6 class="fw-bold mb-1" id="offerProductTitle"></h6>
-                            <small class="text-muted" id="offerProductPrice"></small>
-                        </div>
-                    </div>
-                    <form id="offerForm" onsubmit="window.submitOffer(event)">
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Seu valor de oferta (R$)</label>
-                            <input type="number" class="form-control" id="offerAmount" step="0.01" min="0.01" placeholder="Ex: 150.00" required>
-                            <small class="text-muted">O valor deve ser menor que o preço anunciado.</small>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Quantidade</label>
-                            <input type="number" class="form-control" id="offerQty" min="1" value="1" required>
-                        </div>
-                        <p class="small text-muted mb-3"><i class="bi bi-info-circle me-1"></i>O vendedor pode aceitar ou recusar sua oferta em até alguns dias. Você será avisado assim que ele responder.</p>
-                        <button type="submit" class="btn btn-ml-primary w-100 fw-bold py-2">
-                            <i class="bi bi-send me-2"></i>Enviar Oferta
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Offcanvas Menu Mobile -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileMenu" style="width: 85%;">
@@ -972,8 +936,8 @@
         <section class="wa-side">
             <div class="wa-side__header">
                 <h6 id="waSideTitle" class="mb-0">Minhas Vendas</h6>
-                <button type="button" class="btn-close ms-auto" aria-label="Fechar e voltar ao início"
-                        onclick="window.goHome(); window.updateMobileNavActive('eletronicos');"></button>
+                <button type="button" class="ml-auth-close ms-auto" aria-label="Fechar e voltar ao início"
+                        onclick="window.goHome(); window.updateMobileNavActive('eletronicos');" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="wa-side__search">
                 <i class="bi bi-search"></i>
@@ -991,8 +955,8 @@
 
             <div id="waChatActive" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;">
                 <div class="chat-header-pro">
-                    <button type="button" class="chat-header-close d-lg-none" onclick="window.closeWaChat()" aria-label="Voltar" style="margin-right:4px;">
-                        <i class="bi bi-arrow-left"></i>
+                    <button type="button" class="ml-auth-close" onclick="window.closeWaChat()" aria-label="Fechar" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;flex-shrink:0;">
+                        <i class="bi bi-x-lg"></i>
                     </button>
                     <div class="chat-header-avatar-wrap">
                         <img id="chatPartnerAvatar" src="" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=User'">
@@ -1113,6 +1077,7 @@
                         <section class="wa-side">
                             <div class="wa-side__header">
                                 <h6 class="mb-0">Todas as Conversas</h6>
+                                <button type="button" class="ml-auth-close ms-auto" aria-label="Fechar" data-bs-dismiss="modal" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                             </div>
                             <div class="wa-side__search">
                                 <i class="bi bi-search"></i>
@@ -1173,8 +1138,8 @@
                 <!-- Etapa 2: chat do atendimento — ocupa a tela toda (ver #supportModalDialog.modal-fullscreen no CSS) -->
                 <div id="supportChatView" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;">
                     <div class="chat-header-pro">
-                        <button type="button" class="chat-header-close" onclick="window.closeSupportChatModal(); try { bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'))?.hide(); } catch(e){}" aria-label="Voltar" style="margin-right:4px;">
-                            <i class="bi bi-arrow-left"></i>
+                        <button type="button" class="ml-auth-close" onclick="window.closeSupportChatModal(); try { bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'))?.hide(); } catch(e){}" aria-label="Fechar" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;flex-shrink:0;">
+                            <i class="bi bi-x-lg"></i>
                         </button>
                         <div class="chat-header-avatar-wrap">
                             <i class="bi bi-headset support-chat-header-icon"></i>
