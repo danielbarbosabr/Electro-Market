@@ -1,4 +1,4 @@
-﻿@media (max-width: 576px) {
+@media (max-width: 576px) {
     #productsGrid,
     .products-grid-uniform {
         grid-template-columns: repeat(2, 1fr);
@@ -103,7 +103,7 @@
 @media (max-width: 768px) {
     .auth-wrapper {
         width: 100vw !important;
-        height: 100dvh !important; /* dVH é melhor para mobile Android/Chrome */
+        height: 100dvh !important; /* dVH � melhor para mobile Android/Chrome */
         max-width: 100% !important;
         max-height: 100% !important;
         border-radius: 0 !important;
@@ -117,48 +117,48 @@
     }
     .auth-column-form {
         width: 100% !important;
-        padding: 50px 20px 20px !important; /* Aumentado padding superior para dar espaço ao botão de fechar */
+        padding: 50px 20px 20px !important; /* Aumentado padding superior para dar espa�o ao bot�o de fechar */
         background: var(--card-bg) !important;
-        justify-content: flex-start !important; /* Alinha ao topo para evitar que o conteúdo suma em telas pequenas */
+        justify-content: flex-start !important; /* Alinha ao topo para evitar que o conte�do suma em telas pequenas */
         height: 100% !important;
-        overflow-y: auto !important; /* Habilita scroll para formulários longos como o de Cadastro */
+        overflow-y: auto !important; /* Habilita scroll para formul�rios longos como o de Cadastro */
         -webkit-overflow-scrolling: touch;
     }
     .auth-content {
-        position: absolute !important; /* Volta para absolute para as telas não empilharem */
+        position: absolute !important; /* Volta para absolute para as telas n�o empilharem */
         inset: 0 !important;
         flex-direction: column !important;
     }
     .auth-close-btn {
-        position: fixed !important; /* Muda de absolute para fixed para ignorar o scroll do formulário */
+        position: fixed !important; /* Muda de absolute para fixed para ignorar o scroll do formul�rio */
         top: 20px !important; 
         right: 15px !important;
         background: transparent !important; /* Remove o fundo circular (a bolota) */
-        width: 44px !important; /* Mantém área de clique boa para o polegar */
+        width: 44px !important; /* Mant�m �rea de clique boa para o polegar */
         height: 44px !important;
         border-radius: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        z-index: 999999 !important; /* Z-index máximo para garantir que fique no topo de tudo */
+        z-index: 999999 !important; /* Z-index m�ximo para garantir que fique no topo de tudo */
         box-shadow: none !important; /* Remove a sombra da bolota */
         opacity: 1 !important;
         visibility: visible !important;
-        pointer-events: all !important; /* Força a detecção de clique */
+        pointer-events: all !important; /* For�a a detec��o de clique */
         cursor: pointer !important;
         display: flex !important;
     }
 
     .auth-close-btn i, 
     .auth-close-btn img {
-        display: block !important; /* Mostra o ícone original novamente */
+        display: block !important; /* Mostra o �cone original novamente */
         filter: none !important; 
         color: #ff0000 !important; /* Define a cor do X como vermelho */
-        font-size: 2rem !important; /* Ajusta o tamanho do ícone */
-        pointer-events: none !important; /* O clique deve passar para o botão pai */
+        font-size: 2rem !important; /* Ajusta o tamanho do �cone */
+        pointer-events: none !important; /* O clique deve passar para o bot�o pai */
     }
     .login-icon-v3 {
-        width: 100px; /* Reduzido levemente para economizar espaço vertical */
+        width: 100px; /* Reduzido levemente para economizar espa�o vertical */
         height: 100px;
         margin-top: 5px;
         margin-bottom: 5px;
@@ -170,7 +170,7 @@
         margin-bottom: 10px !important;
         padding: 8px 12px !important; /* Inputs um pouco mais compactos no mobile */
     }
-    /* Remove animações de deslocamento horizontal que causam "pulos" na visualização mobile */
+    /* Remove anima��es de deslocamento horizontal que causam "pulos" na visualiza��o mobile */
     body.sign-in-js .first-content .second-column,
     body.sign-up-js .second-content .second-column {
         animation: none !important;
@@ -233,12 +233,12 @@
 }
 
 /* ============================================================
-   AJUSTES DE CHAT NA VERSÃO MOBILE
-   Cabeçalho, balões, barra de input e telas cheias (admin /
+   AJUSTES DE CHAT NA VERS�O MOBILE
+   Cabe�alho, bal�es, barra de input e telas cheias (admin /
    suporte) adaptados para telas estreitas (celular).
    ============================================================ */
 @media (max-width: 768px) {
-    /* Cabeçalho do chat: menos padding/gap pra caber avatar + nome + botões */
+    /* Cabe�alho do chat: menos padding/gap pra caber avatar + nome + bot�es */
     .chat-header-pro {
         gap: 8px;
         padding: 10px 12px;
@@ -250,8 +250,8 @@
     .chat-header-name {
         font-size: 0.92rem;
     }
-    /* A sub-linha (ex: "Comprador ↔ Vendedor · #ABC123 · N mensagens") corta
-       com ellipsis em vez de estourar o cabeçalho em telas de 360px. */
+    /* A sub-linha (ex: "Comprador ? Vendedor � #ABC123 � N mensagens") corta
+       com ellipsis em vez de estourar o cabe�alho em telas de 360px. */
     .chat-header-order-id {
         white-space: nowrap;
         overflow: hidden;
@@ -265,7 +265,7 @@
     }
 
     /* Linhas da lista (pedidos / chamados) no mobile: texto de detalhe
-       corta com ellipsis em vez de empurrar os botões de ação p/ fora. */
+       corta com ellipsis em vez de empurrar os bot�es de a��o p/ fora. */
     .admin-row-info small {
         white-space: nowrap;
         overflow: hidden;
@@ -276,7 +276,7 @@
         flex-shrink: 0;
     }
 
-    /* Balões de mensagem: aproveita melhor a largura estreita */
+    /* Bal�es de mensagem: aproveita melhor a largura estreita */
     .chat-messages {
         padding: 0.65rem;
     }
@@ -284,7 +284,7 @@
         max-width: 85%;
     }
 
-    /* Barra de input: respiro no fundo p/ não colar no dock/home indicator */
+    /* Barra de input: respiro no fundo p/ n�o colar no dock/home indicator */
     .chat-input-bar,
     #supportChatInputBar {
         padding-bottom: max(10px, env(safe-area-inset-bottom));
@@ -293,7 +293,7 @@
     }
 
     /* Tela cheia do chat de pedido (admin unificado / vendedor): some com o
-       dock e garante altura total. O seletor da aba agora é #admin-support. */
+       dock e garante altura total. O seletor da aba agora � #admin-support. */
     body.admin-chat-fullscreen .main-footer-dock {
         display: none !important;
     }
@@ -304,7 +304,7 @@
         padding: 0 !important;
     }
 
-    /* Modal de suporte do usuário em tela cheia: desconta o header fixo e
+    /* Modal de suporte do usu�rio em tela cheia: desconta o header fixo e
        afasta a input bar da borda inferior segura. */
     body.support-chat-fullscreen {
         display: flex;
@@ -316,13 +316,31 @@
         display: none !important;
     }
     #supportModalDialog.modal-fullscreen {
-        margin-top: var(--header-height, 92px) !important;
-        height: calc(100% - var(--header-height, 92px)) !important;
+        margin-top: var(--header-height, 64px) !important;
+        height: calc(100dvh - var(--header-height, 64px)) !important;
     }
-    /* Em mobile o header fixo é mais curto: reduz o --header-height pra o
-       modal de suporte não ficar com folga excessiva embaixo. */
+    /* Em mobile o header fixo � mais curto: reduz o --header-height pra o
+       modal de suporte n�o ficar com folga excessiva embaixo. */
     :root {
         --header-height: 64px;
+    }
+
+    /* Android: quando o teclado abrir, garante que a barra de input
+       fique vis�vel e o modal n�o quebre o layout */
+    #supportChatInputBar {
+        position: sticky;
+        bottom: 0;
+        background: inherit;
+        z-index: 10;
+    }
+    #supportChatInputBar.modal-footer {
+        border-radius: 0;
+    }
+    .support-chat-messages {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 }
 
@@ -331,7 +349,33 @@
     .chat-message { max-width: 90%; }
     .chat-input-bar,
     #supportChatInputBar { padding-top: 8px; }
-    /* Lista de contatos do chat cliente↔vendedor: nomes e avatares compactos */
+    /* Lista de contatos do chat cliente?vendedor: nomes e avatares compactos */
     .wa-side__item { padding: 8px 10px; }
     .wa-side__avatar { width: 38px; height: 38px; }
+
+    /* Card de loja encontrada na busca no mobile */
+    .storefront-banner-content {
+        padding: 10px 12px;
+        padding-top: 50px;
+        gap: 10px;
+        min-height: 100px;
+    }
+    .storefront-banner-avatar {
+        width: 44px;
+        height: 44px;
+    }
+    .storefront-banner:not(:has(.storefront-banner-bg)) .storefront-banner-content {
+        padding-top: 10px;
+    }
+    .storefront-banner:not(:has(.storefront-banner-bg)) .storefront-banner-avatar {
+        width: 40px;
+        height: 40px;
+    }
+    .storefront-banner-name {
+        font-size: 0.88rem;
+    }
+    .storefront-banner-visit-btn {
+        font-size: 0.75rem;
+        padding: 5px 12px;
+    }
 }

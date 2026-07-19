@@ -71,3 +71,14 @@ alter table public.avaliacoes add column if not exists videos jsonb default '[]'
 -- ---------- ÍNDICES ----------
 create index if not exists idx_users_email        on public.users (email);
 create index if not exists idx_notifications_user on public.notifications (user_id);
+
+-- ---------- CONDIÇÃO DO PRODUTO (Novo/Usado/Recondicionado) ----------
+-- A condição é guardada como um prefixo na própria descrição, ex: "[Novo] descrição...".
+-- Produtos criados antes desse campo existir não têm esse prefixo, então o selo
+-- de condição não aparece nos cards. Este UPDATE marca esses produtos antigos como
+-- "Novo" por padrão (ajuste para 'Usado' antes de rodar, se preferir outro padrão).
+-- Depois disso, qualquer vendedor pode editar o produto e corrigir a condição real.
+update public.products
+set descricao = '[Novo] ' || descricao
+where descricao is not null
+  and descricao !~ '^\[(Novo|Usado|Recondicionado)\]';

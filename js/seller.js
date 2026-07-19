@@ -767,28 +767,40 @@ window.sendChatMessage = async function(event) {
 window.sendChatImage = async function(urlParam) {
     const rawUrl = urlParam;
     if (!rawUrl || !rawUrl.startsWith('http')) {
-        showToast("Link de imagem inválido!", "warning");
+        showToast("Link inválido!", "warning");
         return;
     }
 
     const url = normalizeImageUrl(rawUrl);
-
     const user = getSavedUser();
     if (!user || !currentChat) return;
-    
+
+    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+    const isGif = /\.gif$/i.test(url);
+
     try {
         const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-        const chat       = chatResult?.[0];
+        const chat = chatResult?.[0];
         if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
 
-        chat.messages.push({
+        const msg = {
             senderId: user.id, senderName: user.nome,
-            text: 'Imagem', image: url,
-            timestamp: new Date().toISOString(), type: 'image'
-        });
+            text: isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem'),
+            timestamp: new Date().toISOString()
+        };
+
+        if (isVideo) {
+            msg.type = 'video';
+            msg.video = url;
+        } else {
+            msg.type = 'image';
+            msg.image = url;
+        }
+
+        chat.messages.push(msg);
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         await loadChatMessages(currentChat);
-    } catch (e) { showToast('Erro ao processar o envio do link da imagem.', 'error'); }
+    } catch (e) { showToast('Erro ao processar o link.', 'error'); }
 };
 
 window.sendChatFile = async function(urlParam) {
@@ -837,7 +849,7 @@ window.setChatAttachType = function(type) {
         btn.classList.toggle('active', btn.dataset.attachType === type);
     });
     const input = document.getElementById('chatAttachLinkInput');
-    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem...' : 'Cole o link do arquivo...';
+    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem, vídeo ou GIF...' : 'Cole o link do documento...';
 };
 
 window.confirmChatAttach = async function() {
@@ -1313,7 +1325,7 @@ window.renderSellerPanel = async function() {
             <div class="col-12 text-center py-5">
                 <i class="bi bi-box-seam" style="font-size:3.5rem;color:#ccc;"></i>
                 <h5 class="mt-3">Você ainda não tem produtos</h5>
-                <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#announceModal">
+                <button class="btn btn-primary mt-2" onclick="window.showCreateAdPage()">
                     <i class="bi bi-plus-circle me-2"></i>Anunciar Produto
                 </button>
             </div>`;

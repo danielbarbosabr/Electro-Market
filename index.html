@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>ElectroMarket | Compra e Venda de Eletrônicos</title>
     <!-- Favicon do Site -->
     <link rel="icon" href="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" type="image/jpeg">
@@ -58,13 +58,13 @@
                             <i id="navUserIcon" class="bi bi-person-circle fs-5 text-white"></i>
                             <span id="navUserName" class="text-white fw-bold small">Usuário</span>
                         </div>
-                        <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-3" style="position:relative;">
                             <button class="btn btn-theme p-0 border-0 text-white" id="themeToggle" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
                             <a href="#" class="text-white text-decoration-none position-relative role-client" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
                                 <i class="bi bi-cart2 fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="cartBadgeDesktop" style="font-size: 0.6rem;">0</span>
                             </a>
-                            <a href="#" class="text-white text-decoration-none position-relative" title="Notificações" data-bs-toggle="modal" data-bs-target="#notificacoesModal">
+                            <a href="#" class="text-white text-decoration-none position-relative" title="Notificações" onclick="event.preventDefault();window.showNotifications()">
                                 <i class="bi bi-bell fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBadgeDesktop" style="font-size: 0.6rem;">0</span>
                             </a>
@@ -146,9 +146,9 @@
                         <a href="#" class="text-white text-decoration-none role-seller d-none" onclick="window.renderSellerPanel()">
                             <i class="bi bi-box-seam me-1"></i> <strong>Meus Produtos</strong>
                         </a>
-                        <a href="#" class="text-white text-decoration-none role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal()">
-                            <i class="bi bi-plus-circle me-1"></i> <strong>Vender Produto</strong>
-                        </a>
+<a href="#" class="text-white text-decoration-none role-seller d-none" onclick="window.showCreateAdPage()">
+    <i class="bi bi-plus-circle me-1"></i> <strong>Vender Produto</strong>
+</a>
                         <a href="#" class="text-white text-decoration-none role-seller d-none position-relative" onclick="window.renderOrderManagement('seller_requests')">
                             <i class="bi bi-bell me-1"></i> <strong>Solicitações</strong>
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="pendingBadgeNav" style="font-size: 0.6rem;">0</span>
@@ -160,6 +160,22 @@
                     </nav>
                 </div>
             </div>
+        </div>
+        <!-- Dropdown de notificações (fora do bloco d-none d-md-flex para funcionar também no mobile) -->
+        <div class="notif-dropdown" id="notifDropdown">
+            <div class="notif-dropdown-header">
+                <div class="notif-dropdown-title">
+                    <i class="bi bi-bell-fill"></i>
+                    <span>Notificações</span>
+                </div>
+                <div class="notif-dropdown-actions">
+                                        <button type="button" class="notif-dropdown-btn notif-dropdown-btn-danger" onclick="window.deleteAllNotifs()" title="Apagar todas"><i class="bi bi-trash3"></i></button>
+                    <button type="button" class="notif-dropdown-close" onclick="window.closeNotifications()">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="notif-dropdown-body" id="notificacoesList"></div>
         </div>
     </header>
 
@@ -611,6 +627,17 @@
                             <input type="text" class="form-control" id="prodTitle" placeholder="Título do anúncio" required>
                         </div>
                         <div class="mb-3">
+                            <select class="form-select" id="prodCondition" required>
+                                <option value="" selected disabled>Condição do produto</option>
+                                <option value="Novo">Novo</option>
+                                <option value="Usado - Como novo">Usado - Como novo</option>
+                                <option value="Usado - Bom estado">Usado - Bom estado</option>
+                                <option value="Usado - Estado regular">Usado - Estado regular</option>
+                                <option value="Para peças ou não funciona">Para peças ou não funciona</option>
+                                <option value="Recondicionado">Recondicionado</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <textarea class="form-control" id="prodDescription" placeholder="Descrição detalhada" rows="3" required></textarea>
                         </div>
                         <div class="row">
@@ -891,7 +918,7 @@
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none" onclick="window.renderSellerPanel(); window.closeMobileMenu();">
                     <i class="bi bi-box-seam"></i> <strong>Meus Produtos</strong>
                 </a>
-                <a href="#" class="list-group-item list-group-item-action role-seller d-none" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); window.closeMobileMenu();">
+                <a href="#" class="list-group-item list-group-item-action role-seller d-none" onclick="window.showCreateAdPage(); window.closeMobileMenu();">
                     <i class="bi bi-tag"></i> <strong>Vender Produto</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none d-flex justify-content-between align-items-center" onclick="window.renderOrderManagement('seller_requests'); window.closeMobileMenu();">
@@ -1009,10 +1036,13 @@
                 <div id="chatAttachPanel" class="p-3 bg-light border-top d-none">
                     <div class="d-flex gap-2 mb-2">
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
-                            <i class="bi bi-image me-1"></i>Imagem
+                            <i class="bi bi-play-circle me-1"></i>Mídia
                         </button>
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
-                            <i class="bi bi-file-earmark me-1"></i>Arquivo
+                            <i class="bi bi-file-earmark me-1"></i>Documentos
+                        </button>
+                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendChatLocation()">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
                         </button>
                     </div>
                     <div class="input-group input-group-sm mb-2">
@@ -1171,10 +1201,13 @@
                     <div id="supportChatAttachPanel" class="p-3 bg-light border-top d-none">
                         <div class="d-flex gap-2 mb-2">
                             <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setSupportAttachType('image')">
-                                <i class="bi bi-image me-1"></i>Imagem
+                                <i class="bi bi-play-circle me-1"></i>Mídia
                             </button>
                             <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setSupportAttachType('file')">
-                                <i class="bi bi-file-earmark me-1"></i>Arquivo
+                                <i class="bi bi-file-earmark me-1"></i>Documentos
+                            </button>
+                            <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendSupportChatLocation()">
+                                <i class="bi bi-geo-alt-fill me-1"></i>Endereço
                             </button>
                         </div>
                         <div class="input-group input-group-sm mb-2">
@@ -1244,20 +1277,6 @@
     </div>
 
     <!-- Modal Notificações -->
-    <div class="modal fade" id="notificacoesModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-bell-fill me-2"></i> Notificações</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-0">
-                    <div class="list-group list-group-flush" id="notificacoesList"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Offcanvas Editar Perfil -->
     <!-- Tela de Edição de Perfil — estilo "link in bio" (cartão central, seções em pílulas empilhadas) -->
     <div id="profileEditScreen" class="profile-links-screen d-none">
@@ -1423,7 +1442,7 @@
                 <a href="#" class="nav-item role-seller d-none" data-page="renderSellerPanel" onclick="window.renderSellerPanel(); updateMobileNavActive('renderSellerPanel')">
                     <i class="bi bi-box-seam"></i><span>Produtos</span>
                 </a>
-                <a href="#" class="nav-item role-seller d-none" data-page="announceModal" data-bs-toggle="modal" data-bs-target="#announceModal" onclick="window.resetAnnounceModal(); updateMobileNavActive('announceModal')">
+                <a href="#" class="nav-item role-seller d-none" data-page="createAd" onclick="window.showCreateAdPage(); updateMobileNavActive('createAd')">
                     <i class="bi bi-plus-circle"></i><span>Vender</span>
                 </a>
                 <a href="#" class="nav-item role-seller d-none" data-page="seller_sales" onclick="window.renderOrderManagement('seller_sales'); updateMobileNavActive('seller_sales')">

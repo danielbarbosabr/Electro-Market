@@ -68,8 +68,16 @@ function buildAdminProductsRows(products) {
 /** Monta as linhas da tabela de Usuários do painel admin — usada tanto na
  *  renderização inicial quanto pra atualizar só a tabela quando o admin pesquisa. */
 function buildAdminUsersRows(users, currentUserId) {
-    if (!users.length) return `<tr><td colspan="4" class="admin-table-empty">Nenhum usuário encontrado.</td></tr>`;
-    return users.map(u => `
+    if (!users.length) return `<tr><td colspan="6" class="admin-table-empty">Nenhum usuário encontrado.</td></tr>`;
+    return users.map(u => {
+        const idade = u.created_at ? (() => {
+            const dias = Math.floor((Date.now() - new Date(u.created_at).getTime()) / 86400000);
+            if (dias < 30) return `${dias}d`;
+            if (dias < 365) return `${Math.floor(dias / 30)}m`;
+            return `${Math.floor(dias / 365)}a`;
+        })() : '-';
+        const rating = u.avaliacao || u.rating || '-';
+        return `
         <tr>
             <td>
                 <div class="d-flex align-items-center gap-2">
@@ -78,6 +86,8 @@ function buildAdminUsersRows(users, currentUserId) {
                 </div>
             </td>
             <td class="text-muted">${u.email}</td>
+            <td class="text-muted">${idade}</td>
+            <td>${typeof rating === 'number' ? '<span class="admin-row-badge badge-open"><i class="bi bi-star-fill me-1" style="color:#f59f00;font-size:0.7rem"></i>' + rating.toFixed(1) + '</span>' : '-'}</td>
             <td><span class="admin-badge-tipo ${u.tipo==='ADMIN'?'tipo-admin':(u.tipo==='VENDEDOR'?'tipo-vendedor':'tipo-cliente')}">${u.tipo === 'ADMIN' ? 'Administrador' : (u.tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente')}</span></td>
             <td class="text-end">
                 ${u.id !== currentUserId ? `
@@ -86,7 +96,8 @@ function buildAdminUsersRows(users, currentUserId) {
                     </button>
                 ` : '<span class="admin-row-badge badge-muted">Você</span>'}
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 window.renderAdminPanel = async function() {
@@ -201,15 +212,20 @@ window.renderAdminPanel = async function() {
                                 <div class="admin-row">
                                     <img src="${safeParseImages(t.requester_avatar)[0] || ('https://ui-avatars.com/api/?name=' + encodeURIComponent((t.requester_name || '?').slice(0,2)) + '&background=e50914&color=fff&size=40')}" class="admin-row-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
                                     <div class="admin-row-info">
-                                        <strong>${SUPPORT_CATEGORY_LABELS[t.category] || t.subject || 'Chamado'}</strong>
+                                        <strong>${getTicketLabel(t)}</strong>
                                         <small>${t.requester_name || 'Visitante'}</small>
                                     </div>
                                     <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}">${t.status === 'closed' ? 'Encerrado' : 'Aberto'}</span>
                                 </div>`).join('') || '<p class="text-muted small mb-0">Nenhum chamado ainda.</p>'}
                         </div>
 
-                        <h6 class="admin-section-subtitle"><i class="bi bi-bar-chart-line-fill me-2"></i>Relatórios</h6>
-                        <div class="admin-reports-grid">
+                        <header class="admin-topbar" style="margin-top:0.5rem">
+                            <div>
+                                <h4 class="fw-bold mb-0" style="font-size:1.1rem">Relatórios</h4>
+                                <small class="text-muted">Métricas e estatísticas da plataforma</small>
+                            </div>
+                        </header>
+                        <div class="admin-reports-grid" style="margin-top:0.75rem">
                             <div class="admin-card admin-chart-card">
                                 <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários por Tipo</h6>
                                 <div class="admin-chart-wrap"><canvas id="chartUsersType"></canvas></div>
@@ -231,6 +247,27 @@ window.renderAdminPanel = async function() {
                     </div>
 
                     <div class="admin-tab-panel" id="admin-content">
+                        <div class="admin-card" id="adminContentUsersCard">
+                            <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários <span class="admin-nav-count" id="adminContentUsersCount">${users.length}</span></h6>
+                            <div class="admin-table-wrap">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>E-mail</th>
+                                            <th>Idade da Conta</th>
+                                            <th>Avaliação</th>
+                                            <th>Tipo de Conta</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminUsersTableBody">
+                                        ${buildAdminUsersRows(users, user.id)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <div class="admin-card" id="adminContentProdsCard">
                             <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>Publicações <span class="admin-nav-count" id="adminContentProdsCount">${products.length}</span></h6>
                             <div class="admin-table-wrap">
@@ -249,29 +286,11 @@ window.renderAdminPanel = async function() {
                                 </table>
                             </div>
                         </div>
-
-                        <div class="admin-card" id="adminContentUsersCard">
-                            <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários <span class="admin-nav-count" id="adminContentUsersCount">${users.length}</span></h6>
-                            <div class="admin-table-wrap">
-                                <table class="admin-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Usuário</th>
-                                            <th>E-mail</th>
-                                            <th>Tipo de Conta</th>
-                                            <th class="text-end">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="adminUsersTableBody">
-                                        ${buildAdminUsersRows(users, user.id)}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="admin-tab-panel" id="admin-cats">
                         <div class="admin-card">
+                            <h6 class="admin-card-title"><i class="bi bi-tags-fill me-2"></i>Categorias Ativas</h6>
                             ${categorias.map(cat => `
                                 <div class="admin-row">
                                     <div class="admin-row-icon"><i class="bi bi-tag-fill"></i></div>
@@ -279,6 +298,13 @@ window.renderAdminPanel = async function() {
                                     <span class="admin-row-badge badge-muted">${products.filter(p => p.categoria === cat).length} anúncios</span>
                                 </div>
                             `).join('')}
+                        </div>
+
+                        <div class="admin-card mt-3" id="adminPendingCatsCard">
+                            <h6 class="admin-card-title"><i class="bi bi-hourglass-split me-2"></i>Categorias Pendentes <span class="admin-nav-count" id="pendingCatsCount">0</span></h6>
+                            <div id="adminPendingCatsList">
+                                <p class="text-muted small">Nenhuma sugestão pendente.</p>
+                            </div>
                         </div>
                     </div>
 
@@ -289,6 +315,9 @@ window.renderAdminPanel = async function() {
             </div>`;
 
         showAdminTopNavTabs(tabCounts);
+
+        // Popula categorias pendentes
+        renderPendingCategories();
 
         // Guarda os dados carregados pra alimentar os gráficos (usados aqui
         // mesmo, dentro da aba "Início" — só constrói quando o canvas estiver
@@ -697,32 +726,62 @@ window.adminDeleteProduct = async function(pid, title) {
 window.adminEditProduct = function(pid) {
     const p = window._adminProductsCache?.find(x => x.id === pid) || allProductsCache.find(x => x.id === pid);
     if (!p) { showToast('Produto não encontrado.', 'error'); return; }
+    window.showCreateAdPage(pid, true);
+};
 
-    document.getElementById('prodTitle').value          = p.titulo;
-    document.getElementById('prodDescription').value     = p.descricao;
-    document.getElementById('prodPrice').value           = p.preco;
-    document.getElementById('prodQuantity').value        = p.quantidade;
-    document.getElementById('prodPrecoOriginal').value   = '';
-    document.getElementById('prodCategory').value        = p.categoria;
-    document.getElementById('prodDelivery').checked      = !!(p.realiza_entrega ?? p.realizaEntrega ?? p.realizaentrega ?? true);
-    document.getElementById('announceForm').dataset.editingId  = p.id;
-    document.getElementById('announceForm').dataset.adminEdit  = 'true';
-
-    for (let n = 1; n <= 3; n++) {
-        const el = document.getElementById(`prodLink${n}`);
-        if (el) el.value = '';
+/** Renderiza a lista de categorias pendentes no painel admin */
+function renderPendingCategories() {
+    const container = document.getElementById('adminPendingCatsList');
+    if (!container) return;
+    const pendentes = JSON.parse(localStorage.getItem('emCategoriasPendentes') || '[]');
+    const countEl = document.getElementById('pendingCatsCount');
+    if (countEl) countEl.textContent = pendentes.length;
+    if (pendentes.length === 0) {
+        container.innerHTML = '<p class="text-muted small">Nenhuma sugestão pendente.</p>';
+        return;
     }
-    safeParseImages(p.img).forEach((url, i) => {
-        const el = document.getElementById(`prodLink${i + 1}`);
-        if (el) el.value = url;
-    });
+    container.innerHTML = pendentes.map((p, i) => `
+        <div class="admin-row">
+            <div class="admin-row-icon"><i class="bi bi-tag"></i></div>
+            <div class="admin-row-info">
+                <strong>${p.nome}</strong>
+                <small>Sugerido por ${p.sugeridoPor} em ${new Date(p.data).toLocaleDateString('pt-BR')}</small>
+            </div>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-success" onclick="window.aprovarCategoria(${i})" title="Aprovar"><i class="bi bi-check-lg"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="window.rejeitarCategoria(${i})" title="Recusar"><i class="bi bi-x-lg"></i></button>
+            </div>
+        </div>
+    `).join('');
+}
 
-    const modalTitle = document.querySelector('#announceModal .modal-title');
-    const submitBtn  = document.querySelector('#announceForm button[type="submit"]');
-    if (modalTitle) modalTitle.textContent = `Editar Anúncio (Admin) — loja ${p.loja || ''}`;
-    if (submitBtn)  submitBtn.textContent  = 'Salvar Alterações';
+window.aprovarCategoria = function(index) {
+    const pendentes = JSON.parse(localStorage.getItem('emCategoriasPendentes') || '[]');
+    const item = pendentes[index];
+    if (!item) return;
+    const aprovadas = JSON.parse(localStorage.getItem('emCategoriasAprovadas') || '[]');
+    if (!aprovadas.includes(item.nome)) aprovadas.push(item.nome);
+    localStorage.setItem('emCategoriasAprovadas', JSON.stringify(aprovadas));
+    pendentes.splice(index, 1);
+    localStorage.setItem('emCategoriasPendentes', JSON.stringify(pendentes));
+    showToast(`Categoria "${item.nome}" aprovada!`, 'success');
+    renderPendingCategories();
+    // Recarrega o select de categorias se a página de criação estiver aberta
+    const catSelect = document.getElementById('caCategory');
+    if (catSelect && document.querySelector('.create-ad-active')) {
+        const selected = catSelect.value;
+        catSelect.innerHTML = renderCategoriaOptions(selected);
+    }
+};
 
-    new bootstrap.Modal(document.getElementById('announceModal')).show();
+window.rejeitarCategoria = function(index) {
+    const pendentes = JSON.parse(localStorage.getItem('emCategoriasPendentes') || '[]');
+    const item = pendentes[index];
+    if (!item) return;
+    pendentes.splice(index, 1);
+    localStorage.setItem('emCategoriasPendentes', JSON.stringify(pendentes));
+    showToast(`Categoria "${item.nome}" recusada.`, 'warning');
+    renderPendingCategories();
 };
 
 /**
@@ -1436,7 +1495,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
                 id: t.id,
                 type: 'ticket',
                 name: t.requester_name || 'Visitante',
-                subname: `${SUPPORT_CATEGORY_LABELS[t.category] || t.subject || 'Chamado'} · ${roleLabel}`,
+                subname: `${getTicketLabel(t)} · ${roleLabel}`,
                 avatar: t.requester_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((t.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=45`,
                 lastMsg: lastMsg?.text || (lastMsg?.image ? '[Imagem]' : ''),
                 lastTime: lastMsg?.timestamp || '',
@@ -1678,7 +1737,7 @@ window.adminSupportSelect = async function(id, type) {
                 || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
             const msgCount = (ticket.messages || []).filter(m => m.type !== 'system').length;
             const roleLabel = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
-            const reasonLabel = SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado';
+            const reasonLabel = getTicketLabel(ticket);
 
             activeChatEl.innerHTML = `
                 <div class="chat-header-pro">
@@ -2349,6 +2408,11 @@ const SUPPORT_CATEGORY_LABELS = {
     outro:                     'Outro assunto'
 };
 
+/** Retorna o label legível de um chamado de suporte: categoria → assunto → primeira mensagem → fallback */
+function getTicketLabel(t) {
+    return SUPPORT_CATEGORY_LABELS[t?.category] || t?.subject || t?.messages?.[0]?.text || 'Chamado';
+}
+
 /** Converte a linha crua de `chats` (com a mensagem de metadados embutida) num objeto de chamado "achatado" e fácil de usar na UI */
 function normalizeTicket(raw) {
     if (!raw) return null;
@@ -2663,6 +2727,36 @@ window.closeSupportChatModal = function() {
     stopSupportChatPolling();
 };
 
+/** Corrige a visualização do chat de suporte no Android: quando o teclado
+ *  abre, garante que a barra de input continue visível e o modal se ajuste. */
+function bindSupportChatKeyboardFix() {
+    const input = document.getElementById('supportChatInput');
+    if (!input) return;
+    const onFocus = () => {
+        setTimeout(() => {
+            const bar = document.getElementById('supportChatInputBar');
+            if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 300);
+    };
+    input.addEventListener('focus', onFocus);
+    // visualViewport resize: o teclado do Android muda o viewport
+    if (window.visualViewport) {
+        const onResize = () => {
+            if (document.activeElement === input) {
+                const bar = document.getElementById('supportChatInputBar');
+                if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        };
+        window.visualViewport.addEventListener('resize', onResize);
+    }
+}
+// Executa depois que o DOM estiver pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindSupportChatKeyboardFix);
+} else {
+    bindSupportChatKeyboardFix();
+}
+
 async function loadMySupportTicket(ticketId, silent = false) {
     const container = document.getElementById('supportChatMessages');
     if (!container) return;
@@ -2699,14 +2793,14 @@ async function loadMySupportTicket(ticketId, silent = false) {
         if (statusBar) {
             statusBar.innerHTML = ticket.status === 'closed'
                 ? '<span class="admin-row-badge badge-muted"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>'
-                : `<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>${SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado'}</span>`;
+                : `<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>${getTicketLabel(ticket)}</span>`;
         }
 
         const headerStatus = document.getElementById('supportChatHeaderStatus');
         if (headerStatus) {
             headerStatus.textContent = ticket.status === 'closed'
                 ? 'Atendimento encerrado'
-                : (SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Suporte ao cliente');
+                : (getTicketLabel(ticket) || 'Suporte ao cliente');
         }
 
         const ticketSummary = document.getElementById('supportChatTicketSummary');
@@ -2996,7 +3090,7 @@ window.adminViewTicket = async function(ticketId) {
         grid.className = 'admin-panel-active';
         const msgCount   = (ticket.messages || []).filter(m => m.type !== 'system').length;
         const roleLabel  = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
-        const reasonLabel = SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.subject || 'Chamado';
+        const reasonLabel = getTicketLabel(ticket);
 
         grid.innerHTML = `
             <div class="admin-standalone-page">

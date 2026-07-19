@@ -42,6 +42,19 @@ const ORDER_STATUS_MAP = {
     'dispute':         { text: 'Em Disputa',               class: 'bg-danger' }
 };
 
+const CONDICOES_PRODUTO = ['Novo', 'Usado - Como novo', 'Usado - Bom estado', 'Usado - Estado regular', 'Para peças ou não funciona', 'Recondicionado'];
+const REGEX_CONDICAO = new RegExp(`^\\[(${CONDICOES_PRODUTO.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\]\\s*`);
+function condToClass(c) {
+    return c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+function renderCondicoesOptions(selected) {
+    let h = '<option value="">Selecione a condição</option>';
+    CONDICOES_PRODUTO.forEach(c => {
+        h += `<option value="${c}"${c === selected ? ' selected' : ''}>${c}</option>`;
+    });
+    return h;
+}
+
 // ============================================
 // SISTEMA DE TOAST (substitui alerts)
 // ============================================
@@ -157,6 +170,10 @@ window.exitWaOrdersView = function() {
 };
 
 async function loadPage(query = 'eletronicos', forceRefresh = false) {
+    // Limpa hash de produto ao navegar
+    if (window.location.hash.startsWith('#/produto/')) {
+        history.pushState(null, '', window.location.pathname + window.location.search);
+    }
     const grid = document.getElementById('productsGrid');
     const user = getSavedUser();
     const role = user?.tipo || 'CLIENTE';
@@ -313,6 +330,9 @@ window.adminSearchProducts = async function(term) {
 
 window.goHome = function() {
     const user = getEffectiveUser();
+    if (window.location.hash.startsWith('#/produto/')) {
+        history.pushState(null, '', window.location.pathname + window.location.search);
+    }
     if (user?.tipo === 'ADMIN') {
         window.renderAdminPanel();
     } else {
@@ -449,6 +469,8 @@ function renderCard(item) {
     const temOferta   = !!(item.preco_original && parseFloat(item.preco_original) > parseFloat(preco));
     const descontoPct = temOferta ? Math.round(100 - (preco / parseFloat(item.preco_original)) * 100) : 0;
 
+    const condMatch = (item.descricao || '').match(REGEX_CONDICAO);
+
     return `
         <div class="card product-card-ml" onclick="window.showDetail('${pid}')">
             ${temOferta ? `<div class="offer-badge-ml">${descontoPct}% OFF</div>` : ''}
@@ -469,6 +491,7 @@ function renderCard(item) {
             </div>
             <div class="card-body product-card-body">
                 <h6 class="product-title-grid">${item.titulo}</h6>
+                ${condMatch ? `<span class="ml-cond-badge ml-cond-${condToClass(condMatch[1])}">${condMatch[1]}</span>` : ''}
                 <div class="current-price">
                     ${temOferta
                         ? `<div class="price-old-line text-muted text-decoration-line-through" style="font-size:0.75rem;font-weight:normal;">
@@ -478,7 +501,6 @@ function renderCard(item) {
                     }
                     <div class="price-main-line">
                         <span class="price-main-text">${precoFormatado}</span>
-                        ${temOferta ? `<span class="offer-pct-inline">${descontoPct}% OFF</span>` : ''}
                     </div>
                 </div>
                 <div class="${realizaEntrega ? 'text-success' : 'text-muted'} delivery-line fw-bold mt-2">
@@ -552,39 +574,43 @@ function updateCategoryFilterUI() {
 }
 
 /**
- * Mostra um pequeno "cartão de loja encontrada" acima dos resultados de busca
- * quando o termo digitado bate com o nome de um ou mais vendedores — igual ao
- * atalho de loja que aparece na busca do Mercado Livre/Shopee.
+ * Mostra o cartão de loja encontrada na busca: banner, foto e dados do
+ * vendedor. Ao clicar leva para os anúncios dele (showSellerProfile).
  */
 async function renderStorefrontBanner(stores) {
     const container = document.getElementById('storefrontBanner');
     if (!container) return;
     if (!stores || stores.length === 0) { container.innerHTML = ''; return; }
 
-    // Busca banner de cada loja a partir do campo avatar (array [avatar, banner])
     const storeIds = stores.map(s => s.vendedor_id).join(',');
-    let bannersMap = {};
+    let usersMap = {};
     try {
         const usersData = await supabaseFetch(`users?select=id,avatar&id=in.(${storeIds})`);
         if (usersData) {
             usersData.forEach(u => {
-                const { banner } = splitAvatarField(u.avatar);
-                if (banner) bannersMap[u.id] = banner;
+                const { avatar, banner } = splitAvatarField(u.avatar);
+                usersMap[u.id] = { avatar, banner };
             });
         }
     } catch(e) {}
 
     container.innerHTML = stores.map(s => {
-        const banner = bannersMap[s.vendedor_id] || '';
+        const user   = usersMap[s.vendedor_id] || {};
+        const banner = user.banner || '';
+        const avatar = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((s.loja||'L').slice(0,2))}&background=2dcc71&color=fff&size=80`;
         return `
         <div class="storefront-banner" onclick="window.showSellerProfile('${s.vendedor_id}', '${(s.loja||'').replace(/'/g,"\\'")}')">
-            ${banner ? `<div class="storefront-banner-thumb"><img src="${banner}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'"></div>` : ''}
-            <div class="storefront-banner-icon"><i class="bi bi-shop"></i></div>
-            <div class="storefront-banner-info">
-                <strong>${s.loja}</strong>
-                <small>Ver todos os anúncios desta loja</small>
+            ${banner ? `<div class="storefront-banner-bg"><img src="${banner}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'"></div>` : ''}
+            <div class="storefront-banner-content">
+                <img src="${avatar}" class="storefront-banner-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=2dcc71&color=fff&size=80'">
+                <div class="storefront-banner-info">
+                    <strong class="storefront-banner-name">${s.loja}</strong>
+                    <span class="storefront-banner-badge">Loja Oficial</span>
+                </div>
+                <div class="storefront-banner-actions">
+                    <span class="storefront-banner-visit-btn">Visitar Loja <i class="bi bi-arrow-right"></i></span>
+                </div>
             </div>
-            <i class="bi bi-chevron-right storefront-banner-arrow"></i>
         </div>`;
     }).join('');
 }
@@ -630,32 +656,47 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
         const localizacao = [seller.cidade, seller.estado].filter(Boolean).join(' - ');
         const membroDesde = seller.created_at ? new Date(seller.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '';
         const { avatar: sellerAvatar, banner: sellerBanner } = splitAvatarField(seller.avatar);
-        const heroBg = sellerBanner ? `background-image:url('${sellerBanner}');background-size:cover;background-position:center;` : (sellerAvatar ? `background-image:url('${sellerAvatar}');background-size:cover;background-position:center;` : '');
 
         grid.innerHTML = `
-            <div class="seller-profile-page">
+            <div class="detail-page">
                 <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
                     <i class="bi bi-arrow-left"></i> Voltar
                 </button>
 
-                <div class="seller-profile-hero"${sellerBanner || sellerAvatar ? ` style="${heroBg}"` : ''}>
-                    <div class="seller-profile-hero-overlay${sellerBanner || sellerAvatar ? '' : ' no-banner'}">
-                        <img src="${sellerAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(nome)}" class="seller-profile-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
-                        <div class="seller-profile-info">
-                            <h4 class="fw-bold mb-1">${nome}</h4>
-                            <div class="mb-1">
-                                ${ratingCount > 0
-                                    ? `<span class="fw-bold">${ratingAvg.toFixed(1)}</span> <i class="bi bi-star-fill text-warning"></i> <span class="text-muted small">(${ratingCount} avaliaç${ratingCount === 1 ? 'ão' : 'ões'})</span>`
-                                    : `<span class="text-muted small">Ainda sem avaliações</span>`}
+                <div class="ml-store-card">
+                    <div class="ml-store-banner"${sellerBanner ? ` style="background-image:url('${sellerBanner}');"` : ''}>
+                        <div class="ml-store-banner-overlay">
+                            <div class="ml-store-header">
+                                <div class="ml-store-brand">
+                                    <div class="ml-store-avatar-wrap">
+                                        ${sellerAvatar
+                                            ? `<img src="${sellerAvatar}" class="ml-store-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=2dcc71&color=fff&size=80'">`
+                                            : `<div class="ml-store-avatar-placeholder"><i class="bi bi-shop"></i></div>`
+                                        }
+                                    </div>
+                                    <div class="ml-store-brand-info">
+                                        <h1 class="ml-store-name">${nome}</h1>
+                                        <div class="ml-store-badge">Loja Oficial</div>
+                                        <div class="ml-store-meta">
+                                            <span><i class="bi bi-star-fill text-warning"></i> ${ratingCount > 0 ? `${ratingAvg.toFixed(1)} (${ratingCount})` : 'Sem avaliações'}</span>
+                                            <span><i class="bi bi-geo-alt"></i> ${localizacao || 'Brasil'}</span>
+                                            <span><i class="bi bi-calendar3"></i> ${membroDesde ? `Desde ${membroDesde}` : ''}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ml-store-actions">
+                                    <button class="ml-store-btn ml-store-btn-share" onclick="const url=window.location.href;if(navigator.share){navigator.share({title:'${nome}',url}).catch(()=>{})}else{navigator.clipboard.writeText(url).then(()=>showToast('Link copiado!','success',2000))}"><i class="bi bi-share me-1"></i></button>
+                                </div>
                             </div>
-                            <small class="text-muted d-block">${localizacao ? `<i class="bi bi-geo-alt me-1"></i>${localizacao}` : ''}</small>
-                            ${membroDesde ? `<small class="text-muted d-block"><i class="bi bi-calendar3 me-1"></i>No ElectroMarket desde ${membroDesde}</small>` : ''}
-                            <small class="text-muted d-block"><i class="bi bi-box-seam me-1"></i>${products.length} anúncio${products.length === 1 ? '' : 's'} ativo${products.length === 1 ? '' : 's'}</small>
                         </div>
+                    </div>
+
+                    <div class="ml-store-nav">
+                        <span class="ml-store-nav-item-text">${products.length} anúncio${products.length === 1 ? '' : 's'}</span>
                     </div>
                 </div>
 
-                <h6 class="fw-bold mt-4 mb-3">Anúncios desta loja</h6>
+                <h6 class="fw-bold mt-4 mb-3">Todos os anúncios</h6>
                 <div class="products-grid-uniform" id="sellerProfileProductsGrid"></div>
             </div>`;
 
@@ -673,7 +714,537 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
     }
 };
 
-/** Remove acentos e normaliza caixa, para comparar nomes de cidade sem erro de digitação/acentuação */
+const CATEGORIAS_BASE = [
+    { label: 'Games', options: [
+        'Eletrônicos > Games > Consoles > PlayStation',
+        'Eletrônicos > Games > Consoles > Xbox',
+        'Eletrônicos > Games > Consoles > Nintendo',
+        'Eletrônicos > Games > Consoles > Portáteis',
+        'Eletrônicos > Games > Jogos > Mídia Física',
+        'Eletrônicos > Games > Jogos > Digital',
+        'Eletrônicos > Games > Acessórios > Controles',
+        'Eletrônicos > Games > Acessórios > Headsets',
+        'Eletrônicos > Games > Acessórios > Volantes',
+        'Eletrônicos > Games > Acessórios > Suportes e Bases',
+        'Eletrônicos > Games > PC Gamer > PCs Montados',
+        'Eletrônicos > Games > PC Gamer > Periféricos Gamer',
+        'Eletrônicos > Games > Realidade Virtual (VR)'
+    ]},
+    { label: 'Informática', options: [
+        'Eletrônicos > Informática > Notebooks > Básico',
+        'Eletrônicos > Informática > Notebooks > Gamer',
+        'Eletrônicos > Informática > Notebooks > Profissional',
+        'Eletrônicos > Informática > Computadores > Desktop',
+        'Eletrônicos > Informática > Computadores > All-in-One',
+        'Eletrônicos > Informática > Computadores > Mini PC',
+        'Eletrônicos > Informática > Componentes > Placa de Vídeo',
+        'Eletrônicos > Informática > Componentes > Processador',
+        'Eletrônicos > Informática > Componentes > Memória RAM',
+        'Eletrônicos > Informática > Componentes > SSD / HD',
+        'Eletrônicos > Informática > Componentes > Placa-mãe',
+        'Eletrônicos > Informática > Componentes > Fonte',
+        'Eletrônicos > Informática > Periféricos > Teclado',
+        'Eletrônicos > Informática > Periféricos > Mouse',
+        'Eletrônicos > Informática > Periféricos > Monitor',
+        'Eletrônicos > Informática > Periféricos > Webcam',
+        'Eletrônicos > Informática > Periféricos > Headset',
+        'Eletrônicos > Informática > Impressão > Impressoras',
+        'Eletrônicos > Informática > Impressão > Multifuncionais',
+        'Eletrônicos > Informática > Impressão > Suprimentos'
+    ]},
+    { label: 'Celulares e Tablets', options: [
+        'Eletrônicos > Celulares e Tablets > Smartphones',
+        'Eletrônicos > Celulares e Tablets > Tablets',
+        'Eletrônicos > Celulares e Tablets > Smartwatches',
+        'Eletrônicos > Celulares e Tablets > Acessórios > Capas',
+        'Eletrônicos > Celulares e Tablets > Acessórios > Películas',
+        'Eletrônicos > Celulares e Tablets > Acessórios > Carregadores',
+        'Eletrônicos > Celulares e Tablets > Acessórios > Cabos',
+        'Eletrônicos > Celulares e Tablets > Fones de Ouvido'
+    ]},
+    { label: 'TVs e Áudio', options: [
+        'Eletrônicos > TVs e Áudio > TVs > LED',
+        'Eletrônicos > TVs e Áudio > TVs > OLED',
+        'Eletrônicos > TVs e Áudio > TVs > QLED',
+        'Eletrônicos > TVs e Áudio > Áudio > Soundbar',
+        'Eletrônicos > TVs e Áudio > Áudio > Caixa de Som',
+        'Eletrônicos > TVs e Áudio > Áudio > Home Theater',
+        'Eletrônicos > TVs e Áudio > Projetores'
+    ]},
+    { label: 'Eletrodomésticos', options: [
+        'Eletrônicos > Eletrodomésticos > Geladeiras',
+        'Eletrônicos > Eletrodomésticos > Fogões',
+        'Eletrônicos > Eletrodomésticos > Cooktops',
+        'Eletrônicos > Eletrodomésticos > Micro-ondas',
+        'Eletrônicos > Eletrodomésticos > Lava e Seca',
+        'Eletrônicos > Eletrodomésticos > Lava-louças'
+    ]},
+    { label: 'Eletroportáteis', options: [
+        'Eletrônicos > Eletroportáteis > Cozinha > Air Fryer',
+        'Eletrônicos > Eletroportáteis > Cozinha > Liquidificador',
+        'Eletrônicos > Eletroportáteis > Cozinha > Cafeteira',
+        'Eletrônicos > Eletroportáteis > Cozinha > Batedeira',
+        'Eletrônicos > Eletroportáteis > Limpeza > Aspirador',
+        'Eletrônicos > Eletroportáteis > Limpeza > Robô Aspirador',
+        'Eletrônicos > Eletroportáteis > Cuidados Pessoais > Secador',
+        'Eletrônicos > Eletroportáteis > Cuidados Pessoais > Chapinha',
+        'Eletrônicos > Eletroportáteis > Cuidados Pessoais > Barbeador'
+    ]},
+    { label: 'Climatização', options: [
+        'Eletrônicos > Climatização > Ar-condicionado',
+        'Eletrônicos > Climatização > Ventiladores',
+        'Eletrônicos > Climatização > Aquecedores',
+        'Eletrônicos > Climatização > Umidificadores'
+    ]},
+    { label: 'Segurança e Automação', options: [
+        'Eletrônicos > Segurança e Automação > Câmeras',
+        'Eletrônicos > Segurança e Automação > Alarmes',
+        'Eletrônicos > Segurança e Automação > Sensores',
+        'Eletrônicos > Segurança e Automação > Fechaduras Digitais',
+        'Eletrônicos > Segurança e Automação > Casa Inteligente > Alexa / Google Home',
+        'Eletrônicos > Segurança e Automação > Casa Inteligente > Lâmpadas Smart',
+        'Eletrônicos > Segurança e Automação > Casa Inteligente > Tomadas Inteligentes'
+    ]},
+    { label: 'Automotivo', options: [
+        'Eletrônicos > Automotivo > Som Automotivo',
+        'Eletrônicos > Automotivo > Multimídia',
+        'Eletrônicos > Automotivo > Câmeras Veiculares',
+        'Eletrônicos > Automotivo > Carregadores'
+    ]},
+    { label: 'Câmeras e Drones', options: [
+        'Eletrônicos > Câmeras e Drones > Câmeras DSLR',
+        'Eletrônicos > Câmeras e Drones > Mirrorless',
+        'Eletrônicos > Câmeras e Drones > Drones',
+        'Eletrônicos > Câmeras e Drones > Acessórios'
+    ]},
+    { label: 'Redes e Conectividade', options: [
+        'Eletrônicos > Redes e Conectividade > Roteadores',
+        'Eletrônicos > Redes e Conectividade > Modems',
+        'Eletrônicos > Redes e Conectividade > Repetidores',
+        'Eletrônicos > Redes e Conectividade > Switches'
+    ]},
+    { label: 'Armazenamento', options: [
+        'Eletrônicos > Armazenamento > HD Externo',
+        'Eletrônicos > Armazenamento > SSD',
+        'Eletrônicos > Armazenamento > Pen Drive',
+        'Eletrônicos > Armazenamento > Cartão de Memória'
+    ]},
+    { label: 'Cabos e Energia', options: [
+        'Eletrônicos > Cabos e Energia > Cabos (HDMI, USB)',
+        'Eletrônicos > Cabos e Energia > Adaptadores',
+        'Eletrônicos > Cabos e Energia > Extensões',
+        'Eletrônicos > Cabos e Energia > Filtros de Linha'
+    ]}
+];
+
+/** Retorna todas as categorias (base + aprovadas) */
+function getCategorias() {
+    const aprovadas = JSON.parse(localStorage.getItem('emCategoriasAprovadas') || '[]');
+    const todas = [];
+    CATEGORIAS_BASE.forEach(g => {
+        todas.push(...g.options);
+    });
+    aprovadas.forEach(c => {
+        if (!todas.includes(c)) todas.push(c);
+    });
+    return todas;
+}
+
+/** Gera HTML do select de categorias */
+function renderCategoriaOptions(selected) {
+    const todas = getCategorias();
+    const grupos = {};
+    CATEGORIAS_BASE.forEach(g => { grupos[g.label] = [...g.options]; });
+    // Adiciona categorias aprovadas que não estão em nenhum grupo
+    const aprovadas = JSON.parse(localStorage.getItem('emCategoriasAprovadas') || '[]');
+    if (aprovadas.length) {
+        const extras = aprovadas.filter(c => !todas.some(t => t === c));
+        if (extras.length) grupos['Categorias Customizadas'] = extras;
+    }
+    let html = '<option value="" selected disabled>Selecione a categoria</option>';
+    Object.entries(grupos).forEach(([label, opts]) => {
+        html += `<optgroup label="${label}">`;
+        opts.forEach(o => {
+            html += `<option value="${o}"${o === selected ? ' selected' : ''}>${o.split(' > ').pop()}</option>`;
+        });
+        html += '</optgroup>';
+    });
+    return html;
+}
+
+// Handler do novo formulário fullscreen de criar anúncio
+async function handleCreateAdSubmit(e) {
+    e.preventDefault();
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+
+    const btn = e.target.querySelector('button[type="submit"]');
+    const orig = btn.textContent;
+
+    const titulo = document.getElementById('caTitle').value.trim();
+    if (!titulo) { showToast('O título do anúncio é obrigatório.', 'warning'); return; }
+
+    const condicao = document.getElementById('caCondition').value;
+    if (!condicao) { showToast('Selecione a condição do produto.', 'warning'); return; }
+
+    const descricao = document.getElementById('caDescription').value.trim();
+    if (!descricao) { showToast('A descrição do produto é obrigatória.', 'warning'); return; }
+
+    const precoInput = document.getElementById('caPrice').value;
+    const preco = parseFloat(precoInput);
+    const PRECO_MAXIMO = 10000000;
+    if (isNaN(preco) || preco < 0) { showToast('Preço inválido!', 'warning'); return; }
+    if (preco > PRECO_MAXIMO) { showToast(`Preço máximo é R$ ${PRECO_MAXIMO.toLocaleString('pt-BR')}.`, 'warning'); return; }
+
+    const quantidadeInput = document.getElementById('caQuantity').value;
+    const quantidade = parseInt(quantidadeInput);
+    if (isNaN(quantidade) || quantidade < 1) { showToast('Quantidade inválida!', 'warning'); return; }
+
+    const categoria = document.getElementById('caCategory').value;
+    if (!categoria) { showToast('Selecione uma categoria.', 'warning'); return; }
+
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Publicando...';
+
+        const now = new Date().toISOString();
+        const form = document.getElementById('createAdForm');
+        const editingId = form.dataset.editingId;
+        const isAdminEdit = form.dataset.adminEdit === 'true';
+        const produtoOriginal = editingId
+            ? (allProductsCache.find(p => p.id === editingId) || window._adminProductsCache?.find(p => p.id === editingId))
+            : null;
+
+        let imgsArray = [];
+        for (let n = 0; n <= 3; n++) {
+            const lInput = document.getElementById(`caFoto${n}`);
+            if (lInput && lInput.value.trim()) {
+                imgsArray.push(normalizeImageUrl(lInput.value.trim()));
+            }
+        }
+        if (imgsArray.length === 0 && editingId) {
+            imgsArray = safeParseImages(produtoOriginal?.img);
+        }
+
+        let precoOriginal = null;
+        if (editingId && produtoOriginal) {
+            const precoAnterior = parseFloat(produtoOriginal.preco);
+            if (precoAnterior && preco < precoAnterior) {
+                precoOriginal = precoAnterior;
+            }
+        }
+
+        const productData = {
+            titulo,
+            descricao: condicao ? `[${condicao}] ${descricao}` : descricao,
+            preco,
+            preco_original: precoOriginal,
+            quantidade, categoria,
+            img: JSON.stringify(imgsArray),
+            loja: isAdminEdit ? (produtoOriginal?.loja || user.nome) : user.nome,
+            vendedor_id: isAdminEdit ? (produtoOriginal?.vendedor_id || user.id) : user.id,
+            cidade: isAdminEdit ? (produtoOriginal?.cidade || '') : (user.cidade || ''),
+            realizaentrega: document.getElementById('caDelivery')?.checked ?? true,
+            updated_at: now
+        };
+
+        if (editingId) {
+            await supabaseFetch(`products?id=eq.${editingId}`, { method: 'PATCH', body: JSON.stringify(productData) });
+        } else {
+            productData.id = `prod_${Date.now()}`;
+            productData.created_at = now;
+            await supabaseFetch('products', { method: 'POST', body: JSON.stringify(productData) });
+        }
+
+        window.closeProductDetail();
+        if (isAdminEdit) {
+            delete form.dataset.adminEdit;
+            createPersistentNotification('Anúncio atualizado pelo administrador.', 'success');
+            window.renderAdminPanel();
+        } else {
+            await loadPage(undefined, true);
+            createPersistentNotification(editingId ? 'Seu anúncio foi atualizado.' : 'Novo anúncio publicado com sucesso!', 'success');
+        }
+    } catch (err) {
+        console.error(err);
+        const errorMsg = err.message || (typeof err === 'string' ? err : 'Verifique os campos e a conexão.');
+        showToast(`Erro ao publicar: ${errorMsg}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+}
+
+window.showCreateAdPage = function(editingId, isAdminEdit) {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+
+    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active') && !grid.classList.contains('create-ad-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    grid.className = 'create-ad-active';
+    grid.style.display = 'block';
+
+    const user = getSavedUser();
+    const isEditing = !!editingId;
+    const editLabel = isEditing ? 'Editar Anúncio' : 'Publicar Anúncio';
+
+    grid.innerHTML = `
+    <div class="detail-page">
+        <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+
+        <div class="create-ad-wrap">
+            <div class="create-ad-header">
+                <div>
+                    <h4>${isEditing ? 'Editar Anúncio' : 'Criar Anúncio'}</h4>
+                    <p class="text-muted small mb-0">Preencha os dados do produto para publicar na loja</p>
+                </div>
+            </div>
+
+            <form id="createAdForm" class="create-ad-form">
+                <!-- INFORMAÇÕES -->
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title">
+                        <i class="bi bi-info-circle-fill"></i>
+                        <span>Informações do Produto</span>
+                    </div>
+                    <div class="create-ad-section-body">
+                        <div class="mb-3">
+                            <label class="create-ad-label">Título do anúncio <span class="text-danger">*</span></label>
+                            <input type="text" class="create-ad-input" id="caTitle" placeholder="Ex: iPhone 14 128GB Novo Lacrado" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="create-ad-label">Condição <span class="text-danger">*</span></label>
+                                <select class="create-ad-input" id="caCondition" required>
+                                    ${renderCondicoesOptions()}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="create-ad-label">Descrição <span class="text-danger">*</span></label>
+                            <textarea class="create-ad-input create-ad-textarea" id="caDescription" placeholder="Descreva o produto com detalhes" rows="4" required></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PREÇO -->
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title">
+                        <i class="bi bi-cash-coin"></i>
+                        <span>Preço e Quantidade</span>
+                    </div>
+                    <div class="create-ad-section-body">
+                        <div class="create-ad-price-row">
+                            <div class="mb-3">
+                                <label class="create-ad-label">Preço (R$) <span class="text-danger">*</span></label>
+                                <input type="number" class="create-ad-input" id="caPrice" placeholder="0,00" min="0" step="0.01" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="create-ad-label">Quantidade <span class="text-danger">*</span></label>
+                                <input type="number" class="create-ad-input" id="caQuantity" placeholder="1" min="1" required>
+                            </div>
+                            <div class="d-flex align-items-center" style="padding-bottom:1px;">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="caDelivery" checked onchange="document.getElementById('caDeliveryLabel').textContent=this.checked?'Faço entrega':'Não realizo entregas'">
+                                    <label class="form-check-label small" for="caDelivery" id="caDeliveryLabel">Faço entrega</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CATEGORIA -->
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title">
+                        <i class="bi bi-tags-fill"></i>
+                        <span>Categoria</span>
+                    </div>
+                    <div class="create-ad-section-body">
+                        <div class="mb-3">
+                            <label class="create-ad-label">Categoria <span class="text-danger">*</span></label>
+                            <div class="ca-cat-search-wrap">
+                                <input type="text" class="create-ad-input" id="caCatSearch" placeholder="Digite para buscar uma categoria..." autocomplete="off">
+                                <i class="bi bi-search ca-cat-search-icon"></i>
+                            </div>
+                            <div class="ca-cat-list-wrap">
+                                <select class="create-ad-input" id="caCategory" size="6" required>
+                                    ${renderCategoriaOptions()}
+                                </select>
+                            </div>
+                            <div id="caSuggestCatWrap" class="ca-suggest-cat-wrap d-none">
+                                <hr class="my-2">
+                                <p class="small text-muted mb-1">Não encontrou a categoria ideal?</p>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" id="caSuggestCatInput" placeholder="Digite o nome da nova categoria">
+                                    <button type="button" class="btn btn-sm btn-ml-secondary" onclick="window.suggestCategory()">Sugerir</button>
+                                </div>
+                                <small class="text-muted">Sua sugestão será analisada pelo administrador.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FOTOS -->
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title">
+                        <i class="bi bi-images"></i>
+                        <span>Fotos do Produto</span>
+                    </div>
+                    <div class="create-ad-section-body">
+                        <div class="ca-fotos-info mb-2">
+                            <small class="text-muted">Adicione links das imagens (Imgur ou URL direta). A primeira será a foto principal.</small>
+                        </div>
+                        <button type="button" class="ml-btn ml-btn-outline btn-sm mb-2" style="width:auto;display:inline-flex;gap:6px;padding:8px 16px;font-size:0.82rem;" onclick="abrirUploadExterno()">
+                            <i class="bi bi-cloud-upload"></i> Subir imagens no Imgur
+                        </button>
+                        <div id="caFotosContainer">
+                            <div class="ca-foto-row" data-idx="0">
+                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto0" placeholder="Link da imagem principal">
+                                <div class="ca-foto-preview" id="caFotoPreview0"></div>
+                            </div>
+                            <div class="ca-foto-row" data-idx="1">
+                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto1" placeholder="Link da imagem 2">
+                                <div class="ca-foto-preview" id="caFotoPreview1"></div>
+                            </div>
+                            <div class="ca-foto-row" data-idx="2">
+                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto2" placeholder="Link da imagem 3">
+                                <div class="ca-foto-preview" id="caFotoPreview2"></div>
+                            </div>
+                            <div class="ca-foto-row" data-idx="3">
+                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto3" placeholder="Link da imagem 4">
+                                <div class="ca-foto-preview" id="caFotoPreview3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTÃO FIXO -->
+                <div class="create-ad-footer">
+                    <button type="button" class="ml-btn ml-btn-outline" onclick="window.closeProductDetail()">
+                        <i class="bi bi-x-lg me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" class="ml-btn ml-btn-primary">
+                        <i class="bi bi-check-lg me-2"></i>${editLabel}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+
+    // Inputs de foto com preview automático
+    document.querySelectorAll('.ca-foto-input').forEach(input => {
+        input.addEventListener('input', function() {
+            const idx = this.closest('.ca-foto-row').dataset.idx;
+            const preview = document.getElementById(`caFotoPreview${idx}`);
+            const url = this.value.trim();
+            if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                preview.innerHTML = `<img src="${normalizeImageUrl(url)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.closest('.ca-foto-preview').innerHTML='<i class=\\'bi bi-image text-muted\\' style=\\'font-size:1.5rem;\\'></i>'">`;
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+    });
+
+    // Busca de categorias
+    const catSearch = document.getElementById('caCatSearch');
+    const catSelect = document.getElementById('caCategory');
+    if (catSearch && catSelect) {
+        catSearch.addEventListener('input', function() {
+            const term = this.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            Array.from(catSelect.options).forEach(opt => {
+                if (!opt.value) return;
+                const text = opt.text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const val = opt.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const match = text.includes(term) || val.includes(term);
+                opt.style.display = term ? (match ? '' : 'none') : '';
+            });
+            // Mostra/esconde o link "sugerir categoria"
+            const suggestWrap = document.getElementById('caSuggestCatWrap');
+            const visibleCount = Array.from(catSelect.options).filter(o => o.style.display !== 'none' && o.value).length;
+            suggestWrap.classList.toggle('d-none', visibleCount > 0 || !term);
+        });
+    }
+
+    // Se for edição, carrega os dados
+    if (isEditing) {
+        const item = (allProductsCache.find(p => p.id === editingId) || window._adminProductsCache?.find(p => p.id === editingId));
+        if (item) {
+            document.getElementById('caTitle').value = item.titulo || '';
+            // Extrai condição do início da descrição: "[Novo] descricao..."
+            const descMatch = (item.descricao || '').match(REGEX_CONDICAO);
+            // Produtos antigos (criados antes desse campo existir) não têm a condição
+            // salva na descrição. Sem um valor padrão aqui, o <select> ficava vazio e o
+            // atributo "required" bloqueava o envio do formulário silenciosamente,
+            // impedindo a edição. Usamos "Novo" como padrão, e o vendedor pode ajustar.
+            document.getElementById('caCondition').value = descMatch ? descMatch[1] : 'Novo';
+            document.getElementById('caDescription').value = descMatch ? item.descricao.slice(descMatch[0].length) : (item.descricao || '');
+            document.getElementById('caPrice').value = item.preco || '';
+            document.getElementById('caQuantity').value = item.quantidade || '';
+            document.getElementById('caDelivery').checked = !!(item.realiza_entrega ?? item.realizaEntrega ?? item.realizaentrega ?? true);
+            if (item.categoria) {
+                const opt = catSelect.querySelector(`option[value="${item.categoria}"]`);
+                if (opt) { opt.selected = true; opt.scrollIntoView?.(); }
+            }
+            const imgs = safeParseImages(item.img);
+            imgs.forEach((url, i) => {
+                const el = document.getElementById(`caFoto${i}`);
+                if (el) {
+                    el.value = url;
+                    el.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+        document.getElementById('createAdForm').dataset.editingId = editingId;
+        if (isAdminEdit) {
+            document.getElementById('createAdForm').dataset.adminEdit = 'true';
+        }
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Garante que o submit handler está atrelado ao formulário
+    document.getElementById('createAdForm')?.addEventListener('submit', handleCreateAdSubmit);
+};
+
+/** Vendedor sugere uma nova categoria (vai para análise do admin) */
+window.suggestCategory = function() {
+    const input = document.getElementById('caSuggestCatInput');
+    const nome = input?.value.trim();
+    if (!nome) { showToast('Digite o nome da categoria.', 'warning'); return; }
+    const pendentes = JSON.parse(localStorage.getItem('emCategoriasPendentes') || '[]');
+    if (pendentes.some(p => p.nome.toLowerCase() === nome.toLowerCase())) {
+        showToast('Essa categoria já foi sugerida.', 'info');
+        input.value = '';
+        return;
+    }
+    const todas = getCategorias();
+    if (todas.some(c => c.toLowerCase() === nome.toLowerCase())) {
+        showToast('Essa categoria já existe!', 'info');
+        input.value = '';
+        return;
+    }
+    pendentes.push({ nome, data: new Date().toISOString(), sugeridoPor: getSavedUser()?.nome || 'Anônimo' });
+    localStorage.setItem('emCategoriasPendentes', JSON.stringify(pendentes));
+    showToast('Categoria sugerida! O administrador irá analisar.', 'success');
+    input.value = '';
+};
+
 function normalizeStr(s) {
     return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 }
@@ -871,7 +1442,11 @@ window.showDetail = async function(pid) {
 
     if (isOwner) {
         document.getElementById('prodTitle').value       = item.titulo;
-        document.getElementById('prodDescription').value = item.descricao;
+        const prodDescMatch = (item.descricao || '').match(REGEX_CONDICAO);
+        // Mesmo motivo do handleCreateAdSubmit: produto antigo sem condição salva
+        // deixava o select vazio e o "required" bloqueava o salvamento sem aviso nenhum.
+        document.getElementById('prodCondition').value = prodDescMatch ? prodDescMatch[1] : 'Novo';
+        document.getElementById('prodDescription').value = prodDescMatch ? item.descricao.slice(prodDescMatch[0].length) : (item.descricao || '');
         document.getElementById('prodPrice').value       = item.preco;
         document.getElementById('prodQuantity').value    = item.quantidade;
         // O campo de "preço original" não é mais preenchido manualmente pelo vendedor:
@@ -983,7 +1558,13 @@ window.showDetail = async function(pid) {
                 </div>
 
                 <div class="ml-panel-right">
-                    <div class="ml-condition">${item.categoria || 'Produto'}${totalSold > 0 ? ` | ${totalSold} vendido${totalSold > 1 ? 's' : ''}` : ''}</div>
+                    <div class="ml-condition">
+                    ${(() => {
+                        const cm = (item.descricao || '').match(REGEX_CONDICAO);
+                        return cm ? `<span class="ml-cond-badge ml-cond-${condToClass(cm[1])} me-2">${cm[1]}</span>` : '';
+                    })()}
+                    ${item.categoria || 'Produto'}${totalSold > 0 ? ` | ${totalSold} vendido${totalSold > 1 ? 's' : ''}` : ''}
+                </div>
 
                     <div class="ml-title-row">
                         <h1 class="ml-title">${item.titulo}</h1>
@@ -1014,7 +1595,7 @@ window.showDetail = async function(pid) {
                         <i class="bi bi-truck ml-shipping-check" style="color:#3483fa;"></i>
                         <div>
                             <span class="ml-shipping-title">Entrega disponível</span>
-                            <span class="ml-shipping-detail">Entrega em <strong>${regiaoEntrega}</strong></span>
+                            <span class="ml-shipping-detail"><a href="#" class="text-muted text-decoration-none" onclick="event.preventDefault();event.stopPropagation();window.openAddressMap('${regiaoEntrega.replace(/'/g, "\\'")}')">Entrega em <strong>${regiaoEntrega}</strong></a></span>
                         </div>
                     </div>
                     ` : `
@@ -1022,7 +1603,7 @@ window.showDetail = async function(pid) {
                         <i class="bi bi-geo-alt-fill" style="color:#e67e22;font-size:1.3rem;"></i>
                         <div>
                             <span class="ml-shipping-title" style="color:#e67e22;">Retirada no local</span>
-                            <span class="ml-shipping-detail">${sellerAddress}</span>
+                            <span class="ml-shipping-detail"><a href="#" class="text-decoration-none" style="color:#e67e22;" onclick="event.preventDefault();event.stopPropagation();window.openAddressMap('${sellerAddress.replace(/'/g, "\\'")}')">${sellerAddress}</a></span>
                         </div>
                     </div>
                     `}
@@ -1075,7 +1656,7 @@ window.showDetail = async function(pid) {
 
                 <div class="ml-panel-desc">
                     <h5 class="fw-bold">Descrição</h5>
-                    <p class="text-muted" style="line-height:1.7;white-space:pre-line;">${item.descricao || 'Sem descrição detalhada.'}</p>
+                    <p class="text-muted" style="line-height:1.7;white-space:pre-line;">${(item.descricao || '').replace(REGEX_CONDICAO, '') || 'Sem descrição detalhada.'}</p>
                 </div>
             </div>
 
@@ -1091,6 +1672,10 @@ window.showDetail = async function(pid) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     // Carrega avaliações do produto
     window.loadProductReviews(pid);
+    // Atualiza a URL para permitir compartilhamento
+    if (window.location.hash !== '#/produto/' + pid) {
+        history.pushState(null, '', '#/produto/' + pid);
+    }
 };
 
 /** Fecha a página de detalhes em tela cheia e restaura exatamente a tela anterior
@@ -1111,10 +1696,14 @@ window.closeProductDetail = function() {
     if (hero) hero.classList.toggle('d-none', state.heroHidden);
 
     window._preDetailState = null;
+    // Limpa a URL
+    if (window.location.hash.startsWith('#/produto/')) {
+        history.pushState(null, '', window.location.pathname + window.location.search);
+    }
 };
 
 window.prepareEditProduct = function(pid) {
-    new bootstrap.Modal(document.getElementById('announceModal')).show();
+    window.showCreateAdPage(pid);
 };
 
 // ============================================
@@ -1317,53 +1906,207 @@ async function loadNotifications() {
     if (container) {
         const notifs = displayNotifs;
             if (notifs.length === 0) {
-                container.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-bell-slash fs-1 d-block mb-2"></i>Nenhuma notificação</div>';
+                container.innerHTML = '<div class="notif-empty"><i class="bi bi-bell-slash"></i><span>Nenhuma notificação</span></div>';
             } else {
-                const icons = { 
-                    success: { icon: 'bi-check-circle-fill', color: 'text-success' }, 
-                    error:   { icon: 'bi-x-circle-fill', color: 'text-danger' }, 
-                    info:    { icon: 'bi-info-circle-fill', color: 'text-primary' }, 
-                    warning: { icon: 'bi-exclamation-triangle-fill', color: 'text-warning' } 
+                const icons = {
+                    success: { icon: 'bi-check-lg', bg: '#28a745' },
+                    error:   { icon: 'bi-x', bg: '#dc3545' },
+                    info:    { icon: 'bi-info', bg: '#3483fa' },
+                    warning: { icon: 'bi-exclamation', bg: '#e67e22' }
                 };
 
-                container.innerHTML = notifs.map(n => `
-                    <div class="list-group-item list-group-item-action border-start-0 border-end-0 py-3 ${n.read ? 'opacity-75' : 'bg-light fw-bold'}">
-                        <div class="d-flex align-items-center gap-3">
-                            <i class="bi ${(icons[n.type] || icons.info).icon} fs-4 ${(icons[n.type] || icons.info).color}"></i>
-                            <div class="flex-grow-1">
-                                <div class="small">${n.message}</div>
-                                <div class="text-muted" style="font-size: 0.65rem;">${new Date(n.created_at).toLocaleString('pt-BR')}</div>
-                            </div>
+                container.innerHTML = notifs.map((n, idx) => {
+                    const ico = icons[n.type] || icons.info;
+                    const lines = (n.message || '').split('\n');
+                    const title = lines[0] || '';
+                    const desc = lines.slice(1).join(' ') || '';
+                    const isUnread = !n.read;
+                    return `
+                    <div class="notif-item${isUnread ? ' notif-item-unread' : ''}" style="animation-delay:${idx * 0.03}s">
+                        <div class="notif-item-icon" style="background:${ico.bg};color:#fff">
+                            <i class="bi ${ico.icon}" style="color:#fff"></i>
                         </div>
-                    </div>
-                `).join('');
+                        <div class="notif-item-content">
+                            <div class="notif-item-title">${title || 'Notificação'}</div>
+                            ${desc ? `<div class="notif-item-desc">${desc}</div>` : ''}
+                            <div class="notif-item-time">${n.created_at ? new Date(n.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
+                        </div>
+                        <button type="button" class="notif-item-close" onclick="event.stopPropagation();window.deleteSingleNotif(${idx})" title="Remover">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>`;
+                }).join('');
             }
     }
     
-    if (badge) {
-        const unread = displayNotifs.filter(n => !n.read).length;
-        badge.textContent = unread;
-        badge.classList.toggle('d-none', unread === 0);
-    }
-    // Badge para o menu mobile "Mais"
-    const mobileBadge = document.getElementById('mobileNotifBadge');
-    if (mobileBadge) {
-        const unread = displayNotifs.filter(n => !n.read).length;
-        mobileBadge.textContent = unread;
-        mobileBadge.classList.toggle('d-none', unread === 0);
-    }
+    updateNotifBadges();
 }
 
 /**
- * Abre o painel de notificações e marca como lidas
+ * Abre/fecha o dropdown de notificações
  */
 window.showNotifications = async function() {
-    const modalEl = document.getElementById('notificacoesModal');
-    if (modalEl) {
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-        modal.show();
-        loadNotifications();
+    const dropdown = document.getElementById('notifDropdown');
+    if (!dropdown) return;
+    const isOpen = dropdown.classList.contains('notif-open');
+    if (isOpen) {
+        window.closeNotifications();
+        return;
     }
+    dropdown.classList.add('notif-open');
+    await loadNotifications();
+    const user = getSavedUser();
+    if (user && notificationsCache.length) {
+        const unread = notificationsCache.filter(n => !n.read);
+        if (unread.length) {
+            try {
+                await supabaseFetch(`notifications?user_id=eq.${user.id}&read=eq.false`, { method: 'PATCH', body: JSON.stringify({ read: true }) });
+            } catch(e) {}
+        }
+        notificationsCache.forEach(n => n.read = true);
+        localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+        updateNotifBadges();
+    }
+};
+
+window.closeNotifications = function() {
+    const dropdown = document.getElementById('notifDropdown');
+    if (dropdown) dropdown.classList.remove('notif-open');
+};
+
+        // Fecha o dropdown ao clicar fora
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('notifDropdown');
+    const bells = document.querySelectorAll('[onclick*="showNotifications"]');
+    if (dropdown && dropdown.classList.contains('notif-open') && !dropdown.contains(e.target) && !Array.from(bells).some(b => b.contains(e.target))) {
+        window.closeNotifications();
+    }
+});
+
+// Swipe gestures em mobile
+document.addEventListener('touchstart', function(e) {
+    const item = e.target.closest('.notif-item');
+    if (!item || window.innerWidth > 576) return;
+    const touch = e.changedTouches[0];
+    item._swipe = { startX: touch.clientX, startY: touch.clientY, currentX: touch.clientX, moved: false };
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+    const item = e.target.closest('.notif-item');
+    if (!item || !item._swipe) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - item._swipe.startX;
+    const dy = touch.clientY - item._swipe.startY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+        e.preventDefault();
+        item._swipe.moved = true;
+        item._swipe.currentX = touch.clientX;
+        item.style.transform = `translateX(${dx}px)`;
+        item.style.transition = 'none';
+        if (dx < -60) {
+            item.style.background = dx < -120 ? '#f8d7da' : 'var(--card-bg)';
+        } else if (dx > 60) {
+            item.style.background = dx > 120 ? '#d4edda' : 'var(--card-bg)';
+        } else {
+            item.style.background = 'var(--card-bg)';
+        }
+    }
+}, { passive: false });
+
+document.addEventListener('touchend', function(e) {
+    const item = e.target.closest('.notif-item');
+    if (!item || !item._swipe) return;
+    const dx = (e.changedTouches[0].clientX - item._swipe.startX);
+    item._swipe = null;
+    item.style.transition = 'transform .3s ease, background .3s ease';
+    item.style.transform = '';
+    item.style.background = '';
+    const idx = Array.from(item.parentNode.children).indexOf(item);
+    if (idx === -1) return;
+    if (dx < -100) {
+        item.style.transform = 'translateX(-120%)';
+        item.style.opacity = '0';
+        setTimeout(() => { window.deleteSingleNotif(idx); }, 250);
+    } else if (dx > 100) {
+        item.style.transform = 'translateX(120%)';
+        item.style.opacity = '0';
+        setTimeout(() => { window.toggleNotifRead(idx); }, 250);
+    }
+}, { passive: true });
+
+/** Alterna o menu de ações de uma notificação */
+window.toggleNotifMenu = function(btn) {
+    const menu = btn.nextElementSibling;
+    if (menu) menu.classList.toggle('open');
+};
+
+window.closeNotifMenu = function(el) {
+    const menu = el.closest('.notif-item-actions-menu');
+    if (menu) menu.classList.remove('open');
+};
+
+/** Marca/desmarca uma notificação como lida */
+window.toggleNotifRead = function(idx) {
+    const n = notificationsCache[idx];
+    if (!n) return;
+    n.read = !n.read;
+    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+    loadNotifications();
+    updateNotifBadges();
+};
+
+/** Exclui uma notificação individual */
+window.deleteSingleNotif = function(idx) {
+    const n = notificationsCache[idx];
+    if (!n) return;
+    notificationsCache.splice(idx, 1);
+    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+    // Tenta excluir do banco se tiver ID
+    const user = getSavedUser();
+    if (user && n.id) {
+        supabaseFetch(`notifications?id=eq.${n.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+    loadNotifications();
+    updateNotifBadges();
+};
+
+/** Marca todas como lidas */
+window.markAllRead = function() {
+    const user = getSavedUser();
+    if (user && notificationsCache.length) {
+        const unread = notificationsCache.filter(n => !n.read);
+        if (unread.length) {
+            supabaseFetch(`notifications?user_id=eq.${user.id}&read=eq.false`, { method: 'PATCH', body: JSON.stringify({ read: true }) }).catch(() => {});
+        }
+    }
+    notificationsCache.forEach(n => n.read = true);
+    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+    loadNotifications();
+    updateNotifBadges();
+    showToast('Todas as notificações marcadas como lidas.', 'success');
+};
+
+/** Exclui todas as notificações com confirmação */
+window.deleteAllNotifs = function() {
+    if (notificationsCache.length === 0) return;
+    if (!confirm('Tem certeza que deseja excluir todas as notificações?')) return;
+    const user = getSavedUser();
+    if (user) {
+        supabaseFetch(`notifications?user_id=eq.${user.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+    notificationsCache = [];
+    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
+    loadNotifications();
+    updateNotifBadges();
+    showToast('Todas as notificações foram excluídas.', 'info');
+};
+
+function updateNotifBadges() {
+    const unread = notificationsCache.filter(n => !n.read).length;
+    const badge = document.getElementById('notifBadgeDesktop');
+    if (badge) { badge.textContent = unread; badge.classList.toggle('d-none', unread === 0); }
+    const mobileBadge = document.getElementById('mobileNotifBadge');
+    if (mobileBadge) { mobileBadge.textContent = unread; mobileBadge.classList.toggle('d-none', unread === 0); }
 }
 
 function updateCartBadge() {
@@ -1372,6 +2115,60 @@ function updateCartBadge() {
         if (el) { el.textContent = count; el.classList.toggle('d-none', count === 0); }
     });
 }
+
+window.openAddressMap = function(location) {
+    if (!location) {
+        showToast('Endereço não disponível para este anúncio.', 'info');
+        return;
+    }
+    window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(location), '_blank');
+};
+
+window.sendChatLocation = async function() {
+    const user = getSavedUser();
+    const addr = user?.endereco || user?.cidade;
+    if (!addr) {
+        showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info');
+        return;
+    }
+    if (!window.currentChat) { showToast('Nenhum chat aberto.', 'warning'); return; }
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
+        chat.messages.push({
+            senderId: user.id, senderName: user.nome,
+            text: `📍 ${addr}\n${mapsUrl}`,
+            timestamp: new Date().toISOString(), type: 'location'
+        });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        if (typeof loadChatMessages === 'function') loadChatMessages(window.currentChat);
+        showToast('Localização enviada!', 'success');
+    } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
+};
+
+window.sendSupportChatLocation = async function() {
+    const user = getSavedUser();
+    const addr = user?.endereco || user?.cidade;
+    if (!addr) { showToast('Cadastre um endereço no seu perfil.', 'info'); return; }
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) { showToast('Nenhum chamado aberto.', 'warning'); return; }
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const ticket = result?.[0];
+        if (!ticket) { showToast('Chamado não encontrado.', 'error'); return; }
+        ticket.messages.push({
+            senderId: user.id, senderName: user.nome,
+            text: `📍 ${addr}\n${mapsUrl}`,
+            timestamp: new Date().toISOString(), type: 'location'
+        });
+        await supabaseFetch(`chats?id=eq.${ticket.id}`, { method: 'PATCH', body: JSON.stringify({ messages: ticket.messages }) });
+        if (typeof loadMySupportTicket === 'function') loadMySupportTicket(ticketId);
+        showToast('Localização enviada!', 'success');
+    } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
+};
 
 // ============================================
 // CARRINHO
@@ -1793,6 +2590,12 @@ function bootstrapApp() {
         const titulo = document.getElementById('prodTitle').value.trim();
         if (!titulo) { showToast('O título do anúncio é obrigatório.', 'warning'); return; }
 
+        const condicao = document.getElementById('prodCondition').value;
+        if (!condicao) { showToast('Selecione a condição do produto.', 'warning'); return; }
+
+        const descricao = document.getElementById('prodDescription').value.trim();
+        if (!descricao) { showToast('A descrição do produto é obrigatória.', 'warning'); return; }
+
         const precoInput = document.getElementById('prodPrice').value;
         const preco = parseFloat(precoInput);
         const PRECO_MAXIMO = 10000000; // R$ 10 milhões - teto sensato pra evitar erro de digitação (ex: zeros a mais)
@@ -1859,7 +2662,7 @@ function bootstrapApp() {
 
             const productData = {
                 titulo:       document.getElementById('prodTitle').value,
-                descricao:    document.getElementById('prodDescription').value,
+                descricao:    condicao ? `[${condicao}] ${descricao}` : descricao,
                 preco:        preco, // Usar o valor validado
                 preco_original: precoOriginal, // null se não houver oferta/desconto
                 quantidade:   quantidade, // Usar o valor validado
@@ -1903,7 +2706,6 @@ function bootstrapApp() {
             btn.textContent = orig;
         }
     });
-
     // Perfil
     document.getElementById('supportRequestModal')?.addEventListener('hidden.bs.modal', () => {
         stopSupportChatPolling();
@@ -2045,6 +2847,43 @@ function bootstrapApp() {
             startChatPolling(currentChat);
         }
     });
+
+    // Navegação por hash (#/produto/xxx)
+    function navigateByHash() {
+        const match = window.location.hash.match(/^#\/produto\/(.+)/);
+        if (match) {
+            const pid = match[1];
+            // Aguarda o cache de produtos carregar antes de abrir
+            const tryOpen = () => {
+                if (allProductsCache.find(x => x.id == pid || x.id === pid)) {
+                    window.showDetail(pid);
+                } else {
+                    // Tenta buscar o produto específico
+                    supabaseFetch(`products?id=eq.${encodeURIComponent(pid)}&limit=1`).then(rows => {
+                        if (rows && rows.length > 0) {
+                            if (!allProductsCache.find(x => x.id == rows[0].id)) allProductsCache.push(rows[0]);
+                            window.showDetail(rows[0].id);
+                        } else {
+                            showToast('Produto não encontrado.', 'error');
+                            history.replaceState(null, '', window.location.pathname + window.location.search);
+                        }
+                    });
+                }
+            };
+            if (allProductsCache.length > 0) {
+                tryOpen();
+            } else {
+                // Espera o loadPage terminar
+                const check = setInterval(() => {
+                    if (allProductsCache.length > 0) { clearInterval(check); tryOpen(); }
+                }, 100);
+                setTimeout(() => clearInterval(check), 10000);
+            }
+        }
+    }
+    window.addEventListener('hashchange', navigateByHash);
+    // Verifica hash na inicialização (depois que o app carregar)
+    setTimeout(navigateByHash, 500);
 
     // Init
     updateUI();
@@ -3023,7 +3862,13 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             <span class="chat-file-name">${cleanText.replace(/^Arquivo:\s*/, '') || msg.file.name || 'Arquivo'}</span>
         </a>` : '';
 
-    const showTextCaption = cleanText && !(msg.image && cleanText === 'Imagem') && !(msg.type === 'file' && msg.file);
+    const locationChipHtml = (msg.type === 'location') ? `
+        <div class="chat-location-chip mb-2">
+            <i class="bi bi-geo-alt-fill" style="color:#e67e22;"></i>
+            <span>Localização compartilhada</span>
+        </div>` : '';
+
+    const showTextCaption = cleanText && !(msg.type === 'image' && (cleanText === 'Imagem' || cleanText === 'GIF')) && !(msg.type === 'file' && msg.file) && !(msg.type === 'video');
 
     // Reação
     const reaction = msg.reaction || null;
@@ -3069,7 +3914,12 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
                 <img src="${msg.image}" class="img-fluid rounded mb-2" referrerpolicy="no-referrer"
                      style="max-width:220px;cursor:pointer;"
                      onclick="window.openImageFull('${msg.image}')" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${msg.video ? `
+                <video src="${msg.video}" class="img-fluid rounded mb-2" controls
+                       style="max-width:220px;max-height:200px;background:#000;border-radius:8px;"
+                       onerror="this.outerHTML='<a href=\\'${msg.video.replace(/'/g, "\\'")}\\' target=\\'_blank\\' class=\\'small text-break\\'>${msg.video}</a>'"></video>` : ''}
             ${fileChipHtml}
+            ${locationChipHtml}
             ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${window.formatLinks?.(cleanText) ?? cleanText}</div>` : ''}
             <div class="msg-time">
                 ${isMe ? `<span class="msg-status me-1">${msg.visto ? '<span class="text-info"><i class="bi bi-check-all"></i> Visto</span>' : '<span class="text-muted"><i class="bi bi-check"></i> Entregue</span>'}</span>` : ''}
