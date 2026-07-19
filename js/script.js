@@ -519,6 +519,11 @@ function renderCard(item) {
                 <div class="text-muted city-line mt-1">
                     <i class="bi bi-geo-alt"></i> ${cidade}
                 </div>
+                <div class="product-card-sold mt-1">
+                    ${item.vendas && parseInt(item.vendas) > 0
+                        ? `<i class="bi bi-bag-check-fill me-1"></i>${parseInt(item.vendas)} vendido${parseInt(item.vendas) > 1 ? 's' : ''}`
+                        : `<span class="text-muted">Novo anúncio</span>`}
+                </div>
                 <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
                     <small class="text-muted text-truncate" style="max-width:60%">${item.loja || 'Vendedor'}</small>
                     <span class="badge bg-light text-dark border" style="font-size:0.58rem;">${(item.categoria || 'Geral').split(' > ').pop()}</span>
@@ -689,6 +694,10 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
                                     </div>
                                     <div class="ml-store-brand-info">
                                         <h1 class="ml-store-name">${nome}</h1>
+                                        <div class="ml-store-id-row">
+                                            <span class="ml-store-id-badge"><i class="bi bi-shop me-1"></i>Vendedor</span>
+                                            <span class="ml-store-id-code">ID: ${sellerId.slice(-8).toUpperCase()}</span>
+                                        </div>
                                         <div class="ml-store-badge">
                                             ${ratingCount > 0
                                                 ? `${renderRatingStars(ratingAvg)} <span style="font-size:0.7rem;opacity:0.7;margin-left:4px;">${ratingAvg.toFixed(1)} (${ratingCount})</span>`
@@ -702,7 +711,7 @@ window.showSellerProfile = async function(sellerId, sellerNameFallback = '') {
                                     </div>
                                 </div>
                                 <div class="ml-store-actions">
-                                    <button class="ml-store-btn ml-store-btn-share" onclick="const url=window.location.href;if(navigator.share){navigator.share({title:'${nome}',url}).catch(()=>{})}else{navigator.clipboard.writeText(url).then(()=>showToast('Link copiado!','success',2000))}"><i class="bi bi-share me-1"></i></button>
+                                    <button class="ml-store-btn ml-store-btn-share" onclick="window.shareSeller('${sellerId}', '${(nome || '').replace(/'/g, "\\'")}')" title="Compartilhar loja"><i class="bi bi-share me-1"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -1672,7 +1681,7 @@ window.showDetail = async function(pid) {
                         <div class="ml-reputation-stars">${sellerRatingCount > 0
                             ? `${renderRatingStars(sellerRatingAvg)} <span style="margin-left:6px;font-size:0.85em;">${sellerRatingAvg.toFixed(1)} · ${sellerRatingCount} avaliaç${sellerRatingCount === 1 ? 'ão' : 'ões'}</span>`
                             : 'Ainda sem avaliações'}</div>
-                        <p style="font-size:0.82rem;color:var(--text-muted);margin:6px 0 0 0;"><i class="bi bi-bag-check" style="margin-right:4px;"></i>${sellerSalesCount} venda${sellerSalesCount === 1 ? '' : 's'} realizadas</p>
+                        <div class="ml-seller-sales"><i class="bi bi-bag-check" style="margin-right:4px;"></i>${sellerSalesCount} venda${sellerSalesCount === 1 ? '' : 's'} concluída${sellerSalesCount === 1 ? '' : 's'}</div>
                         <a href="javascript:void(0)" class="ml-more-link" onclick="event.preventDefault(); window.showSellerProfile('${item.vendedor_id}', '${(item.loja||'').replace(/'/g,"\\'")}');">Ver mais dados do vendedor</a>
                     </div>
                 </div>
@@ -2951,11 +2960,11 @@ function bootstrapApp() {
         }
     });
 
-    // Navegação por hash (#/produto/xxx)
+    // Navegação por hash (#/produto/xxx ou #/vendedor/yyy)
     function navigateByHash() {
-        const match = window.location.hash.match(/^#\/produto\/(.+)/);
-        if (match) {
-            const pid = match[1];
+        const prodMatch = window.location.hash.match(/^#\/produto\/(.+)/);
+        if (prodMatch) {
+            const pid = prodMatch[1];
             // Aguarda o cache de produtos carregar antes de abrir
             const tryOpen = () => {
                 if (allProductsCache.find(x => x.id == pid || x.id === pid)) {
@@ -2982,6 +2991,14 @@ function bootstrapApp() {
                 }, 100);
                 setTimeout(() => clearInterval(check), 10000);
             }
+            return;
+        }
+
+        const sellerMatch = window.location.hash.match(/^#\/vendedor\/(.+)/);
+        if (sellerMatch) {
+            const sid = sellerMatch[1];
+            // Abre o perfil do vendedor direto, sem recarregar o site
+            window.showSellerProfile(sid, '');
         }
     }
     window.addEventListener('hashchange', navigateByHash);

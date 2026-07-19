@@ -68,6 +68,29 @@
     .wa-chat { display: none; }
     .wa-main.wa-chat-open .wa-side { display: none; }
     .wa-main.wa-chat-open .wa-chat { display: flex; }
+
+    /* Chat aberto no painel (admin / qualquer conversa): evita estourar a
+       largura da tela e cortar as mensagens para a direita no mobile.
+       Força 100% de largura + box-sizing e esconde overflow horizontal,
+       espelhando o comportamento do chat cliente?vendedor. */
+    .admin-standalone-page,
+    .admin-chat-main,
+    .chat-container,
+    .chat-messages,
+    .wa-main,
+    .wa-chat {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+    .chat-messages {
+        padding: 0.65rem !important;
+    }
+    .chat-message {
+        max-width: 85% !important;
+        box-sizing: border-box;
+    }
 }
 @media (max-width: 768px) {
     .chat-sidebar {
@@ -307,22 +330,73 @@
     /* Modal de suporte do usu�rio em tela cheia: desconta o header fixo e
        afasta a input bar da borda inferior segura. */
     body.support-chat-fullscreen {
-        display: flex;
-        flex-direction: column;
-        height: 100dvh;
         overflow: hidden;
     }
     body.support-chat-fullscreen .main-footer-dock {
         display: none !important;
     }
-    #supportModalDialog.modal-fullscreen {
-        margin-top: var(--header-height, 64px) !important;
-        height: calc(100dvh - var(--header-height, 64px)) !important;
+    /* Anula o .modal-dialog-centered e prende o diálogo à viewport inteira */
+    #supportModalDialog.modal-fullscreen.modal-dialog-centered {
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100dvh !important;
+        height: 100vh !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        transform: none !important;
+    }
+    #supportModalDialog.modal-fullscreen .modal-content {
+        border-radius: 0 !important;
+        margin-top: var(--header-height, 56px);
+        height: calc(100dvh - var(--header-height, 56px)) !important;
+        height: calc(100vh - var(--header-height, 56px)) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        max-height: none !important;
+        overflow: hidden !important;
+    }
+    #supportModalDialog.modal-fullscreen #supportChatView {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: 100% !important;
+    }
+    #supportModalDialog.modal-fullscreen .chat-header-pro,
+    #supportModalDialog.modal-fullscreen .chat-status-bar,
+    #supportModalDialog.modal-fullscreen #supportChatInputBar {
+        flex-shrink: 0 !important;
+    }
+    /* Barra de status do chamado de suporte: igual ao chat cliente?vendedor
+       (alert centralizado, sem corte nas bordas no mobile) */
+    #supportModalDialog.modal-fullscreen #supportChatView .chat-status-bar {
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+    #supportModalDialog.modal-fullscreen #supportChatView .chat-status-bar .alert {
+        margin: 8px 10px !important;
+        border-radius: 8px !important;
+        width: auto !important;
+        text-align: center !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+    #supportModalDialog.modal-fullscreen #supportChatMessages {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
     }
     /* Em mobile o header fixo � mais curto: reduz o --header-height pra o
        modal de suporte n�o ficar com folga excessiva embaixo. */
     :root {
-        --header-height: 64px;
+        --header-height: 56px;
     }
 
     /* Android: quando o teclado abrir, garante que a barra de input
@@ -340,7 +414,17 @@
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+        overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 0.65rem !important;
+    }
+    /* Bolhas do chat de suporte no mobile: mesmo padrão do chat cliente?vendedor */
+    #supportChatMessages .chat-message {
+        max-width: 85% !important;
+        box-sizing: border-box;
     }
 }
 

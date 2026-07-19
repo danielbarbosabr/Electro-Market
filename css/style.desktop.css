@@ -1480,6 +1480,21 @@ body.dark-theme .product-card-img-container {
     text-overflow: ellipsis;
 }
 
+/* Linha "X vendido(s)" no card (estilo Mercado Livre) */
+.product-card-sold {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #00a650;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.product-card-sold .text-muted {
+    font-weight: 400;
+    color: var(--text-muted) !important;
+}
+
 .current-price {
     color: var(--text-main);
     font-size: 22px;
@@ -2165,6 +2180,13 @@ body.dark-theme .presence-dot {
     letter-spacing: 0.02em;
 }
 
+.chat-header-price {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #00A884;
+    margin-top: 1px;
+}
+
 .chat-header-close {
     background: transparent;
     border: none;
@@ -2235,6 +2257,15 @@ body.dark-theme .presence-dot {
     border-bottom: 1px solid rgba(0,0,0,0.06);
     padding: 8px 14px;
     flex-shrink: 0;
+}
+
+.chat-status-bar .admin-row-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 600;
 }
 
 /* Modal "Falar com o Suporte" — a etapa 2 (conversa/"Atendimento do Suporte")
@@ -3226,6 +3257,13 @@ body.admin-chat-fullscreen .admin-standalone-page .admin-chat-main {
     flex-shrink: 0;
     font-size: 0.6rem;
     margin-top: 3px;
+}
+
+.wa-contact-textbox small {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .wa-contact-section-header {
@@ -5877,6 +5915,35 @@ body.dark-theme .storefront-banner:hover {
     font-weight: 700;
     margin: 0 0 4px 0;
     line-height: 1.2;
+}
+
+.ml-store-id-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.ml-store-id-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #3483fa;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 4px;
+}
+
+.ml-store-id-code {
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.85;
+    font-family: monospace;
 }
 
 .ml-store-badge {

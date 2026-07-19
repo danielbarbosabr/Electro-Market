@@ -202,7 +202,7 @@ window.renderAdminPanel = async function() {
                                         <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</strong>
                                         <small>${order.buyer_name || '?'} ↔ ${order.seller_name || '?'}</small>
                                     </div>
-                                    <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'}">${c.closed ? 'Encerrado' : 'Aberto'}</span>
+                                    <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'}">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span>
                                 </div>`;
                             }).join('') || '<p class="text-muted small mb-0">Nenhuma conversa ainda.</p>'}
                         </div>
@@ -215,7 +215,7 @@ window.renderAdminPanel = async function() {
                                         <strong>${getTicketLabel(t)}</strong>
                                         <small>${t.requester_name || 'Visitante'}</small>
                                     </div>
-                                    <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}">${t.status === 'closed' ? 'Encerrado' : 'Aberto'}</span>
+                                    <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}"><i class="bi ${t.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${t.status === 'closed' ? 'Solicitação Encerrada' : 'Solicitação Aberta'}</span>
                                 </div>`).join('') || '<p class="text-muted small mb-0">Nenhum chamado ainda.</p>'}
                         </div>
 
@@ -540,7 +540,7 @@ window.renderAdminAllChats = async function() {
                         <div class="admin-row admin-row-wrap admin-row-clickable" onclick="window.adminOpenChatsModal('${c.order_id}')">
                             <div class="admin-row-icon"><i class="bi bi-chat-dots-fill"></i></div>
                             <div class="admin-row-info">
-                                <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)} <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'} ms-1">${c.closed ? 'Encerrado' : 'Aberto'}</span></strong>
+                                <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)} <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'} ms-1">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span></strong>
                                 <small class="d-block">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} mensagens</small>
                                 ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate" style="max-width:320px;">"${(lastMsg.text || '[mídia]').slice(0,60)}"</small>` : ''}
                             </div>
@@ -1060,7 +1060,7 @@ window.adminViewChat = async function(orderId) {
             <div class="admin-standalone-page">
                 <div class="d-flex align-items-center gap-2 mb-3">
                     <button class="btn btn-sm btn-ml-secondary" onclick="adminRefreshCurrentView()"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
-                    <h5 class="fw-bold mb-0">Conversa do pedido <span class="admin-row-badge ${chat.closed ? 'badge-muted' : 'badge-open'} ms-1">${chat.closed ? 'Encerrado' : 'Aberto'}</span></h5>
+                    <h5 class="fw-bold mb-0">Conversa do pedido <span class="admin-row-badge ${chat.closed ? 'badge-muted' : 'badge-open'} ms-1">${chat.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order?.status]?.text || 'Aberto')}</span></h5>
                 </div>
                 <div class="wa-main admin-chat-main" style="margin:0;">
                     <section class="wa-chat" style="flex-grow:1;">
@@ -1076,6 +1076,7 @@ window.adminViewChat = async function(orderId) {
                                 <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuários da conversa">
                                     <i class="bi bi-people-fill"></i>
                                 </button>
+                                ${order?.status === 'finished' ? `<button type="button" class="chat-header-close text-danger" onclick="window.adminDeleteChat('${orderId}')" title="Apagar conversa e pedido (finalizado)"><i class="bi bi-trash"></i></button>` : ''}
                                 <div class="dropdown">
                                     <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
                                         <i class="bi bi-three-dots-vertical"></i>
@@ -1265,7 +1266,7 @@ window.adminOpenChatsModal = async function(orderId) {
                             <div class="wa-contact-text">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} msgs</div>
                             ${lastMsg ? `<div class="wa-contact-text fst-italic">"${(lastMsg.text || '[mídia]').slice(0,40)}"</div>` : ''}
                         </div>
-                        <span class="badge ${c.closed ? 'bg-secondary' : 'bg-success'} wa-contact-badge">${c.closed ? 'Encerrado' : 'Aberto'}</span>
+                        <span class="badge ${c.closed ? 'bg-secondary' : 'bg-success'} wa-contact-badge">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span>
                     </div>`;
                 }).join('');
         };
@@ -1681,7 +1682,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
                     </div>
                     <div class="wa-contact-badge text-end" style="flex-shrink:0;">
                         <small class="text-muted" style="font-size:0.65rem;">${timeStr}</small>
-                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;">${c.closed ? 'Enc.' : (c.type === 'ticket' ? 'Ticket' : 'Aberto')}</span></div>
+                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${c.closed ? 'bi-lock-fill' : (c.type === 'ticket' ? 'bi-headset' : 'bi-bag-fill')} me-1"></i>${c.closed ? 'Enc.' : (c.type === 'ticket' ? 'Solicitação Aberta' : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'))}</span></div>
                     </div>
                 </div>`;
         };
@@ -1773,6 +1774,7 @@ window.adminSupportSelect = async function(id, type) {
                     </div>
                     <div class="chat-header-info">
                         <span class="chat-header-name">${order?.product_title || 'Pedido #' + id.slice(-6)}</span>
+                        ${order ? `<span class="chat-header-price">${formatPreco(order.total, {htmlGratis:false})}</span>` : ''}
                         <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${id.slice(-6).toUpperCase()} · ${msgCount} mensagens</span>
                     </div>
                     <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminSupportParticipants')" title="Ver usuários">
@@ -1791,9 +1793,9 @@ window.adminSupportSelect = async function(id, type) {
                 </div>
 
                 <div class="chat-status-bar">
-                    <span class="badge ${st.class}">${st.text}</span>
-                    ${order ? `<span class="small fw-bold text-success ms-2">${formatPreco(order.total, {htmlGratis:false})}</span>` : ''}
-                    ${closed ? `<span class="small text-muted ms-2"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>` : ''}
+                    ${closed
+                        ? `<div class="alert alert-secondary mb-0 py-2 text-center small"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</div>`
+                        : `<div class="alert alert-${order?.status === 'finished' ? 'success' : (order?.status === 'cancelled' ? 'danger' : 'info')} mb-0 py-2 text-center small">${st.text}</div>`}
                 </div>
 
                 <div id="adminSupportParticipants" class="chat-participants-panel d-none">
@@ -1897,6 +1899,7 @@ window.adminSupportSelect = async function(id, type) {
                     <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminSupportTicketParticipants')" title="Ver usuário">
                         <i class="bi bi-people-fill"></i>
                     </button>
+                    ${ticket.status === 'closed' ? `<button type="button" class="chat-header-close text-danger" onclick="window.adminSupportDelete('${id}', 'ticket')" title="Apagar chamado (encerrado)"><i class="bi bi-trash"></i></button>` : ''}
                     <div class="dropdown">
                         <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
                             <i class="bi bi-three-dots-vertical"></i>
@@ -1910,8 +1913,9 @@ window.adminSupportSelect = async function(id, type) {
                 </div>
 
                 <div class="chat-status-bar">
-                    <span class="admin-row-badge ${ticket.status === 'closed' ? 'badge-muted' : 'badge-open'}">${ticket.status === 'closed' ? 'Encerrado' : 'Aberto'}</span>
-                    ${ticket.status === 'closed' ? `<span class="small text-muted ms-2"><i class="bi bi-lock-fill me-1"></i>Chamado encerrado</span>` : ''}
+                    <div class="alert ${ticket.status === 'closed' ? 'alert-secondary' : 'alert-info'} mb-0 py-2 text-center small">
+                        <i class="bi ${ticket.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${ticket.status === 'closed' ? 'Solicitação Encerrada' : 'Solicitação Aberta'}
+                    </div>
                 </div>
 
                 <div id="adminSupportTicketParticipants" class="chat-participants-panel d-none">
@@ -2860,7 +2864,7 @@ function startSupportChatPolling(ticketId) {
         const isOpen  = modalEl?.classList.contains('show');
         if (!isOpen || window._activeSupportTicketId !== ticketId) { stopSupportChatPolling(); return; }
         loadMySupportTicket(ticketId, true);
-    }, 4000);
+    }, 1500);
 }
 
 function stopSupportChatPolling() {
@@ -2949,10 +2953,26 @@ async function loadMySupportTicket(ticketId, silent = false) {
         const raw = result?.[0];
         if (!raw) {
             stopSupportChatPolling();
-            if (!silent) container.innerHTML = '<div class="text-center text-muted py-4">Chamado não encontrado.</div>';
+            // Chamado foi removido (ex: pelo admin) — fecha o modal de suporte
+            // automaticamente pra não deixar a tela travada com mensagem de erro.
+            try { bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'))?.hide(); } catch (e) {}
+            try { localStorage.removeItem('electroGuestTicketId'); } catch (e) {}
             return;
         }
         const ticket = normalizeTicket(raw);
+
+        // Se o chamado é de um pedido, busca o pedido pra mostrar o card de
+        // resumo do produto (foto + título + preço) no topo do chat — igual
+        // ao chat de pedido cliente ↔ vendedor.
+        let relatedOrder = null;
+        const relatedOrderId = ticket.order_id || null;
+        if (relatedOrderId) {
+            try {
+                const ord = await supabaseFetch(`orders?select=*&id=eq.${relatedOrderId}&limit=1`);
+                relatedOrder = ord?.[0] || null;
+            } catch (e) {}
+        }
+        renderSupportChatProductCard(relatedOrder);
 
         const signature = JSON.stringify(raw.messages) + '|' + getChatClosed(raw);
         if (silent && signature === supportChatLastSignature) return;
@@ -2974,15 +2994,15 @@ async function loadMySupportTicket(ticketId, silent = false) {
         const statusBar = document.getElementById('supportChatStatusBar');
         if (statusBar) {
             statusBar.innerHTML = ticket.status === 'closed'
-                ? '<span class="admin-row-badge badge-muted"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</span>'
-                : `<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>${getTicketLabel(ticket)}</span>`;
+                ? '<span class="admin-row-badge badge-muted"><i class="bi bi-lock-fill me-1"></i>Solicitação Encerrada</span>'
+                : '<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>Solicitação Aberta</span>';
         }
 
         const headerStatus = document.getElementById('supportChatHeaderStatus');
         if (headerStatus) {
             headerStatus.textContent = ticket.status === 'closed'
-                ? 'Atendimento encerrado'
-                : (getTicketLabel(ticket) || 'Suporte ao cliente');
+                ? 'Solicitação Encerrada'
+                : 'Solicitação Aberta';
         }
 
         const ticketSummary = document.getElementById('supportChatTicketSummary');
@@ -3000,6 +3020,35 @@ async function loadMySupportTicket(ticketId, silent = false) {
         console.error(e);
         if (!silent) container.innerHTML = '<div class="text-center text-muted py-4">Erro ao carregar a conversa.</div>';
     }
+}
+
+/**
+ * Mostra o card de resumo do produto (foto + título + preço) no topo do chat
+ * de suporte, igual ao chat de pedido cliente ↔ vendedor. Só aparece quando
+ * o chamado está vinculado a um pedido (related_order_id).
+ */
+function renderSupportChatProductCard(order) {
+    const el = document.getElementById('supportChatTicketSummary');
+    if (!el) return;
+    if (!order) { el.classList.add('d-none'); el.innerHTML = ''; return; }
+
+    const img   = order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20';
+    const title = order.product_title || 'Pedido #' + (order.id || '').slice(-6);
+    const st    = ORDER_STATUS_MAP[order.status] || { text: order.status || '—', class: 'bg-secondary' };
+
+    el.classList.remove('d-none');
+    el.innerHTML = `
+        <div class="chat-product-summary">
+            <img src="${img}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45/e9ecef/6c757d?text=%20'">
+            <div class="chat-product-summary-info">
+                <div class="chat-product-summary-title">${title}</div>
+                <div class="chat-product-summary-price">${formatPreco(order.total, { htmlGratis: false })}</div>
+            </div>
+            <small class="chat-product-summary-id">#${(order.id || '').slice(-6).toUpperCase()}</small>
+        </div>
+        <div class="chat-status-bar">
+            <span class="badge ${st.class}">${st.text}</span>
+        </div>`;
 }
 
 /** Bolha de mensagem na visão do usuário: a mensagem dele fica à direita, e
@@ -3613,13 +3662,28 @@ window.adminDeleteTicket = async function(ticketId) {
 window.shareProduct = function(pid) {
     const item = allProductsCache.find(x => x.id === pid || x.id == pid);
     if (!item) return;
-    const url  = window.location.href;
+    // Link direto e estático para o produto (não recarrega do zero ao abrir)
+    const base = window.location.origin + window.location.pathname;
+    const url  = `${base}#/produto/${pid}`;
     const text = `Confira: ${item.titulo} no ElectroMarket!`;
 
     if (navigator.share) {
         navigator.share({ title: 'ElectroMarket', text, url }).catch(console.error);
     } else {
-        navigator.clipboard.writeText(url).then(() => showToast('Link copiado!', 'success', 2000));
+        navigator.clipboard.writeText(url).then(() => showToast('Link do produto copiado!', 'success', 2000));
+    }
+};
+
+/** Compartilha o perfil público de um vendedor (loja) via link direto */
+window.shareSeller = function(sellerId, sellerName = '') {
+    const base = window.location.origin + window.location.pathname;
+    const url  = `${base}#/vendedor/${sellerId}`;
+    const text = `Confira a loja ${sellerName || 'deste vendedor'} no ElectroMarket!`;
+
+    if (navigator.share) {
+        navigator.share({ title: 'ElectroMarket', text, url }).catch(console.error);
+    } else {
+        navigator.clipboard.writeText(url).then(() => showToast('Link da loja copiado!', 'success', 2000));
     }
 };
 
