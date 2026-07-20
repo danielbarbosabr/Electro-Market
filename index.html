@@ -431,14 +431,13 @@
                             <label for="v2CadBairro">Bairro</label>
                         </div>
                         <div class="row g-2">
-                            <div class="col-8">
+                            <div class="col-6">
                                 <div class="ml-field">
                                     <input type="text" id="v2CadCid" placeholder=" " required>
                                     <label for="v2CadCid">Cidade</label>
                                 </div>
                             </div>
-                            <div class="col-4">
-                                <label class="ml-select-label">Estado</label>
+                            <div class="col-6">
                                 <select class="ml-select" id="v2CadUF">
                                     <option value="SP">SP</option><option value="RJ">RJ</option><option value="MG">MG</option>
                                     <option value="ES">ES</option><option value="PR">PR</option><option value="SC">SC</option>
@@ -453,19 +452,34 @@
                             <option value="debito">Débito</option>
                             <option value="boleto">Boleto</option>
                         </select>
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirUploadExterno()" style="font-size:0.75rem;white-space:nowrap;">
-                                <i class="bi bi-upload"></i> Subir foto
+                        <label class="ml-select-label mt-1">Foto de perfil</label>
+                        <div class="profile-link-inline mb-2">
+                            <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                <i class="bi bi-box-arrow-up-right"></i>
                             </button>
+                            <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                <i class="bi bi-cloud-upload"></i>
+                                <input type="file" id="v2CadAvatarFile" accept="image/*" hidden onchange="window.uploadCadPhoto(this)">
+                            </label>
                             <div class="ml-field flex-grow-1 mb-0">
                                 <input type="url" id="v2CadAvatarLink" placeholder=" ">
                                 <label for="v2CadAvatarLink">Link da foto (opcional)</label>
                             </div>
                         </div>
 
-                        <div class="ml-field mb-2">
-                            <input type="url" id="v2CadBannerLink" placeholder=" ">
-                            <label for="v2CadBannerLink">Banner (opcional)</label>
+                        <label class="ml-select-label">Banner de perfil</label>
+                        <div class="profile-link-inline mb-2">
+                            <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </button>
+                            <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                <i class="bi bi-cloud-upload"></i>
+                                <input type="file" id="v2CadBannerFile" accept="image/*" hidden onchange="window.uploadCadBanner(this)">
+                            </label>
+                            <div class="ml-field flex-grow-1 mb-0">
+                                <input type="url" id="v2CadBannerLink" placeholder=" ">
+                                <label for="v2CadBannerLink">Link do banner (opcional)</label>
+                            </div>
                         </div>
 
                         <div class="d-flex gap-2 mt-2">
@@ -781,13 +795,35 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Fotos do Produto (Links externos)</label>
-                            <button type="button" class="btn btn-sm btn-info text-white mb-2 d-block" onclick="abrirUploadExterno()">
-                                <i class="bi bi-upload"></i> Subir imagens no Imgur
-                            </button>
-                            <div class="d-flex flex-column gap-2">
-                                <input type="url" class="form-control form-control-sm" id="prodLink1" placeholder="Link da imagem 1 (Ex: Imgur)">
+                            <label class="form-label small fw-bold">Fotos do Produto</label>
+                            <div class="profile-link-inline mb-2">
+                                <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </button>
+                                <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                    <i class="bi bi-cloud-upload"></i>
+                                    <input type="file" id="prodPhotoFile1" accept="image/*" hidden onchange="window.uploadProdPhoto(this, 1)">
+                                </label>
+                                <input type="url" class="form-control form-control-sm" id="prodLink1" placeholder="Link da imagem 1 (Imgur)">
+                            </div>
+                            <div class="profile-link-inline mb-2">
+                                <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </button>
+                                <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                    <i class="bi bi-cloud-upload"></i>
+                                    <input type="file" id="prodPhotoFile2" accept="image/*" hidden onchange="window.uploadProdPhoto(this, 2)">
+                                </label>
                                 <input type="url" class="form-control form-control-sm" id="prodLink2" placeholder="Link da imagem 2">
+                            </div>
+                            <div class="profile-link-inline">
+                                <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </button>
+                                <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                    <i class="bi bi-cloud-upload"></i>
+                                    <input type="file" id="prodPhotoFile3" accept="image/*" hidden onchange="window.uploadProdPhoto(this, 3)">
+                                </label>
                                 <input type="url" class="form-control form-control-sm" id="prodLink3" placeholder="Link da imagem 3">
                             </div>
                         </div>
@@ -999,27 +1035,59 @@
                 <!-- Painel de Anexo (abre ao clicar no clipe, sem popups feios de prompt()) -->
                 <div id="chatAttachPanel" class="p-3 bg-light border-top d-none">
                     <div class="d-flex gap-2 mb-2">
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
                             <i class="bi bi-play-circle me-1"></i>Mídia
                         </button>
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
                             <i class="bi bi-file-earmark me-1"></i>Documentos
                         </button>
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendChatLocation()">
+                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="location" onclick="window.setChatAttachType('location')">
                             <i class="bi bi-geo-alt-fill me-1"></i>Endereço
                         </button>
                     </div>
-                    <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                        <input type="url" id="chatAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
+
+                    <!-- Aba Mídia: link + escolher do PC (imagem) -->
+                    <div id="attachImageBox">
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                            <input type="url" id="chatAttachLinkInput" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF...">
+                            <button type="button" class="ml-attach ml-btn-media" onclick="window.confirmChatAttach()"><i class="bi bi-send"></i></button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <label class="ml-attach ml-btn-pc flex-grow-1" style="cursor:pointer;">
+                                <i class="bi bi-cloud-upload me-1"></i>Escolher do PC
+                                <input type="file" id="chatImageFile" accept="image/*" hidden onchange="window.sendChatImageFile(this)">
+                            </label>
+                            <button type="button" class="ml-attach ml-btn-imgur flex-grow-1" onclick="window.abrirUploadExterno()">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Imgur
+                            </button>
+                        </div>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
-                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
-                        </button>
-                        <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmChatAttach()">
-                            <i class="bi bi-send me-1"></i>Enviar
-                        </button>
+
+                    <!-- Aba Documentos: Google Drive / OneDrive -->
+                    <div id="attachFileBox" class="d-none">
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                            <input type="url" id="chatAttachLinkInputFile" class="form-control" placeholder="Cole o link do documento...">
+                            <button type="button" class="ml-attach ml-btn-media" onclick="window.confirmChatAttach()"><i class="bi bi-send"></i></button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="ml-attach ml-btn-drive flex-grow-1" onclick="window.abrirDocHost('Google Drive')"><i class="bi bi-google me-1"></i>Google Drive</button>
+                            <button type="button" class="ml-attach ml-btn-onedrive flex-grow-1" onclick="window.abrirDocHost('OneDrive')"><i class="bi bi-microsoft me-1"></i>OneDrive</button>
+                        </div>
+                    </div>
+
+                    <!-- Aba Endereço: link do Maps + Atual/Cadastrado -->
+                    <div id="attachLocationBox" class="d-none">
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
+                            <input type="url" id="chatAttachLinkInputLoc" class="form-control" placeholder="Cole o link do endereço (Google Maps)...">
+                            <button type="button" class="ml-attach ml-btn-media" onclick="window.sendChatLocation('other')"><i class="bi bi-send"></i></button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="ml-attach ml-btn-loc flex-grow-1" onclick="window.sendChatLocation('current')"><i class="bi bi-geo-alt-fill me-1"></i>Endereço atual</button>
+                            <button type="button" class="ml-attach ml-btn-loc flex-grow-1" onclick="window.sendChatLocation('stored')"><i class="bi bi-house-door me-1"></i>Endereço cadastrado</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1252,19 +1320,45 @@
 
             <div class="profile-links-avatar-wrap">
                 <img id="profilePreview" src="https://placehold.co/100" referrerpolicy="no-referrer">
-                <button type="button" class="profile-links-avatar-edit" onclick="abrirUploadExterno()" title="Alterar foto">
+                <button type="button" class="profile-links-avatar-edit" onclick="document.getElementById('profilePhotoFile').click()" title="Alterar foto">
                     <i class="bi bi-camera-fill"></i>
                 </button>
             </div>
             <h5 id="profileLinksName" class="profile-links-name">Meu Perfil</h5>
             <span id="profileLinksTypeBadge" class="profile-links-badge">Cliente</span>
 
-            <div class="profile-links-avatar-fields">
-                <input type="url" class="form-control form-control-sm" id="editAvatarLink" placeholder="Ou cole o link da imagem aqui">
+            <div class="mb-2"></div>
+            <label class="form-label small fw-bold">Foto de perfil</label>
+            <div class="profile-link-inline">
+                <button type="button" class="profile-link-icon" onclick="window.abrirUploadExterno()" title="Subir no Imgur">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                </button>
+                <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                    <i class="bi bi-cloud-upload"></i>
+                    <input type="file" id="profilePhotoFile" accept="image/*" hidden onchange="window.uploadProfilePhoto(this)">
+                </label>
+                <div class="ml-field flex-grow-1 mb-0">
+                    <input type="url" id="editAvatarLink" placeholder=" ">
+                    <label for="editAvatarLink">Link da foto (opcional)</label>
+                </div>
             </div>
-            <div class="profile-links-avatar-fields">
-                <input type="url" class="form-control form-control-sm" id="editBannerLink" placeholder="Banner (opcional)">
+
+            <label class="form-label small fw-bold mt-3">Banner de perfil</label>
+            <div class="profile-link-inline">
+                <button type="button" class="profile-link-icon" onclick="window.abrirUploadExterno()" title="Subir no Imgur">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                </button>
+                <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                    <i class="bi bi-cloud-upload"></i>
+                    <input type="file" id="profileBannerFile" accept="image/*" hidden onchange="window.uploadProfileBanner(this)">
+                </label>
+                <div class="ml-field flex-grow-1 mb-0">
+                    <input type="url" id="editBannerLink" placeholder=" ">
+                    <label for="editBannerLink">Link do banner (opcional)</label>
+                </div>
             </div>
+
+            <div class="mb-3"></div>
 
             <!-- Seção: Dados Pessoais -->
             <div class="profile-link-section">
@@ -1273,21 +1367,21 @@
                     <i class="bi bi-chevron-down profile-link-chevron"></i>
                 </button>
                 <div class="profile-link-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Nome Completo</label>
-                        <input type="text" class="form-control" id="editNome" required>
+                    <div class="ml-field">
+                        <input type="text" id="editNome" placeholder=" " required>
+                        <label for="editNome">Nome Completo</label>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">E-mail</label>
-                        <input type="email" class="form-control" id="editEmail" required readonly style="background-color: var(--hover-bg);">
+                    <div class="ml-field">
+                        <input type="email" id="editEmail" placeholder=" " required readonly style="background-color: var(--hover-bg);">
+                        <label for="editEmail">E-mail</label>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">CPF</label>
-                        <input type="text" class="form-control" id="editCPF" readonly style="background-color: var(--hover-bg);">
+                    <div class="ml-field">
+                        <input type="text" id="editCPF" placeholder=" " readonly style="background-color: var(--hover-bg);">
+                        <label for="editCPF">CPF</label>
                     </div>
-                    <div class="mb-0">
-                        <label class="form-label small fw-bold">Telefone / WhatsApp</label>
-                        <input type="tel" class="form-control" id="editTelefone" maxlength="15">
+                    <div class="ml-field">
+                        <input type="tel" id="editTelefone" placeholder=" " maxlength="15">
+                        <label for="editTelefone">Telefone / WhatsApp</label>
                     </div>
                 </div>
             </div>
@@ -1299,38 +1393,42 @@
                     <i class="bi bi-chevron-down profile-link-chevron"></i>
                 </button>
                 <div class="profile-link-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">CEP</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="editCEP" maxlength="9" placeholder="00000-000">
-                            <button type="button" class="btn btn-outline-secondary" onclick="window.buscarCepPerfil()" title="Buscar endereço pelo CEP">
-                                <i class="bi bi-search"></i>
-                            </button>
-                        </div>
+                    <div class="ml-field">
+                        <input type="text" id="editCEP" placeholder=" " maxlength="9">
+                        <label for="editCEP">CEP</label>
+                        <i class="bi bi-search ml-eye-icon" style="pointer-events:auto;" onclick="window.buscarCepPerfil()" title="Buscar endereço pelo CEP"></i>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Rua / Logradouro</label>
-                        <input type="text" class="form-control" id="editRua" required>
+                    <div class="ml-field">
+                        <input type="text" id="editRua" placeholder=" " required>
+                        <label for="editRua">Rua / Logradouro</label>
                     </div>
                     <div class="row">
-                        <div class="col-4 mb-3">
-                            <label class="form-label small fw-bold">Número</label>
-                            <input type="text" class="form-control" id="editNumero">
+                        <div class="col-4">
+                            <div class="ml-field">
+                                <input type="text" id="editNumero" placeholder=" ">
+                                <label for="editNumero">Número</label>
+                            </div>
                         </div>
-                        <div class="col-8 mb-3">
-                            <label class="form-label small fw-bold">Bairro</label>
-                            <input type="text" class="form-control" id="editBairro">
+                        <div class="col-8">
+                            <div class="ml-field">
+                                <input type="text" id="editBairro" placeholder=" ">
+                                <label for="editBairro">Bairro</label>
+                            </div>
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-6 mb-0">
-                            <label class="form-label small fw-bold">Cidade</label>
-                            <input type="text" class="form-control" id="editCidade" required>
+                        <div class="col-6">
+                            <div class="ml-field">
+                                <input type="text" id="editCidade" placeholder=" " required>
+                                <label for="editCidade">Cidade</label>
+                            </div>
                         </div>
-                        <div class="col-6 mb-0">
-                            <label class="form-label small fw-bold">Estado</label>
-                            <select class="form-select" id="editEstado" required>
-                            </select>
+                        <div class="col-6">
+                            <div class="ml-field">
+                                <select id="editEstado" required>
+                                </select>
+                                <label for="editEstado">Estado</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1343,24 +1441,23 @@
                     <i class="bi bi-chevron-down profile-link-chevron"></i>
                 </button>
                 <div class="profile-link-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Pagamento Preferido</label>
-                        <select class="form-select" id="editPagamento" required>
+                    <div class="ml-field">
+                        <select id="editPagamento" required>
                             <option value="pix">PIX</option>
                             <option value="cartao">Cartão de Crédito</option>
                             <option value="debito">Cartão de Débito</option>
                             <option value="boleto">Boleto Bancário</option>
                         </select>
+                        <label for="editPagamento">Pagamento Preferido</label>
                     </div>
-                    <div class="mb-0" id="editTipoWrap">
-                        <label class="form-label small fw-bold">Tipo de Conta</label>
-                        <select class="form-select" id="editTipo">
+                    <div class="ml-field" id="editTipoWrap">
+                        <select id="editTipo">
                             <option value="CLIENTE">Cliente</option>
                             <option value="VENDEDOR">Vendedor</option>
                         </select>
+                        <label for="editTipo">Tipo de Conta</label>
                     </div>
                     <div class="mb-0 d-none" id="editTipoAdminNote">
-                        <label class="form-label small fw-bold">Tipo de Conta</label>
                         <div class="alert alert-info small mb-0 py-2 px-3">
                             <i class="bi bi-shield-lock-fill me-1"></i>
                             Sua conta é Administrador. Pra ver a plataforma como Cliente ou Vendedor,
@@ -1448,6 +1545,7 @@
                     <a href="https://vercel.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="20" title="Vercel" style="filter: invert(1) brightness(2);"></a>
                     <a href="https://supabase.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="20" title="Supabase"></a>
                     <a href="https://opencode.ai/" target="_blank"><img src="https://opencode.ai/favicon.ico" width="20" title="OpenCode AI" style="border-radius: 4px; filter: none !important;" onerror="this.onerror=null;this.style.display='none'"></a>
+                    <a href="#" onclick="window.abrirUploadExterno(); event.preventDefault();" title="Imgur" style="color:#fff;font-size:1.1rem;"><i class="bi bi-box-arrow-up-right"></i></a>
                 </div>
 
                 <span class="text-white-50 d-md-none" style="font-size: 0.6rem;">© 2026 ElectroMarket</span>
@@ -1503,6 +1601,48 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Chart.js: usado no Relatório Gráfico do Painel Admin -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <!-- Modal: produto do Mercado Livre (busca misturada na vitrine) -->
+    <div class="modal fade" id="mlExternalModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title"><i class="bi bi-shop me-2"></i>Mercado Livre</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="mlExternalImg" src="" class="img-fluid rounded mb-3" style="max-height:260px;object-fit:contain;" referrerpolicy="no-referrer">
+                    <h6 id="mlExternalTitle" class="mb-2"></h6>
+                    <div id="mlExternalSeller" class="text-muted small mb-2"></div>
+                    <div id="mlExternalPrice" class="fw-bold fs-5 mb-3"></div>
+                    <a id="mlExternalLink" href="#" target="_blank" rel="noopener" class="btn btn-warning w-100">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Ir ao Mercado Livre
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: produto do Mercado Livre (busca misturada na vitrine) -->
+    <div class="modal fade" id="mlExternalModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title"><i class="bi bi-shop me-2"></i>Mercado Livre</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="mlExternalImg" src="" class="img-fluid rounded mb-3" style="max-height:260px;object-fit:contain;" referrerpolicy="no-referrer">
+                    <h6 id="mlExternalTitle" class="mb-2"></h6>
+                    <div id="mlExternalSeller" class="text-muted small mb-2"></div>
+                    <div id="mlExternalPrice" class="fw-bold fs-5 mb-3"></div>
+                    <a id="mlExternalLink" href="#" target="_blank" rel="noopener" class="btn btn-warning w-100">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Ir ao Mercado Livre
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="js/script.js"></script>
     <script src="js/seller.js"></script>
     <script src="js/admin.js"></script>

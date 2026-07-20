@@ -974,6 +974,12 @@ body.dark-theme .ml-shipping-card {
     opacity: 0.9;
 }
 
+.ml-btn-sm {
+    font-size: 0.8rem;
+    padding: 7px 10px;
+    border-radius: 6px;
+}
+
 .ml-btn-primary {
     background: #3483fa;
     color: #fff;
@@ -984,6 +990,31 @@ body.dark-theme .ml-shipping-card {
     color: #3483fa;
     border: 1px solid #3483fa;
 }
+
+/* Botões do painel de anexo: mesmo design dos botões do card do produto
+   (curvinha, fonte, peso), só um pouco menores. Só a cor muda. */
+.ml-attach {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    text-decoration: none;
+    line-height: 1.2;
+}
+.ml-attach:hover { opacity: 0.9; }
+
+.ml-btn-drive   { background: #1fa463; color: #fff; }
+.ml-btn-onedrive{ background: #0364b8; color: #fff; }
+.ml-btn-loc     { background: #ea4335; color: #fff; }
+.ml-btn-media   { background: #3483fa; color: #fff; }
+.ml-btn-pc      { background: #f5b50a; color: #1c1c1c; }
+.ml-btn-imgur   { background: #e91e8c; color: #fff; }
 
 .ml-btn-danger {
     background: #dc3545;
@@ -1422,6 +1453,7 @@ body.dark-theme .opinion-video-link:hover {
     box-shadow: 0 15px 30px var(--shadow-color) !important;
 }
 
+/* Card de resultado do Mercado Livre (busca misturada na vitrine) */
 .product-card-img-container {
     width: 100%;
     aspect-ratio: 1 / 1;
@@ -1941,12 +1973,105 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
     width: 100%;
     max-width: 460px;
     background: var(--card-bg, #fff);
-    border-radius: 24px;
+    border-radius: 8px;
     padding: 32px 24px 28px;
     text-align: center;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
     height: fit-content;
 }
+
+/* Campo de link com ícones (Imgur / anexar) ao lado — padrão Foto e Banner */
+.profile-link-inline {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+.profile-link-inline .form-control { flex: 1; }
+.profile-link-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    border-radius: 6px;
+    background: #3483fa;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0;
+}
+.profile-link-icon:hover { opacity: 0.9; }
+
+.profile-link-icon-pc { background: #f5b50a; color: #1c1c1c; }
+
+.profile-link-icon-ghost {
+    background: transparent;
+    color: #3483fa;
+    border: 1px solid #3483fa;
+}
+
+.profile-links-divider {
+    border: none;
+    border-top: 1px solid var(--border-light);
+    margin: 18px 0 4px;
+}
+
+/* Campos flutuantes iguais à tela de login/cadastro */
+.profile-links-card .ml-field { margin-bottom: 16px; }
+.profile-links-card .ml-field input,
+.profile-links-card .ml-field select {
+    width: 100%;
+    padding: 18px 14px 8px;
+    border: 1px solid #999;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text-main);
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.profile-links-card .ml-field input:focus,
+.profile-links-card .ml-field select:focus {
+    border-color: #3483fa;
+    box-shadow: 0 0 0 1px #3483fa;
+}
+.profile-links-card .ml-field label {
+    position: absolute;
+    left: 14px;
+    top: 15px;
+    color: #999;
+    font-size: 1rem;
+    pointer-events: none;
+    transition: all .15s ease;
+}
+.profile-links-card .ml-field input:focus + label,
+.profile-links-card .ml-field input:not(:placeholder-shown) + label,
+.profile-links-card .ml-field.filled label {
+    top: 5px;
+    font-size: 0.7rem;
+    color: #3483fa;
+}
+
+/* Wrapper de upload (foto/banner) com botões PC + link */
+.profile-upload-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+}
+.profile-upload-row .ml-attach { flex: 1; }
+
+/* Preview do banner */
+.profile-banner-preview {
+    width: 100%;
+    height: 90px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid var(--border-light);
+    margin-top: 8px;
+    display: none;
+}
+.profile-banner-preview.show { display: block; }
 
 .profile-links-avatar-wrap {
     position: relative;
@@ -4231,6 +4356,8 @@ body.dark-theme .yeti-svgContainer { border-color: #4eb8dd; }
     background: var(--input-bg);
     color: var(--text-main);
     outline: none;
+    height: 56px;
+    box-sizing: border-box;
     transition: border-color .15s ease, box-shadow .15s ease;
 }
 .ml-field input:focus {
@@ -4270,13 +4397,15 @@ body.dark-theme .yeti-svgContainer { border-color: #4eb8dd; }
 }
 .ml-select {
     width: 100%;
-    padding: 12px 14px;
+    padding: 18px 14px 8px;
     border: 1px solid #999;
     border-radius: 6px;
-    font-size: 0.92rem;
+    font-size: 1rem;
     background: var(--input-bg);
     color: var(--text-main);
     margin-bottom: 14px;
+    height: 56px;
+    box-sizing: border-box;
 }
 
 .ml-forgot-link {

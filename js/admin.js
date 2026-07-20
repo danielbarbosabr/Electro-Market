@@ -1,14 +1,14 @@
-﻿// PAINEL ADMINISTRATIVO
+// PAINEL ADMINISTRATIVO
 // ============================================
 
 /**
  * Renderiza a interface de controle total para administradores
  */
-/** Definição única das abas do painel admin — usada tanto na navbar principal (desktop) quanto na barrinha mobile dentro do painel */
+/** Defini��o �nica das abas do painel admin � usada tanto na navbar principal (desktop) quanto na barrinha mobile dentro do painel */
 function buildAdminTabButtons(counts, variant) {
     const tabs = [
-        { tab: 'admin-overview', icon: 'bi-grid-1x2-fill',        label: 'Início' },
-        { tab: 'admin-content',  icon: 'bi-collection-fill',      label: 'Conteúdo',    count: counts.users + counts.products },
+        { tab: 'admin-overview', icon: 'bi-grid-1x2-fill',        label: 'In�cio' },
+        { tab: 'admin-content',  icon: 'bi-collection-fill',      label: 'Conte�do',    count: counts.users + counts.products },
         { tab: 'admin-support',  icon: 'bi-headset',              label: 'Suporte',     count: (counts.chatsAbertos || 0) + (counts.ticketsAbertos || 0) },
         { tab: 'admin-cats',     icon: 'bi-tags-fill',            label: 'Categorias',  count: counts.categorias }
     ];
@@ -28,7 +28,7 @@ function showAdminTopNavTabs(counts) {
     }
 }
 
-/** Some com as abas do painel admin da navbar (usado só pelas telas rápidas "Todos os Produtos"/"Todos os Chats") */
+/** Some com as abas do painel admin da navbar (usado s� pelas telas r�pidas "Todos os Produtos"/"Todos os Chats") */
 function hideAdminTopNavTabs() {
     const nav = document.getElementById('adminPanelTabsNav');
     if (nav) {
@@ -38,12 +38,12 @@ function hideAdminTopNavTabs() {
     }
 }
 
-/** Monta as linhas da tabela de Publicações do painel admin — usada tanto na
- *  renderização inicial quanto pra atualizar só a tabela quando o admin pesquisa. */
+/** Monta as linhas da tabela de Publica��es do painel admin � usada tanto na
+ *  renderiza��o inicial quanto pra atualizar s� a tabela quando o admin pesquisa. */
 function buildAdminProductsRows(products) {
-    if (!products.length) return `<tr><td colspan="4" class="admin-table-empty">Nenhuma publicação encontrada.</td></tr>`;
+    if (!products.length) return `<tr><td colspan="4" class="admin-table-empty">Nenhuma publica��o encontrada.</td></tr>`;
     return products.map(p => `
-        <tr class="admin-table-row-clickable" onclick="window.adminEditProduct('${p.id}')" title="Clique para abrir o anúncio">
+        <tr class="admin-table-row-clickable" onclick="window.adminEditProduct('${p.id}')" title="Clique para abrir o an�ncio">
             <td>
                 <div class="d-flex align-items-center gap-2">
                     <img src="${safeParseImages(p.img)[0] || 'https://placehold.co/45'}" class="admin-row-avatar" style="border-radius:6px;" onerror="this.onerror=null;this.src='https://placehold.co/45'">
@@ -51,13 +51,13 @@ function buildAdminProductsRows(products) {
                 </div>
             </td>
             <td class="text-muted">${p.loja || 'N/A'}</td>
-            <td class="admin-row-value">${parseFloat(p.preco) === 0 ? 'GRÁTIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</td>
+            <td class="admin-row-value">${parseFloat(p.preco) === 0 ? 'GR�TIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</td>
             <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
-                    <button class="admin-icon-btn" onclick="event.stopPropagation(); window.adminEditProduct('${p.id}')" title="Editar Anúncio">
+                    <button class="admin-icon-btn" onclick="event.stopPropagation(); window.adminEditProduct('${p.id}')" title="Editar An�ncio">
                         <i class="bi bi-pencil-fill"></i>
                     </button>
-                    <button class="admin-icon-btn danger" onclick="event.stopPropagation(); window.adminDeleteProduct('${p.id}', '${(p.titulo || '').replace(/'/g, "\\'")}')" title="Remover Publicação">
+                    <button class="admin-icon-btn danger" onclick="event.stopPropagation(); window.adminDeleteProduct('${p.id}', '${(p.titulo || '').replace(/'/g, "\\'")}')" title="Remover Publica��o">
                         <i class="bi bi-trash-fill"></i>
                     </button>
                 </div>
@@ -65,10 +65,10 @@ function buildAdminProductsRows(products) {
         </tr>`).join('');
 }
 
-/** Monta as linhas da tabela de Usuários do painel admin — usada tanto na
- *  renderização inicial quanto pra atualizar só a tabela quando o admin pesquisa. */
+/** Monta as linhas da tabela de Usu�rios do painel admin � usada tanto na
+ *  renderiza��o inicial quanto pra atualizar s� a tabela quando o admin pesquisa. */
 function buildAdminUsersRows(users, currentUserId) {
-    if (!users.length) return `<tr><td colspan="6" class="admin-table-empty">Nenhum usuário encontrado.</td></tr>`;
+    if (!users.length) return `<tr><td colspan="6" class="admin-table-empty">Nenhum usu�rio encontrado.</td></tr>`;
     return users.map(u => {
         const idade = u.created_at ? (() => {
             const dias = Math.floor((Date.now() - new Date(u.created_at).getTime()) / 86400000);
@@ -94,7 +94,7 @@ function buildAdminUsersRows(users, currentUserId) {
                     <button class="admin-icon-btn danger" onclick="window.adminDeleteUser('${u.id}', '${(u.nome || '').replace(/'/g, "\\'")}')" title="Apagar Conta">
                         <i class="bi bi-person-x-fill"></i>
                     </button>
-                ` : '<span class="admin-row-badge badge-muted">Você</span>'}
+                ` : '<span class="admin-row-badge badge-muted">Voc�</span>'}
             </td>
         </tr>`;
     }).join('');
@@ -119,7 +119,7 @@ window.renderAdminPanel = async function() {
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando base de dados...</p></div>';
 
     try {
-        // Busca todos os usuários, produtos, pedidos e conversas para gestão total
+        // Busca todos os usu�rios, produtos, pedidos e conversas para gest�o total
         const [users, products, orders, chats] = await Promise.all([
             supabaseFetch('users?select=*&order=nome.asc'),
             supabaseFetch('products?select=*&order=created_at.desc'),
@@ -130,7 +130,7 @@ window.renderAdminPanel = async function() {
         window._adminProductsCache = products;
         window._adminUsersCache = users;
 
-        // Chamados de suporte (linhas de `chats` com order_id NULL) — busca à parte.
+        // Chamados de suporte (linhas de `chats` com order_id NULL) � busca � parte.
         const tickets = await fetchSupportTicketsSafe();
 
         const categorias = [...new Set(products.map(p => p.categoria || 'Geral'))];
@@ -151,7 +151,7 @@ window.renderAdminPanel = async function() {
                 <main class="admin-main">
                     <header class="admin-topbar">
                         <div>
-                            <h4 class="fw-bold mb-0" id="adminPanelTitle">Início</h4>
+                            <h4 class="fw-bold mb-0" id="adminPanelTitle">In�cio</h4>
                             <small class="text-muted">Bem-vindo(a), ${user.nome}</small>
                         </div>
                         <div class="admin-sim-controls">
@@ -166,15 +166,15 @@ window.renderAdminPanel = async function() {
                     </header>
 
                     <div class="admin-stats-row">
-                        <div class="admin-stat-card stat-blue"><i class="bi bi-people-fill"></i><div><h3>${users.length}</h3><span>Usuários</span></div></div>
-                        <div class="admin-stat-card stat-green"><i class="bi bi-box-seam-fill"></i><div><h3>${products.length}</h3><span>Publicações</span></div></div>
+                        <div class="admin-stat-card stat-blue"><i class="bi bi-people-fill"></i><div><h3>${users.length}</h3><span>Usu�rios</span></div></div>
+                        <div class="admin-stat-card stat-green"><i class="bi bi-box-seam-fill"></i><div><h3>${products.length}</h3><span>Publica��es</span></div></div>
                         <div class="admin-stat-card stat-orange"><i class="bi bi-bag-check-fill"></i><div><h3>${orders.length}</h3><span>Pedidos</span></div></div>
                         <div class="admin-stat-card stat-red"><i class="bi bi-headset"></i><div><h3>${ticketsAbertos}</h3><span>Chamados Abertos</span></div></div>
                     </div>
 
                     <div class="admin-tab-panel active" id="admin-overview">
                         <div class="admin-card">
-                            <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>Últimas Publicações</h6>
+                            <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>�ltimas Publica��es</h6>
                             ${products.slice(0, 5).map(p => `
                                 <div class="admin-row">
                                     <img src="${safeParseImages(p.img)[0] || 'https://placehold.co/40'}" class="admin-row-avatar" onerror="this.onerror=null;this.src='https://placehold.co/40'">
@@ -182,12 +182,12 @@ window.renderAdminPanel = async function() {
                                         <strong>${p.titulo}</strong>
                                         <small>Loja: ${p.loja || 'N/A'}</small>
                                     </div>
-                                    <span class="admin-row-value">${parseFloat(p.preco) === 0 ? 'GRÁTIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</span>
+                                    <span class="admin-row-value">${parseFloat(p.preco) === 0 ? 'GR�TIS' : `R$ ${parseFloat(p.preco).toLocaleString('pt-BR')}`}</span>
                                 </div>
-                            `).join('') || '<p class="text-muted small mb-0">Nenhuma publicação ainda.</p>'}
+                            `).join('') || '<p class="text-muted small mb-0">Nenhuma publica��o ainda.</p>'}
                         </div>
                         <div class="admin-card">
-                            <h6 class="admin-card-title"><i class="bi bi-chat-dots-fill me-2"></i>Últimos Chats de Pedido</h6>
+                            <h6 class="admin-card-title"><i class="bi bi-chat-dots-fill me-2"></i>�ltimos Chats de Pedido</h6>
                             ${chats.slice(0, 5).map(c => {
                                 const order = orders.find(o => o.id === c.order_id) || {};
                                 return `
@@ -200,14 +200,14 @@ window.renderAdminPanel = async function() {
                                     })()}
                                     <div class="admin-row-info">
                                         <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</strong>
-                                        <small>${order.buyer_name || '?'} ↔ ${order.seller_name || '?'}</small>
+                                        <small>${order.buyer_name || '?'} ? ${order.seller_name || '?'}</small>
                                     </div>
                                     <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'}">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span>
                                 </div>`;
                             }).join('') || '<p class="text-muted small mb-0">Nenhuma conversa ainda.</p>'}
                         </div>
                         <div class="admin-card">
-                            <h6 class="admin-card-title"><i class="bi bi-headset me-2"></i>Últimos Chamados de Suporte</h6>
+                            <h6 class="admin-card-title"><i class="bi bi-headset me-2"></i>�ltimos Chamados de Suporte</h6>
                             ${tickets.slice(0, 5).map(t => `
                                 <div class="admin-row">
                                     <img src="${safeParseImages(t.requester_avatar)[0] || ('https://ui-avatars.com/api/?name=' + encodeURIComponent((t.requester_name || '?').slice(0,2)) + '&background=e50914&color=fff&size=40')}" class="admin-row-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
@@ -215,19 +215,19 @@ window.renderAdminPanel = async function() {
                                         <strong>${getTicketLabel(t)}</strong>
                                         <small>${t.requester_name || 'Visitante'}</small>
                                     </div>
-                                    <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}"><i class="bi ${t.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${t.status === 'closed' ? 'Solicitação Encerrada' : 'Solicitação Aberta'}</span>
+                                    <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}"><i class="bi ${t.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${t.status === 'closed' ? 'Solicita��o Encerrada' : 'Solicita��o Aberta'}</span>
                                 </div>`).join('') || '<p class="text-muted small mb-0">Nenhum chamado ainda.</p>'}
                         </div>
 
                         <header class="admin-topbar" style="margin-top:0.5rem">
                             <div>
-                                <h4 class="fw-bold mb-0" style="font-size:1.1rem">Relatórios</h4>
-                                <small class="text-muted">Métricas e estatísticas da plataforma</small>
+                                <h4 class="fw-bold mb-0" style="font-size:1.1rem">Relat�rios</h4>
+                                <small class="text-muted">M�tricas e estat�sticas da plataforma</small>
                             </div>
                         </header>
                         <div class="admin-reports-grid" style="margin-top:0.75rem">
                             <div class="admin-card admin-chart-card">
-                                <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários por Tipo</h6>
+                                <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usu�rios por Tipo</h6>
                                 <div class="admin-chart-wrap"><canvas id="chartUsersType"></canvas></div>
                             </div>
                             <div class="admin-card admin-chart-card">
@@ -240,7 +240,7 @@ window.renderAdminPanel = async function() {
                             </div>
 
                             <div class="admin-card admin-chart-card admin-chart-wide">
-                                <h6 class="admin-card-title"><i class="bi bi-graph-up me-2"></i>Novas Publicações (últimos 6 meses)</h6>
+                                <h6 class="admin-card-title"><i class="bi bi-graph-up me-2"></i>Novas Publica��es (�ltimos 6 meses)</h6>
                                 <div class="admin-chart-wrap"><canvas id="chartProdsTimeline"></canvas></div>
                             </div>
                         </div>
@@ -248,17 +248,17 @@ window.renderAdminPanel = async function() {
 
                     <div class="admin-tab-panel" id="admin-content">
                         <div class="admin-card" id="adminContentUsersCard">
-                            <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usuários <span class="admin-nav-count" id="adminContentUsersCount">${users.length}</span></h6>
+                            <h6 class="admin-card-title"><i class="bi bi-people-fill me-2"></i>Usu�rios <span class="admin-nav-count" id="adminContentUsersCount">${users.length}</span></h6>
                             <div class="admin-table-wrap">
                                 <table class="admin-table">
                                     <thead>
                                         <tr>
-                                            <th>Usuário</th>
+                                            <th>Usu�rio</th>
                                             <th>E-mail</th>
                                             <th>Idade da Conta</th>
-                                            <th>Avaliação</th>
+                                            <th>Avalia��o</th>
                                             <th>Tipo de Conta</th>
-                                            <th class="text-end">Ações</th>
+                                            <th class="text-end">A��es</th>
                                         </tr>
                                     </thead>
                                     <tbody id="adminUsersTableBody">
@@ -269,15 +269,15 @@ window.renderAdminPanel = async function() {
                         </div>
 
                         <div class="admin-card" id="adminContentProdsCard">
-                            <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>Publicações <span class="admin-nav-count" id="adminContentProdsCount">${products.length}</span></h6>
+                            <h6 class="admin-card-title"><i class="bi bi-box-seam-fill me-2"></i>Publica��es <span class="admin-nav-count" id="adminContentProdsCount">${products.length}</span></h6>
                             <div class="admin-table-wrap">
                                 <table class="admin-table">
                                     <thead>
                                         <tr>
-                                            <th>Publicação</th>
+                                            <th>Publica��o</th>
                                             <th>Loja</th>
-                                            <th>Preço</th>
-                                            <th class="text-end">Ações</th>
+                                            <th>Pre�o</th>
+                                            <th class="text-end">A��es</th>
                                         </tr>
                                     </thead>
                                     <tbody id="adminProdsTableBody">
@@ -295,7 +295,7 @@ window.renderAdminPanel = async function() {
                                 <div class="admin-row">
                                     <div class="admin-row-icon"><i class="bi bi-tag-fill"></i></div>
                                     <div class="admin-row-info"><strong>${cat}</strong></div>
-                                    <span class="admin-row-badge badge-muted">${products.filter(p => p.categoria === cat).length} anúncios</span>
+                                    <span class="admin-row-badge badge-muted">${products.filter(p => p.categoria === cat).length} an�ncios</span>
                                 </div>
                             `).join('')}
                         </div>
@@ -303,7 +303,7 @@ window.renderAdminPanel = async function() {
                         <div class="admin-card mt-3" id="adminPendingCatsCard">
                             <h6 class="admin-card-title"><i class="bi bi-hourglass-split me-2"></i>Categorias Pendentes <span class="admin-nav-count" id="pendingCatsCount">0</span></h6>
                             <div id="adminPendingCatsList">
-                                <p class="text-muted small">Nenhuma sugestão pendente.</p>
+                                <p class="text-muted small">Nenhuma sugest�o pendente.</p>
                             </div>
                         </div>
                     </div>
@@ -319,15 +319,15 @@ window.renderAdminPanel = async function() {
         // Popula categorias pendentes
         renderPendingCategories();
 
-        // Guarda os dados carregados pra alimentar os gráficos (usados aqui
-        // mesmo, dentro da aba "Início" — só constrói quando o canvas estiver
-        // realmente visível, senão o Chart.js mede a largura errada).
+        // Guarda os dados carregados pra alimentar os gr�ficos (usados aqui
+        // mesmo, dentro da aba "In�cio" � s� constr�i quando o canvas estiver
+        // realmente vis�vel, sen�o o Chart.js mede a largura errada).
         window._adminReportsData = { users, products, orders, chats, tickets, categorias };
         window._adminChartsReady = false;
 
-        // Se o admin já estava numa aba específica (ex: voltou de uma conversa
+        // Se o admin j� estava numa aba espec�fica (ex: voltou de uma conversa
         // aberta a partir da aba "Chats" ou "Suporte"), reabre na mesma aba
-        // em vez de sempre cair no Início. Mapeia a aba "admin-chats" (antiga)
+        // em vez de sempre cair no In�cio. Mapeia a aba "admin-chats" (antiga)
         // para a aba unificada "admin-support".
         if (window._adminActiveTab === 'admin-chats') window._adminActiveTab = 'admin-support';
         if (window._adminActiveTab && window._adminActiveTab !== 'admin-overview') {
@@ -351,7 +351,7 @@ window.renderAdminPanel = async function() {
         window.closeMobileMenu();
 
         // Se o admin disparou uma busca antes do painel terminar de carregar
-        // (ex: painel ainda montando), aplica ela agora que já está tudo pronto.
+        // (ex: painel ainda montando), aplica ela agora que j� est� tudo pronto.
         if (window._pendingAdminSearch !== undefined) {
             const pending = window._pendingAdminSearch;
             window._pendingAdminSearch = undefined;
@@ -383,7 +383,7 @@ window.switchAdminTab = function(navBtn) {
     document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
     window._adminSupportViewOpen = false;
 
-    // Suporte fullscreen substitui o HTML do grid; se a aba alvo não existe
+    // Suporte fullscreen substitui o HTML do grid; se a aba alvo n�o existe
     // mais no DOM, precisamos re-renderizar o painel admin primeiro.
     if (!document.getElementById(tabId)) {
         adminRefreshCurrentView();
@@ -394,8 +394,8 @@ window.switchAdminTab = function(navBtn) {
     if (panel) panel.classList.add('active');
 
     const titles = {
-        'admin-overview': 'Início',
-        'admin-content': 'Conteúdo',
+        'admin-overview': 'In�cio',
+        'admin-content': 'Conte�do',
         'admin-cats': 'Categorias',
         'admin-support': 'Suporte'
     };
@@ -409,10 +409,10 @@ window.switchAdminTab = function(navBtn) {
 };
 
 /**
- * Devolve pra tela administrativa certa depois de uma ação (excluir produto,
- * apagar/encerrar chat etc.) — sem essa checagem, qualquer ação sempre
+ * Devolve pra tela administrativa certa depois de uma a��o (excluir produto,
+ * apagar/encerrar chat etc.) � sem essa checagem, qualquer a��o sempre
  * jogaria o admin de volta pro dashboard completo, mesmo que ele estivesse
- * na tela rápida "Todos os Produtos" ou "Todos os Chats".
+ * na tela r�pida "Todos os Produtos" ou "Todos os Chats".
  */
 function adminRefreshCurrentView() {
     if (window._adminViewMode === 'products') return window.renderAdminAllProducts();
@@ -422,10 +422,10 @@ function adminRefreshCurrentView() {
 }
 
 /**
- * Atalho da navbar: "Todos os Produtos" — navegação igual à visão normal do
- * cliente (mesma grade de cards), só que trazendo TODOS os anúncios da
- * plataforma (não só os de um vendedor) e com um botão de excluir no overlay
- * de cada card, pra o admin poder remover qualquer anúncio na hora.
+ * Atalho da navbar: "Todos os Produtos" � navega��o igual � vis�o normal do
+ * cliente (mesma grade de cards), s� que trazendo TODOS os an�ncios da
+ * plataforma (n�o s� os de um vendedor) e com um bot�o de excluir no overlay
+ * de cada card, pra o admin poder remover qualquer an�ncio na hora.
  */
 window.renderAdminAllProducts = async function() {
     const user = getSavedUser();
@@ -475,22 +475,22 @@ window.renderAdminAllProducts = async function() {
     }
 };
 
-/** Card de produto padrão (igual ao que o cliente vê) + botões de editar/excluir no overlay, só pro admin — mesma lógica de gerenciamento usada no painel do vendedor */
+/** Card de produto padr�o (igual ao que o cliente v�) + bot�es de editar/excluir no overlay, s� pro admin � mesma l�gica de gerenciamento usada no painel do vendedor */
 function renderAdminProductCard(item) {
     const html = renderCard(item);
     if (!html) return '';
     const actionBtns = `
-                <button class="btn btn-action btn-admin-edit" onclick="event.stopPropagation();window.adminEditProduct('${item.id}')" title="Editar Anúncio (Admin)">
+                <button class="btn btn-action btn-admin-edit" onclick="event.stopPropagation();window.adminEditProduct('${item.id}')" title="Editar An�ncio (Admin)">
                     <i class="bi bi-pencil-fill"></i>
                 </button>
-                <button class="btn btn-action btn-admin-delete" onclick="event.stopPropagation();window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')" title="Excluir Anúncio (Admin)">
+                <button class="btn btn-action btn-admin-delete" onclick="event.stopPropagation();window.adminDeleteProduct('${item.id}', '${(item.titulo || '').replace(/'/g, "\\'")}')" title="Excluir An�ncio (Admin)">
                     <i class="bi bi-trash-fill"></i>
                 </button>`;
     return html.replace('<div class="overlay">', `<div class="overlay">${actionBtns}`);
 }
 
 /**
- * Atalho da navbar: "Todos os Chats" — lista rápida de TODAS as conversas de
+ * Atalho da navbar: "Todos os Chats" � lista r�pida de TODAS as conversas de
  * suporte da plataforma (abertas primeiro), com acesso direto a ver, entrar,
  * responder e encerrar/apagar qualquer uma delas, sem precisar abrir o
  * dashboard completo.
@@ -541,8 +541,8 @@ window.renderAdminAllChats = async function() {
                             <div class="admin-row-icon"><i class="bi bi-chat-dots-fill"></i></div>
                             <div class="admin-row-info">
                                 <strong>${order.product_title || 'Pedido #' + c.order_id?.slice(-6)} <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'} ms-1">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span></strong>
-                                <small class="d-block">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} mensagens</small>
-                                ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate" style="max-width:320px;">"${(lastMsg.text || '[mídia]').slice(0,60)}"</small>` : ''}
+                                <small class="d-block">${order.buyer_name || '?'} ? ${order.seller_name || '?'} � ${msgCount} mensagens</small>
+                                ${lastMsg ? `<small class="text-muted fst-italic d-block text-truncate" style="max-width:320px;">"${(lastMsg.text || '[m�dia]').slice(0,60)}"</small>` : ''}
                             </div>
                             <div class="d-flex gap-1 justify-content-end">
                                 <button class="admin-icon-btn" onclick="event.stopPropagation(); window.adminOpenChatsModal('${c.order_id}')" title="Ver Conversa">
@@ -564,13 +564,13 @@ window.renderAdminAllChats = async function() {
 };
 
 /**
- * Monta os 5 gráficos do painel administrativo (Chart.js) usando os dados já
- * carregados pelo renderAdminPanel — visão geral de usuários, produtos,
+ * Monta os 5 gr�ficos do painel administrativo (Chart.js) usando os dados j�
+ * carregados pelo renderAdminPanel � vis�o geral de usu�rios, produtos,
  * pedidos e chats "de tudo", como pedido pelo administrador.
  */
 window.renderAdminCharts = function() {
     if (typeof Chart === 'undefined') {
-        console.error('Chart.js não carregou — verifique a conexão com o CDN.');
+        console.error('Chart.js n�o carregou � verifique a conex�o com o CDN.');
         return;
     }
     const data = window._adminReportsData;
@@ -586,7 +586,7 @@ window.renderAdminCharts = function() {
     Chart.defaults.color = textColor;
     Chart.defaults.font.family = "'Sora', sans-serif";
 
-    // Destrói instâncias anteriores (evita "Canvas is already in use" ao reabrir a aba)
+    // Destr�i inst�ncias anteriores (evita "Canvas is already in use" ao reabrir a aba)
     window._adminChartInstances = window._adminChartInstances || {};
     Object.values(window._adminChartInstances).forEach(c => c?.destroy());
     window._adminChartInstances = {};
@@ -597,7 +597,7 @@ window.renderAdminCharts = function() {
         plugins: { legend: { labels: { boxWidth: 12, padding: 14 } } }
     };
 
-    // --- Usuários por tipo ---
+    // --- Usu�rios por tipo ---
     const tipoCount = { CLIENTE: 0, VENDEDOR: 0, ADMIN: 0 };
     users.forEach(u => { tipoCount[u.tipo] = (tipoCount[u.tipo] || 0) + 1; });
     window._adminChartInstances.usersType = new Chart(document.getElementById('chartUsersType'), {
@@ -635,7 +635,7 @@ window.renderAdminCharts = function() {
         options: baseOptions
     });
 
-    // --- Publicações por categoria (nível principal, ex: "Games", "Informática") ---
+    // --- Publica��es por categoria (n�vel principal, ex: "Games", "Inform�tica") ---
     const catCount = {};
     products.forEach(p => {
         const top = (p.categoria || 'Geral').split(' > ')[0];
@@ -646,7 +646,7 @@ window.renderAdminCharts = function() {
         type: 'bar',
         data: {
             labels: catLabels,
-            datasets: [{ label: 'Publicações', data: catLabels.map(c => catCount[c]), backgroundColor: palette[0], borderRadius: 6, maxBarThickness: 46 }]
+            datasets: [{ label: 'Publica��es', data: catLabels.map(c => catCount[c]), backgroundColor: palette[0], borderRadius: 6, maxBarThickness: 46 }]
         },
         options: {
             ...baseOptions,
@@ -658,7 +658,7 @@ window.renderAdminCharts = function() {
         }
     });
 
-    // --- Novas publicações por mês (últimos 6 meses) ---
+    // --- Novas publica��es por m�s (�ltimos 6 meses) ---
     const now = new Date();
     const monthKeys = [];
     const monthLabels = [];
@@ -679,7 +679,7 @@ window.renderAdminCharts = function() {
         data: {
             labels: monthLabels,
             datasets: [{
-                label: 'Novos anúncios',
+                label: 'Novos an�ncios',
                 data: monthKeys.map(k => monthCount[k]),
                 borderColor: palette[1],
                 backgroundColor: 'rgba(52, 131, 250, 0.15)',
@@ -700,32 +700,32 @@ window.renderAdminCharts = function() {
 };
 
 window.adminDeleteUser = async function(userId, userName) {
-    if (!confirm(`ATENÇÃO: Deseja realmente excluir a conta de ${userName}?\nEsta ação removerá todos os dados do usuário.`)) return;
+    if (!confirm(`ATEN��O: Deseja realmente excluir a conta de ${userName}?\nEsta a��o remover� todos os dados do usu�rio.`)) return;
     try {
         await supabaseFetch(`users?id=eq.${userId}`, { method: 'DELETE' });
-        showToast(`Usuário ${userName} removido.`, 'success');
+        showToast(`Usu�rio ${userName} removido.`, 'success');
         window.renderAdminPanel(); // Atualiza a lista
     } catch (e) { showToast('Erro ao remover conta.', 'error'); }
 };
 
 window.adminDeleteProduct = async function(pid, title) {
-    if (!confirm(`Remover publicação "${title}" permanentemente?`)) return;
+    if (!confirm(`Remover publica��o "${title}" permanentemente?`)) return;
     try {
         await supabaseFetch(`products?id=eq.${pid}`, { method: 'DELETE' });
-        showToast('Publicação removida pelo administrador.', 'success');
+        showToast('Publica��o removida pelo administrador.', 'success');
         adminRefreshCurrentView(); // Atualiza a lista (fica na mesma tela em que o admin estava)
     } catch (e) { showToast('Erro ao remover produto.', 'error'); }
 };
 
 /**
- * Abre o anúncio de QUALQUER vendedor no formulário de edição, como um
- * administrador geral do marketplace. Ao salvar, o vendedor/loja original é
+ * Abre o an�ncio de QUALQUER vendedor no formul�rio de edi��o, como um
+ * administrador geral do marketplace. Ao salvar, o vendedor/loja original �
  * preservado (ver flag `adminEdit` tratada no submit do #announceForm) e o
- * usuário volta pro painel administrativo em vez da grade normal de produtos.
+ * usu�rio volta pro painel administrativo em vez da grade normal de produtos.
  */
 window.adminEditProduct = function(pid) {
     const p = window._adminProductsCache?.find(x => x.id === pid) || allProductsCache.find(x => x.id === pid);
-    if (!p) { showToast('Produto não encontrado.', 'error'); return; }
+    if (!p) { showToast('Produto n�o encontrado.', 'error'); return; }
     window.showCreateAdPage(pid, true);
 };
 
@@ -737,7 +737,7 @@ function renderPendingCategories() {
     const countEl = document.getElementById('pendingCatsCount');
     if (countEl) countEl.textContent = pendentes.length;
     if (pendentes.length === 0) {
-        container.innerHTML = '<p class="text-muted small">Nenhuma sugestão pendente.</p>';
+        container.innerHTML = '<p class="text-muted small">Nenhuma sugest�o pendente.</p>';
         return;
     }
     container.innerHTML = pendentes.map((p, i) => `
@@ -766,7 +766,7 @@ window.aprovarCategoria = function(index) {
     localStorage.setItem('emCategoriasPendentes', JSON.stringify(pendentes));
     showToast(`Categoria "${item.nome}" aprovada!`, 'success');
     renderPendingCategories();
-    // Recarrega o select de categorias se a página de criação estiver aberta
+    // Recarrega o select de categorias se a p�gina de cria��o estiver aberta
     const catSelect = document.getElementById('caCategory');
     if (catSelect && document.querySelector('.create-ad-active')) {
         const selected = catSelect.value;
@@ -785,10 +785,10 @@ window.rejeitarCategoria = function(index) {
 };
 
 /**
- * Monta o HTML de uma bolha de mensagem no MESMO padrão visual do chat
- * cliente ↔ vendedor (.msg-row/.msg-bubble), usado tanto na visão de admin
+ * Monta o HTML de uma bolha de mensagem no MESMO padr�o visual do chat
+ * cliente ? vendedor (.msg-row/.msg-bubble), usado tanto na vis�o de admin
  * de conversas de pedido quanto na de chamados de suporte. Mensagens da
- * equipe de suporte (isStaff) ficam à direita, destacadas em amarelo.
+ * equipe de suporte (isStaff) ficam � direita, destacadas em amarelo.
  */
 function adminMsgBubbleHtml(m, index, resolveSenderName, myAvatarSrc, partnerAvatarSrc) {
     const adminUser = getSavedUser();
@@ -803,9 +803,9 @@ function adminMsgBubbleHtml(m, index, resolveSenderName, myAvatarSrc, partnerAva
     });
 }
 
-// -------- Bolha de mensagem com opções (aba "Chats" do admin) --------
+// -------- Bolha de mensagem com op��es (aba "Chats" do admin) --------
 // Mesmo conjunto de recursos do chat de suporte: responder, copiar,
-// editar/apagar (só nas próprias mensagens da equipe).
+// editar/apagar (s� nas pr�prias mensagens da equipe).
 
 let adminChatsTabReplyIndex = null;
 let adminChatsTabEditIndex  = null;
@@ -842,7 +842,7 @@ function adminSupportMsgBubbleHtml(m, index, resolveSenderName, resolveSenderAva
     });
 }
 
-/** Prepara a resposta a uma mensagem específica dentro da aba "Chats" do admin */
+/** Prepara a resposta a uma mensagem espec�fica dentro da aba "Chats" do admin */
 window.startAdminChatsTabReply = async function(index) {
     const orderId = window._adminActiveChatOrderId;
     if (!orderId) return;
@@ -859,7 +859,7 @@ window.startAdminChatsTabReply = async function(index) {
         preview.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="small text-truncate" style="max-width: 85%;">
-                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usuário')}</strong>
+                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usu�rio')}</strong>
                     <span class="text-muted">${msg.text}</span>
                 </div>
                 <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelAdminChatsTabReplyOrEdit()"></i>
@@ -868,7 +868,7 @@ window.startAdminChatsTabReply = async function(index) {
     document.getElementById('adminChatsTabMessageInput')?.focus();
 };
 
-/** Começa a editar uma mensagem já enviada pela própria equipe de suporte */
+/** Come�a a editar uma mensagem j� enviada pela pr�pria equipe de suporte */
 window.startAdminChatsTabEdit = async function(index) {
     const orderId = window._adminActiveChatOrderId;
     if (!orderId) return;
@@ -894,7 +894,7 @@ window.startAdminChatsTabEdit = async function(index) {
     input?.focus();
 };
 
-/** Cancela a resposta/edição em andamento na aba "Chats" do admin */
+/** Cancela a resposta/edi��o em andamento na aba "Chats" do admin */
 window.cancelAdminChatsTabReplyOrEdit = function() {
     adminChatsTabReplyIndex = null;
     adminChatsTabEditIndex  = null;
@@ -918,11 +918,11 @@ window.copyAdminChatsTabMessageText = async function(index) {
         await navigator.clipboard.writeText(msg.text);
         showToast('Mensagem copiada!', 'success', 1500);
     } catch (e) {
-        showToast('Não foi possível copiar.', 'error');
+        showToast('N�o foi poss�vel copiar.', 'error');
     }
 };
 
-/** Apaga (soft-delete) uma mensagem própria da equipe de suporte, na aba "Chats" do admin */
+/** Apaga (soft-delete) uma mensagem pr�pria da equipe de suporte, na aba "Chats" do admin */
 window.deleteAdminChatsTabMessage = async function(index) {
     const orderId = window._adminActiveChatOrderId;
     if (!orderId) return;
@@ -942,7 +942,7 @@ window.deleteAdminChatsTabMessage = async function(index) {
     }
 };
 
-// -------- Anexo de imagem/arquivo na aba "Chats" do admin (mesmo padrão do chat cliente ↔ vendedor / suporte) --------
+// -------- Anexo de imagem/arquivo na aba "Chats" do admin (mesmo padr�o do chat cliente ? vendedor / suporte) --------
 
 let adminChatsTabAttachType = 'image'; // 'image' | 'file'
 
@@ -968,7 +968,7 @@ window.confirmAdminChatsTabAttach = async function(orderId) {
     const input = document.getElementById('adminChatsTabAttachLinkInput');
     const url   = input?.value?.trim();
     if (!url || !url.startsWith('http')) {
-        showToast('Cole um link válido (começando com http).', 'warning');
+        showToast('Cole um link v�lido (come�ando com http).', 'warning');
         return;
     }
     const user = getSavedUser();
@@ -1006,7 +1006,7 @@ window.confirmAdminChatsTabAttach = async function(orderId) {
 window.sendAdminChatsTabLocation = async function(orderId) {
     const user = getSavedUser();
     const addr = user?.endereco || user?.cidade;
-    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    if (!addr) { showToast('Cadastre um endere�o no seu perfil para compartilhar.', 'info'); return; }
     const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
     try {
         const result = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
@@ -1015,22 +1015,22 @@ window.sendAdminChatsTabLocation = async function(orderId) {
         const messages = chat.messages || [];
         messages.push({
             senderId: user.id, senderName: `${user.nome} (Suporte)`,
-            text: `📍 ${addr}\n${mapsUrl}`,
+            text: `?? ${addr}\n${mapsUrl}`,
             timestamp: new Date().toISOString(), type: 'location', isStaff: true
         });
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         document.getElementById('adminChatsTabAttachPanel')?.classList.add('d-none');
         window.adminChatsTabSelect(orderId);
-        showToast('Localização enviada!', 'success');
+        showToast('Localiza��o enviada!', 'success');
     } catch (e) {
-        showToast('Erro ao enviar localização.', 'error');
+        showToast('Erro ao enviar localiza��o.', 'error');
     }
 };
 
 /**
- * Visão total do administrador: abre qualquer conversa de pedido do site,
- * no MESMO layout usado no chat entre cliente e vendedor — ver usuários,
- * encerrar e apagar ficam integrados ao próprio chat, sem modais.
+ * Vis�o total do administrador: abre qualquer conversa de pedido do site,
+ * no MESMO layout usado no chat entre cliente e vendedor � ver usu�rios,
+ * encerrar e apagar ficam integrados ao pr�prio chat, sem modais.
  */
 window.adminViewChat = async function(orderId) {
     const grid = document.getElementById('productsGrid');
@@ -1041,7 +1041,7 @@ window.adminViewChat = async function(orderId) {
             Promise.resolve(adminOrdersCache.find(o => o.id === orderId))
         ]);
         const chat = chatResult?.[0];
-        if (!chat) { showToast('Conversa não encontrada.', 'error'); adminRefreshCurrentView(); return; }
+        if (!chat) { showToast('Conversa n�o encontrada.', 'error'); adminRefreshCurrentView(); return; }
 
         const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
         const adminUser = getSavedUser();
@@ -1071,14 +1071,14 @@ window.adminViewChat = async function(orderId) {
                                 </div>
                                 <div class="chat-header-info">
                                     <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
-                                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${orderId.slice(-6).toUpperCase()} · ${msgCount} mensagens${chat.closed ? ' · <i class="bi bi-lock-fill"></i> Encerrado' : ''}</span>
+                                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ? ${order?.seller_name || '?'} � #${orderId.slice(-6).toUpperCase()} � ${msgCount} mensagens${chat.closed ? ' � <i class="bi bi-lock-fill"></i> Encerrado' : ''}</span>
                                 </div>
-                                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuários da conversa">
+                                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usu�rios da conversa">
                                     <i class="bi bi-people-fill"></i>
                                 </button>
                                 ${order?.status === 'finished' ? `<button type="button" class="chat-header-close text-danger" onclick="window.adminDeleteChat('${orderId}')" title="Apagar conversa e pedido (finalizado)"><i class="bi bi-trash"></i></button>` : ''}
                                 <div class="dropdown">
-                                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Op��es">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -1092,14 +1092,14 @@ window.adminViewChat = async function(orderId) {
                                 <div class="chat-participant-row">
                                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.buyer_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                                     <div class="chat-participant-info">
-                                        <strong>${order?.buyer_name || 'Comprador não identificado'}</strong>
+                                        <strong>${order?.buyer_name || 'Comprador n�o identificado'}</strong>
                                         <small><i class="bi bi-bag-fill me-1"></i>Comprador</small>
                                     </div>
                                 </div>
                                 <div class="chat-participant-row">
                                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.seller_name || '?')}&background=22c98e&color=fff" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                                     <div class="chat-participant-info">
-                                        <strong>${order?.seller_name || 'Vendedor não identificado'}</strong>
+                                        <strong>${order?.seller_name || 'Vendedor n�o identificado'}</strong>
                                         <small><i class="bi bi-shop me-1"></i>Vendedor</small>
                                     </div>
                                 </div>
@@ -1110,7 +1110,7 @@ window.adminViewChat = async function(orderId) {
                             ${!chat.closed ? `
                                 <div class="chat-input-bar">
                                     <div class="d-flex gap-2 align-items-center">
-                                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatInput" onclick="window.startVoiceInput('adminChatInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+                                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatInput" onclick="window.startVoiceInput('adminChatInput')" title="Gravar �udio"><i class="bi bi-mic"></i></button>
                                         <input type="text" id="adminChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSendChatMessage('${orderId}');}">
                                         <button type="button" class="chat-send-btn" onclick="window.adminSendChatMessage('${orderId}')"><i class="bi bi-send-fill"></i></button>
@@ -1130,7 +1130,7 @@ window.adminViewChat = async function(orderId) {
     }
 };
 
-/** Mostra/esconde o painel "ver usuários da conversa", integrado ao próprio chat (sem modal) */
+/** Mostra/esconde o painel "ver usu�rios da conversa", integrado ao pr�prio chat (sem modal) */
 window.adminToggleParticipants = function(panelId = 'adminChatParticipants') {
     document.getElementById(panelId)?.classList.toggle('d-none');
 };
@@ -1158,7 +1158,7 @@ window.adminSendChatMessage = async function(orderId) {
 
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         input.value = '';
-        window.adminViewChat(orderId); // recarrega a conversa já com a mensagem nova
+        window.adminViewChat(orderId); // recarrega a conversa j� com a mensagem nova
     } catch (e) {
         showToast('Erro ao enviar mensagem.', 'error');
     }
@@ -1166,13 +1166,13 @@ window.adminSendChatMessage = async function(orderId) {
 
 /**
  * Encerra o atendimento: registra uma mensagem de sistema avisando o
- * encerramento e marca a conversa como fechada (não recebe mais respostas
+ * encerramento e marca a conversa como fechada (n�o recebe mais respostas
  * pelo lado do admin, embora comprador/vendedor continuem podendo se falar).
  *
  * IMPORTANTE: exige a coluna `closed` (boolean) na tabela `chats` do Supabase.
  */
 window.adminCloseChat = async function(orderId) {
-    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento ser� registrada na conversa.')) return;
     const user = getSavedUser();
 
     try {
@@ -1191,15 +1191,15 @@ window.adminCloseChat = async function(orderId) {
         const closedChat = withChatClosed({ messages }, true);
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: closedChat.messages }) });
         showToast('Atendimento encerrado.', 'success');
-        window.adminViewChat(orderId); // recarrega a mesma tela já como encerrada
+        window.adminViewChat(orderId); // recarrega a mesma tela j� como encerrada
     } catch (e) {
         showToast('Erro ao encerrar atendimento.', 'error');
     }
 };
 
-/** Apaga a conversa E o pedido associado (ação total de administrador) */
+/** Apaga a conversa E o pedido associado (a��o total de administrador) */
 window.adminDeleteChat = async function(orderId) {
-    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta a��o n�o pode ser desfeita.')) return;
     try {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
@@ -1211,14 +1211,14 @@ window.adminDeleteChat = async function(orderId) {
 // ============================================
 // MODAL "CENTRAL DE CONVERSAS" DO ADMIN
 // ============================================
-// Mesmo layout visual do chat cliente ↔ vendedor (lista lateral de conversas
-// + painel de chat, classes .wa-main/.wa-side/.wa-chat), só que dentro de um
-// modal e com permissões de administrador (vê TODAS as conversas da
+// Mesmo layout visual do chat cliente ? vendedor (lista lateral de conversas
+// + painel de chat, classes .wa-main/.wa-side/.wa-chat), s� que dentro de um
+// modal e com permiss�es de administrador (v� TODAS as conversas da
 // plataforma, responde como Suporte, encerra e apaga qualquer uma delas).
 
 /**
- * Abre o modal "Central de Conversas" do admin. Se orderId for passado, já
- * abre direto naquela conversa; senão, mostra só a lista pra escolher.
+ * Abre o modal "Central de Conversas" do admin. Se orderId for passado, j�
+ * abre direto naquela conversa; sen�o, mostra s� a lista pra escolher.
  */
 window.adminOpenChatsModal = async function(orderId) {
     const user = getSavedUser();
@@ -1263,8 +1263,8 @@ window.adminOpenChatsModal = async function(orderId) {
                         <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                         <div class="wa-contact-textbox">
                             <div class="wa-contact-name">${order.product_title || 'Pedido #' + c.order_id?.slice(-6)}</div>
-                            <div class="wa-contact-text">${order.buyer_name || '?'} ↔ ${order.seller_name || '?'} • ${msgCount} msgs</div>
-                            ${lastMsg ? `<div class="wa-contact-text fst-italic">"${(lastMsg.text || '[mídia]').slice(0,40)}"</div>` : ''}
+                            <div class="wa-contact-text">${order.buyer_name || '?'} ? ${order.seller_name || '?'} � ${msgCount} msgs</div>
+                            ${lastMsg ? `<div class="wa-contact-text fst-italic">"${(lastMsg.text || '[m�dia]').slice(0,40)}"</div>` : ''}
                         </div>
                         <span class="badge ${c.closed ? 'bg-secondary' : 'bg-success'} wa-contact-badge">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span>
                     </div>`;
@@ -1279,12 +1279,12 @@ window.adminOpenChatsModal = async function(orderId) {
     }
 };
 
-/** Filtra a lista lateral do modal de conversas do admin conforme o usuário digita */
+/** Filtra a lista lateral do modal de conversas do admin conforme o usu�rio digita */
 window.filterAdminChatsModal = function(term) {
     window._adminChatsModalRenderList?.(term);
 };
 
-/** Seleciona e carrega uma conversa específica dentro do modal de conversas do admin */
+/** Seleciona e carrega uma conversa espec�fica dentro do modal de conversas do admin */
 window.adminChatsModalSelect = async function(orderId) {
     window._adminActiveChatOrderId = orderId;
     document.getElementById('adminChatsModalMain')?.classList.add('wa-chat-open'); // no mobile, troca a lista pelo chat
@@ -1303,7 +1303,7 @@ window.adminChatsModalSelect = async function(orderId) {
             Promise.resolve(adminOrdersCache.find(o => o.id === orderId))
         ]);
         const chat = chatResult?.[0];
-        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+        if (!chat) { showToast('Conversa n�o encontrada.', 'error'); return; }
 
         const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
         const adminUser = getSavedUser();
@@ -1316,7 +1316,7 @@ window.adminChatsModalSelect = async function(orderId) {
         const msgsHtml = (chat.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, adminChatMyAvatar, adminChatPartnerAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
         const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
-        const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '—', class: 'bg-secondary' };
+        const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '�', class: 'bg-secondary' };
 
         activeEl.innerHTML = `
             <div class="chat-header-pro">
@@ -1328,13 +1328,13 @@ window.adminChatsModalSelect = async function(orderId) {
                 </div>
                 <div class="chat-header-info">
                     <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
-                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${orderId.slice(-6).toUpperCase()} · ${msgCount} mensagens</span>
+                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ? ${order?.seller_name || '?'} � #${orderId.slice(-6).toUpperCase()} � ${msgCount} mensagens</span>
                 </div>
-                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsModalParticipants')" title="Ver usuários da conversa">
+                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsModalParticipants')" title="Ver usu�rios da conversa">
                     <i class="bi bi-people-fill"></i>
                 </button>
                 <div class="dropdown">
-                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Op��es">
                         <i class="bi bi-three-dots-vertical"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -1355,14 +1355,14 @@ window.adminChatsModalSelect = async function(orderId) {
                 <div class="chat-participant-row">
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.buyer_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                     <div class="chat-participant-info">
-                        <strong>${order?.buyer_name || 'Comprador não identificado'}</strong>
+                        <strong>${order?.buyer_name || 'Comprador n�o identificado'}</strong>
                         <small><i class="bi bi-bag-fill me-1"></i>Comprador</small>
                     </div>
                 </div>
                 <div class="chat-participant-row">
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.seller_name || '?')}&background=22c98e&color=fff" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                     <div class="chat-participant-info">
-                        <strong>${order?.seller_name || 'Vendedor não identificado'}</strong>
+                        <strong>${order?.seller_name || 'Vendedor n�o identificado'}</strong>
                         <small><i class="bi bi-shop me-1"></i>Vendedor</small>
                     </div>
                 </div>
@@ -1373,7 +1373,7 @@ window.adminChatsModalSelect = async function(orderId) {
             ${!chat.closed ? `
                 <div id="adminChatsModalInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
 
-                <!-- Painel de Anexo (mesmo padrão do chat cliente ↔ vendedor / suporte) -->
+                <!-- Painel de Anexo (mesmo padr�o do chat cliente ? vendedor / suporte) -->
                 <div id="adminChatsModalAttachPanel" class="p-3 bg-light border-top d-none">
                     <div class="d-flex gap-2 mb-2">
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setAdminChatsModalAttachType('image')">
@@ -1383,7 +1383,7 @@ window.adminChatsModalSelect = async function(orderId) {
                             <i class="bi bi-file-earmark me-1"></i>Arquivo
                         </button>
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminChatsModalLocation('${orderId}')">
-                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endere�o
                         </button>
                     </div>
                     <div class="input-group input-group-sm mb-2">
@@ -1405,7 +1405,7 @@ window.adminChatsModalSelect = async function(orderId) {
                         <button type="button" class="chat-icon-btn" onclick="window.toggleAdminChatsModalAttachPanel()" title="Anexar imagem ou arquivo">
                             <i class="bi bi-paperclip"></i>
                         </button>
-                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatsModalInput" onclick="window.startVoiceInput('adminChatsModalInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatsModalInput" onclick="window.startVoiceInput('adminChatsModalInput')" title="Gravar �udio"><i class="bi bi-mic"></i></button>
                         <input type="text" id="adminChatsModalInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminChatsModalSend('${orderId}');}">
                         <button type="button" class="chat-send-btn" onclick="window.adminChatsModalSend('${orderId}')"><i class="bi bi-send-fill"></i></button>
@@ -1426,7 +1426,7 @@ window.adminChatsModalBack = function() {
     document.getElementById('adminChatsModalMain')?.classList.remove('wa-chat-open');
 };
 
-// -------- Anexo de imagem/arquivo/localização na Central de Conversas (mesmo padrão do chat cliente ↔ vendedor) --------
+// -------- Anexo de imagem/arquivo/localiza��o na Central de Conversas (mesmo padr�o do chat cliente ? vendedor) --------
 
 let adminChatsModalAttachType = 'image'; // 'image' | 'file'
 
@@ -1452,7 +1452,7 @@ window.confirmAdminChatsModalAttach = async function(orderId) {
     const input = document.getElementById('adminChatsModalAttachLinkInput');
     const url   = input?.value?.trim();
     if (!url || !url.startsWith('http')) {
-        showToast('Cole um link válido (começando com http).', 'warning');
+        showToast('Cole um link v�lido (come�ando com http).', 'warning');
         return;
     }
     const user = getSavedUser();
@@ -1487,7 +1487,7 @@ window.confirmAdminChatsModalAttach = async function(orderId) {
 window.sendAdminChatsModalLocation = async function(orderId) {
     const user = getSavedUser();
     const addr = user?.endereco || user?.cidade;
-    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    if (!addr) { showToast('Cadastre um endere�o no seu perfil para compartilhar.', 'info'); return; }
     const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
     try {
         const result = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
@@ -1496,15 +1496,15 @@ window.sendAdminChatsModalLocation = async function(orderId) {
         const messages = chat.messages || [];
         messages.push({
             senderId: user.id, senderName: `${user.nome} (Suporte)`,
-            text: `📍 ${addr}\n${mapsUrl}`,
+            text: `?? ${addr}\n${mapsUrl}`,
             timestamp: new Date().toISOString(), type: 'location', isStaff: true
         });
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         document.getElementById('adminChatsModalAttachPanel')?.classList.add('d-none');
         window.adminChatsModalSelect(orderId);
-        showToast('Localização enviada!', 'success');
+        showToast('Localiza��o enviada!', 'success');
     } catch (e) {
-        showToast('Erro ao enviar localização.', 'error');
+        showToast('Erro ao enviar localiza��o.', 'error');
     }
 };
 
@@ -1531,7 +1531,7 @@ window.adminChatsModalSend = async function(orderId) {
 
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         input.value = '';
-        window.adminChatsModalSelect(orderId); // recarrega a conversa já com a mensagem nova
+        window.adminChatsModalSelect(orderId); // recarrega a conversa j� com a mensagem nova
     } catch (e) {
         showToast('Erro ao enviar mensagem.', 'error');
     }
@@ -1539,7 +1539,7 @@ window.adminChatsModalSend = async function(orderId) {
 
 /** Encerra o atendimento a partir do modal de conversas do admin */
 window.adminChatsModalCloseChat = async function(orderId) {
-    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento ser� registrada na conversa.')) return;
     const user = getSavedUser();
 
     try {
@@ -1558,7 +1558,7 @@ window.adminChatsModalCloseChat = async function(orderId) {
         const closedChat = withChatClosed({ messages }, true);
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: closedChat.messages }) });
         showToast('Atendimento encerrado.', 'success');
-        window.adminChatsModalSelect(orderId); // recarrega a mesma conversa já como encerrada
+        window.adminChatsModalSelect(orderId); // recarrega a mesma conversa j� como encerrada
         window._adminChatsModalRenderList?.(document.getElementById('adminChatsModalSearch')?.value || '');
     } catch (e) {
         showToast('Erro ao encerrar atendimento.', 'error');
@@ -1567,7 +1567,7 @@ window.adminChatsModalCloseChat = async function(orderId) {
 
 /** Apaga a conversa E o pedido associado, a partir do modal de conversas do admin */
 window.adminChatsModalDelete = async function(orderId) {
-    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta a��o n�o pode ser desfeita.')) return;
     try {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
@@ -1580,16 +1580,16 @@ window.adminChatsModalDelete = async function(orderId) {
 };
 
 // ============================================
-// ABA "CHATS" DO PAINEL ADMIN — chat embutido (sem modal)
+// ABA "CHATS" DO PAINEL ADMIN � chat embutido (sem modal)
 // ============================================
-// Lista no MESMO padrão visual das outras abas do admin (admin-card +
-// admin-row, igual Publicações/Usuários/Suporte). Ao abrir uma conversa,
-// ela ocupa a tela toda no lugar da lista — igual ao chat cliente ↔
+// Lista no MESMO padr�o visual das outras abas do admin (admin-card +
+// admin-row, igual Publica��es/Usu�rios/Suporte). Ao abrir uma conversa,
+// ela ocupa a tela toda no lugar da lista � igual ao chat cliente ?
 // vendedor (mesmas classes chat-header-pro/chat-product-summary/chat-
-// messages/chat-input-bar), só que sem lista lateral do lado, e com as
-// ações de administrador (encerrar/apagar) integradas ao próprio chat.
+// messages/chat-input-bar), s� que sem lista lateral do lado, e com as
+// a��es de administrador (encerrar/apagar) integradas ao pr�prio chat.
 
-/** Preenche a lista da aba "Chats" com as conversas já carregadas pelo renderAdminPanel */
+/** Preenche a lista da aba "Chats" com as conversas j� carregadas pelo renderAdminPanel */
 window.renderAdminSupportTab = function(chats, tickets, orders, users) {
     const list = document.getElementById('adminSupportContactList');
     if (!list) return;
@@ -1614,7 +1614,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
                 id: c.order_id,
                 type: 'order',
                 name,
-                subname: `${buyer} ↔ ${seller}`,
+                subname: `${buyer} ? ${seller}`,
                 avatar: order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=Ped',
                 lastMsg: lastMsg?.text || (lastMsg?.image ? '[Imagem]' : ''),
                 lastTime: lastMsg?.timestamp || c.created_at || '',
@@ -1635,7 +1635,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
                 id: t.id,
                 type: 'ticket',
                 name: t.requester_name || 'Visitante',
-                subname: `${getTicketLabel(t)} · ${roleLabel}`,
+                subname: `${getTicketLabel(t)} � ${roleLabel}`,
                 avatar: t.requester_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((t.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=45`,
                 lastMsg: lastMsg?.text || (lastMsg?.image ? '[Imagem]' : ''),
                 lastTime: lastMsg?.timestamp || '',
@@ -1655,7 +1655,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
         const countEl = document.getElementById('adminSupportSidebarCount');
         if (countEl) {
             const open = contacts.filter(c => !c.closed).length;
-            countEl.textContent = `${open} aberto${open !== 1 ? 's' : ''} · ${contacts.length} total`;
+            countEl.textContent = `${open} aberto${open !== 1 ? 's' : ''} � ${contacts.length} total`;
         }
 
         // Filter
@@ -1682,7 +1682,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
                     </div>
                     <div class="wa-contact-badge text-end" style="flex-shrink:0;">
                         <small class="text-muted" style="font-size:0.65rem;">${timeStr}</small>
-                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${c.closed ? 'bi-lock-fill' : (c.type === 'ticket' ? 'bi-headset' : 'bi-bag-fill')} me-1"></i>${c.closed ? 'Enc.' : (c.type === 'ticket' ? 'Solicitação Aberta' : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'))}</span></div>
+                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${c.closed ? 'bi-lock-fill' : (c.type === 'ticket' ? 'bi-headset' : 'bi-bag-fill')} me-1"></i>${c.closed ? 'Enc.' : (c.type === 'ticket' ? 'Solicita��o Aberta' : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'))}</span></div>
                     </div>
                 </div>`;
         };
@@ -1717,7 +1717,7 @@ window.filterAdminSupportContacts = function(query) {
 
 window.adminSupportSelect = async function(id, type) {
     window._adminActiveSupportId = id;
-    // Garante que nenhuma classe de modal de suporte do USUÁRIO fique
+    // Garante que nenhuma classe de modal de suporte do USU�RIO fique
     // ativa por engano (evita o chat abrir "dentro de outro modal").
     document.body.classList.remove('support-chat-fullscreen');
     document.body.classList.add('wa-locked', 'admin-chat-fullscreen');
@@ -1747,7 +1747,7 @@ window.adminSupportSelect = async function(id, type) {
                 Promise.resolve(adminOrdersCache.find(o => o.id === id))
             ]);
             const chat = chatResult?.[0];
-            if (!chat) { showToast('Conversa não encontrada.', 'error'); window.adminSupportBack(); return; }
+            if (!chat) { showToast('Conversa n�o encontrada.', 'error'); window.adminSupportBack(); return; }
 
             const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
             const resolveSenderAvatar = (m) => {
@@ -1765,7 +1765,7 @@ window.adminSupportSelect = async function(id, type) {
             const msgsHtml = (chat.messages || []).map((m, i) => adminSupportMsgBubbleHtml(m, i, resolveSenderName, resolveSenderAvatar)).join('')
                 || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
             const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
-            const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '—', class: 'bg-secondary' };
+            const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '�', class: 'bg-secondary' };
             const closed = getChatClosed(chat);
 
             activeChatEl.innerHTML = `
@@ -1779,13 +1779,13 @@ window.adminSupportSelect = async function(id, type) {
                     <div class="chat-header-info">
                         <span class="chat-header-name">${order?.product_title || 'Pedido #' + id.slice(-6)}</span>
                         ${order ? `<span class="chat-header-price">${formatPreco(order.total, {htmlGratis:false})}</span>` : ''}
-                        <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${id.slice(-6).toUpperCase()} · ${msgCount} mensagens</span>
+                        <span class="chat-header-order-id">${order?.buyer_name || '?'} ? ${order?.seller_name || '?'} � #${id.slice(-6).toUpperCase()} � ${msgCount} mensagens</span>
                     </div>
-                    <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminSupportParticipants')" title="Ver usuários">
+                    <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminSupportParticipants')" title="Ver usu�rios">
                         <i class="bi bi-people-fill"></i>
                     </button>
                     <div class="dropdown">
-                        <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                        <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Op��es">
                             <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -1823,37 +1823,13 @@ window.adminSupportSelect = async function(id, type) {
 
                 ${!closed ? `
                 <div id="adminSupportInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-                <div id="adminSupportAttachPanel" class="p-3 bg-light border-top d-none">
-                    <div class="d-flex gap-2 mb-2">
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setAdminSupportAttachType('image')">
-                            <i class="bi bi-image me-1"></i>Imagem
-                        </button>
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminSupportAttachType('file')">
-                            <i class="bi bi-file-earmark me-1"></i>Arquivo
-                        </button>
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminSupportLocation()">
-                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
-                        </button>
-                    </div>
-                    <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                        <input type="url" id="adminSupportAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
-                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
-                        </button>
-                        <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmAdminSupportAttach()">
-                            <i class="bi bi-send me-1"></i>Enviar
-                        </button>
-                    </div>
-                </div>
+                ${supportAttachPanelHtml('adminSupport')}
                 <div class="chat-input-bar">
                     <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="chat-icon-btn" onclick="window.toggleAdminSupportAttachPanel()" title="Anexar">
                             <i class="bi bi-paperclip"></i>
                         </button>
-                        <button type="button" class="chat-icon-btn" data-voice-input="adminSupportChatInput" onclick="window.startVoiceInput('adminSupportChatInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+                        <button type="button" class="chat-icon-btn" data-voice-input="adminSupportChatInput" onclick="window.startVoiceInput('adminSupportChatInput')" title="Gravar �udio"><i class="bi bi-mic"></i></button>
                         <input type="text" id="adminSupportChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSupportSendMessage('${id}', 'order');}">
                         <button type="button" class="chat-send-btn" onclick="window.adminSupportSendMessage('${id}', 'order')"><i class="bi bi-send-fill"></i></button>
@@ -1868,7 +1844,7 @@ window.adminSupportSelect = async function(id, type) {
             // Support ticket
             const result = await supabaseFetch(`chats?id=eq.${id}&limit=1`);
             const ticket = normalizeTicket(result?.[0]);
-            if (!ticket) { showToast('Chamado não encontrado.', 'error'); window.adminSupportBack(); return; }
+            if (!ticket) { showToast('Chamado n�o encontrado.', 'error'); window.adminSupportBack(); return; }
 
             const resolveSenderName = () => ticket.requester_name;
             const resolveSenderAvatar = (m) => {
@@ -1898,14 +1874,14 @@ window.adminSupportSelect = async function(id, type) {
                     </div>
                     <div class="chat-header-info">
                         <span class="chat-header-name">${ticket.requester_name || 'Visitante'}</span>
-                        <span class="chat-header-order-id">${roleLabel} · ${reasonLabel}${ticket.order_id ? ' · Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''} · ${msgCount} mensagens</span>
+                        <span class="chat-header-order-id">${roleLabel} � ${reasonLabel}${ticket.order_id ? ' � Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''} � ${msgCount} mensagens</span>
                     </div>
-                    <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminSupportTicketParticipants')" title="Ver usuário">
+                    <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminSupportTicketParticipants')" title="Ver usu�rio">
                         <i class="bi bi-people-fill"></i>
                     </button>
                     ${ticket.status === 'closed' ? `<button type="button" class="chat-header-close text-danger" onclick="window.adminSupportDelete('${id}', 'ticket')" title="Apagar chamado (encerrado)"><i class="bi bi-trash"></i></button>` : ''}
                     <div class="dropdown">
-                        <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                        <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Op��es">
                             <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -1918,7 +1894,7 @@ window.adminSupportSelect = async function(id, type) {
 
                 <div class="chat-status-bar">
                     <div class="alert ${ticket.status === 'closed' ? 'alert-secondary' : 'alert-info'} mb-0 py-2 text-center small">
-                        <i class="bi ${ticket.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${ticket.status === 'closed' ? 'Solicitação Encerrada' : 'Solicitação Aberta'}
+                        <i class="bi ${ticket.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${ticket.status === 'closed' ? 'Solicita��o Encerrada' : 'Solicita��o Aberta'}
                     </div>
                 </div>
 
@@ -1927,7 +1903,7 @@ window.adminSupportSelect = async function(id, type) {
                         <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=3483fa&color=fff&size=40'">
                         <div class="chat-participant-info">
                             <strong>${ticket.requester_name || 'Visitante'}</strong>
-                            <small>${ticket.requester_email || 'E-mail não informado'} · ${roleLabel}</small>
+                            <small>${ticket.requester_email || 'E-mail n�o informado'} � ${roleLabel}</small>
                         </div>
                     </div>
                 </div>
@@ -1936,37 +1912,13 @@ window.adminSupportSelect = async function(id, type) {
 
                 ${ticket.status !== 'closed' ? `
                 <div id="adminSupportInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-                <div id="adminSupportAttachPanel" class="p-3 bg-light border-top d-none">
-                    <div class="d-flex gap-2 mb-2">
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setAdminSupportAttachType('image')">
-                            <i class="bi bi-image me-1"></i>Imagem
-                        </button>
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setAdminSupportAttachType('file')">
-                            <i class="bi bi-file-earmark me-1"></i>Arquivo
-                        </button>
-                        <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminSupportLocation()">
-                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
-                        </button>
-                    </div>
-                    <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                        <input type="url" id="adminSupportAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
-                            <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
-                        </button>
-                        <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmAdminSupportAttach()">
-                            <i class="bi bi-send me-1"></i>Enviar
-                        </button>
-                    </div>
-                </div>
+                ${supportAttachPanelHtml('adminSupport')}
                 <div class="chat-input-bar">
                     <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="chat-icon-btn" onclick="window.toggleAdminSupportAttachPanel()" title="Anexar">
                             <i class="bi bi-paperclip"></i>
                         </button>
-                        <button type="button" class="chat-icon-btn" data-voice-input="adminSupportChatInput" onclick="window.startVoiceInput('adminSupportChatInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+                        <button type="button" class="chat-icon-btn" data-voice-input="adminSupportChatInput" onclick="window.startVoiceInput('adminSupportChatInput')" title="Gravar �udio"><i class="bi bi-mic"></i></button>
                         <input type="text" id="adminSupportChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSupportSendMessage('${id}', 'ticket');}">
                         <button type="button" class="chat-send-btn" onclick="window.adminSupportSendMessage('${id}', 'ticket')"><i class="bi bi-send-fill"></i></button>
@@ -1999,6 +1951,91 @@ window.adminSupportCloseFullscreen = function() {
     window._adminActiveSupportId = null;
     adminRefreshCurrentView();
 };
+
+/**
+ * Gera o HTML do painel de anexo completo (3 abas: M�dia / Documentos /
+ * Endere�o) para o chat de suporte do admin, reaproveitando EXATAMENTE as
+ * mesmas fun��es globais do chat cliente ? vendedor:
+ *   - window.sendChatImageFile   (upload Imgur de imagem do PC)
+ *   - window.sendChatImage       (envio de imagem por link)
+ *   - window.abrirDocHost        (abre Google Drive / OneDrive em nova aba)
+ *   - window.sendChatLocation    (atual / cadastrado / link do Maps)
+ * O `prefix` ('adminSupport' aqui) � usado pra montar os ids dos inputs.
+ */
+function supportAttachPanelHtml(prefix) {
+    return `
+    <div id="${prefix}AttachPanel" class="p-3 bg-light border-top d-none">
+        <div class="d-flex gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="media" onclick="window.setAdminSupportAttachType('media')">
+                <i class="bi bi-play-circle me-1"></i>M�dia
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="docs" onclick="window.setAdminSupportAttachType('docs')">
+                <i class="bi bi-file-earmark me-1"></i>Documentos
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="address" onclick="window.setAdminSupportAttachType('address')">
+                <i class="bi bi-geo-alt-fill me-1"></i>Endere�o
+            </button>
+        </div>
+
+        <!-- M�DIA -->
+        <div id="${prefix}AttachBoxMedia">
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                <input type="url" id="${prefix}AttachLinkInputMedia" class="form-control" placeholder="Cole o link da imagem/v�deo...">
+                <button type="button" class="ml-attach ml-btn-media" onclick="window.sendAdminSupportImageFromLink(document.getElementById('${prefix}AttachLinkInputMedia').value)">
+                    <i class="bi bi-send me-1"></i>Enviar
+                </button>
+            </div>
+            <div class="d-flex gap-2">
+                <label class="ml-attach ml-btn-pc flex-grow-1" style="cursor:pointer;">
+                    <i class="bi bi-cloud-upload me-1"></i>Escolher do PC
+                    <input type="file" accept="image/*,video/*" class="d-none" onchange="window.sendAdminSupportImageFile(this)">
+                </label>
+                <button type="button" class="ml-attach ml-btn-imgur flex-grow-1" onclick="window.abrirUploadExterno()">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Imgur
+                </button>
+            </div>
+        </div>
+
+        <!-- DOCUMENTOS -->
+        <div id="${prefix}AttachBoxDocs" class="d-none">
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                <input type="url" id="${prefix}AttachLinkInputDocs" class="form-control" placeholder="Cole o link do documento...">
+                <button type="button" class="ml-attach ml-btn-media" onclick="window.sendAdminSupportDoc()">
+                    <i class="bi bi-send me-1"></i>Enviar
+                </button>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="ml-attach ml-btn-drive flex-grow-1" onclick="window.abrirDocHost('Google Drive')">
+                    <i class="bi bi-google me-1"></i>Google Drive
+                </button>
+                <button type="button" class="ml-attach ml-btn-onedrive flex-grow-1" onclick="window.abrirDocHost('OneDrive')">
+                    <i class="bi bi-microsoft me-1"></i>OneDrive
+                </button>
+            </div>
+        </div>
+
+        <!-- ENDERE�O -->
+        <div id="${prefix}AttachBoxAddress" class="d-none">
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
+                <input type="url" id="${prefix}AttachLinkInputAddress" class="form-control" placeholder="Cole o link do endere�o (Google Maps)...">
+                <button type="button" class="ml-attach ml-btn-media" onclick="window.sendAdminSupportLocation('other')">
+                    <i class="bi bi-send me-1"></i>Enviar
+                </button>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="ml-attach ml-btn-loc flex-grow-1" onclick="window.sendAdminSupportLocation('current')">
+                    <i class="bi bi-geo-alt-fill me-1"></i>Endere�o atual
+                </button>
+                <button type="button" class="ml-attach ml-btn-loc flex-grow-1" onclick="window.sendAdminSupportLocation('stored')">
+                    <i class="bi bi-house-door me-1"></i>Endere�o cadastrado
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
 
 /** Abre a tela inteira do Suporte com sidebar + chat, igual ao chat do vendedor/cliente */
 window.openAdminSupportFullscreen = async function() {
@@ -2073,7 +2110,7 @@ window.startAdminSupportReply = async function(index) {
         preview.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="small text-truncate" style="max-width:85%;">
-                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usuário')}</strong>
+                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usu�rio')}</strong>
                     <span class="text-muted">${msg.text}</span>
                 </div>
                 <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelAdminSupportReplyOrEdit()"></i>
@@ -2166,7 +2203,7 @@ window.adminSupportSendMessage = async function(id, type) {
                 isStaff:    true
             };
             if (replyTarget) {
-                newMsg.replyTo = { senderName: replyTarget.senderName || (replyTarget.isStaff ? 'Suporte' : 'Usuário'), text: replyTarget.text || (replyTarget.image ? '[imagem]' : '') };
+                newMsg.replyTo = { senderName: replyTarget.senderName || (replyTarget.isStaff ? 'Suporte' : 'Usu�rio'), text: replyTarget.text || (replyTarget.image ? '[imagem]' : '') };
             }
             messages.push(newMsg);
             adminSupportReplyIndex = null;
@@ -2182,7 +2219,7 @@ window.adminSupportSendMessage = async function(id, type) {
 };
 
 window.adminSupportCloseChat = async function(orderId) {
-    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento ser� registrada na conversa.')) return;
     const user = getSavedUser();
     try {
         const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
@@ -2203,7 +2240,7 @@ window.adminSupportCloseChat = async function(orderId) {
 };
 
 window.adminSupportCloseTicket = async function(ticketId) {
-    if (!confirm('Encerrar este chamado?\nUma mensagem de encerramento será registrada.')) return;
+    if (!confirm('Encerrar este chamado?\nUma mensagem de encerramento ser� registrada.')) return;
     const user = getSavedUser();
     try {
         const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
@@ -2225,7 +2262,7 @@ window.adminSupportCloseTicket = async function(ticketId) {
 
 window.adminSupportDelete = async function(id, type) {
     const label = type === 'order' ? 'conversa e o pedido' : 'chamado';
-    if (!confirm(`Apagar ${label} permanentemente?\nEsta ação não pode ser desfeita.`)) return;
+    if (!confirm(`Apagar ${label} permanentemente?\nEsta a��o n�o pode ser desfeita.`)) return;
     try {
         if (type === 'order') {
             await supabaseFetch(`chats?order_id=eq.${id}`, { method: 'DELETE' });
@@ -2245,7 +2282,7 @@ window.toggleAdminSupportAttachPanel = function() {
     if (!panel) return;
     panel.classList.toggle('d-none');
     if (!panel.classList.contains('d-none')) {
-        document.getElementById('adminSupportAttachLinkInput')?.focus();
+        window.setAdminSupportAttachType(adminSupportAttachType || 'media');
     }
 };
 
@@ -2254,8 +2291,21 @@ window.setAdminSupportAttachType = function(type) {
     document.querySelectorAll('#adminSupportAttachPanel .chat-attach-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.attachType === type);
     });
-    const input = document.getElementById('adminSupportAttachLinkInput');
-    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem...' : 'Cole o link do arquivo...';
+    // Mostra/esconde as 3 caixas (M�dia / Documentos / Endere�o)
+    const boxes = {
+        media:   'adminSupportAttachBoxMedia',
+        docs:    'adminSupportAttachBoxDocs',
+        address: 'adminSupportAttachBoxAddress'
+    };
+    Object.entries(boxes).forEach(([k, id]) => {
+        document.getElementById(id)?.classList.toggle('d-none', k !== type);
+    });
+    const focusMap = {
+        media:   'adminSupportAttachLinkInputMedia',
+        docs:    'adminSupportAttachLinkInputDocs',
+        address: 'adminSupportAttachLinkInputAddress'
+    };
+    document.getElementById(focusMap[type])?.focus();
 };
 
 window.confirmAdminSupportAttach = async function() {
@@ -2264,10 +2314,13 @@ window.confirmAdminSupportAttach = async function() {
     const data = window._adminSupportData;
     const isOrder = data?.chats?.some(c => c.order_id === id);
     const type = isOrder ? 'order' : 'ticket';
-    const input = document.getElementById('adminSupportAttachLinkInput');
+    // A aba "M�dia" envia imagem; as demais (docs/address) t�m bot�es pr�prios.
+    if (adminSupportAttachType === 'docs') { return window.sendAdminSupportDoc(); }
+    if (adminSupportAttachType === 'address') { return window.sendChatLocation('other'); }
+    const input = document.getElementById('adminSupportAttachLinkInputMedia');
     const url   = input?.value?.trim();
     if (!url || !url.startsWith('http')) {
-        showToast('Cole um link válido (começando com http).', 'warning');
+        showToast('Cole um link v�lido (come�ando com http).', 'warning');
         return;
     }
     const user = getSavedUser();
@@ -2277,20 +2330,14 @@ window.confirmAdminSupportAttach = async function() {
         const chat = result?.[0];
         if (!chat) return;
         const messages = chat.messages || [];
-        if (adminSupportAttachType === 'image') {
-            messages.push({
-                senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
-                text: 'Imagem', image: normalizeImageUrl(url),
-                timestamp: new Date().toISOString(), type: 'image', isStaff: true
-            });
-        } else {
-            messages.push({
-                senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
-                text: `Arquivo: ${url.split('/').pop()}`,
-                file: { name: 'Arquivo Externo', url, size: 0 },
-                timestamp: new Date().toISOString(), type: 'file', isStaff: true
-            });
-        }
+        const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+        messages.push({
+            senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
+            text: isVideo ? 'V�deo' : 'Imagem',
+            ...(isVideo ? { video: normalizeImageUrl(url) } : { image: normalizeImageUrl(url) }),
+            timestamp: new Date().toISOString(),
+            type: isVideo ? 'video' : 'image', isStaff: true
+        });
         await supabaseFetch(type === 'order' ? `chats?order_id=eq.${id}` : `chats?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         input.value = '';
         document.getElementById('adminSupportAttachPanel')?.classList.add('d-none');
@@ -2298,16 +2345,20 @@ window.confirmAdminSupportAttach = async function() {
     } catch(e) { showToast('Erro ao enviar anexo.', 'error'); }
 };
 
-window.sendAdminSupportLocation = async function() {
+/** Envia imagem/v�deo por link como Suporte (reutiliza a mesma l�gica de tipo do cliente) */
+window.sendAdminSupportImageFromLink = async function(rawUrl) {
+    const url = (rawUrl || '').trim();
+    if (!url || !(url.startsWith('http') || url.startsWith('data:'))) {
+        showToast('Cole um link de imagem/v�deo v�lido (come�ando com http).', 'warning');
+        return;
+    }
     const id = window._adminActiveSupportId;
     if (!id) return;
     const data = window._adminSupportData;
     const isOrder = data?.chats?.some(c => c.order_id === id);
     const type = isOrder ? 'order' : 'ticket';
     const user = getSavedUser();
-    const addr = user?.endereco || user?.cidade;
-    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
-    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
+    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
     try {
         const endpoint = type === 'order' ? `chats?order_id=eq.${id}` : `chats?id=eq.${id}`;
         const result = await supabaseFetch(endpoint + '&limit=1');
@@ -2316,27 +2367,159 @@ window.sendAdminSupportLocation = async function() {
         const messages = chat.messages || [];
         messages.push({
             senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
-            text: `📍 ${addr}\n${mapsUrl}`,
+            text: isVideo ? 'V�deo' : 'Imagem',
+            ...(isVideo ? { video: normalizeImageUrl(url) } : { image: normalizeImageUrl(url) }),
+            timestamp: new Date().toISOString(),
+            type: isVideo ? 'video' : 'image', isStaff: true
+        });
+        await supabaseFetch(endpoint, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        const input = document.getElementById('adminSupportAttachLinkInputMedia');
+        if (input) input.value = '';
+        document.getElementById('adminSupportAttachPanel')?.classList.add('d-none');
+        window.adminSupportSelect(id, type);
+    } catch (e) { showToast('Erro ao enviar imagem.', 'error'); }
+};
+
+/** Upload de imagem do PC via Imgur (reutiliza window.uploadImageToHost) e envio como Suporte */
+window.sendAdminSupportImageFile = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const label = input.closest('label');
+    const original = label ? label.innerHTML : '';
+    if (label) label.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando...';
+    const url = await window.uploadImageToHost(file);
+    if (label) label.innerHTML = original;
+    if (!url) return;
+    const id = window._adminActiveSupportId;
+    if (!id) return;
+    const data = window._adminSupportData;
+    const isOrder = data?.chats?.some(c => c.order_id === id);
+    const type = isOrder ? 'order' : 'ticket';
+    const user = getSavedUser();
+    try {
+        const endpoint = type === 'order' ? `chats?order_id=eq.${id}` : `chats?id=eq.${id}`;
+        const result = await supabaseFetch(endpoint + '&limit=1');
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        messages.push({
+            senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
+            text: 'Imagem', image: normalizeImageUrl(url),
+            timestamp: new Date().toISOString(), type: 'image', isStaff: true
+        });
+        await supabaseFetch(endpoint, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        document.getElementById('adminSupportAttachPanel')?.classList.add('d-none');
+        window.adminSupportSelect(id, type);
+    } catch (e) { showToast('Erro ao enviar imagem.', 'error'); }
+};
+
+/** Envia documento (Google Drive / OneDrive) por link como Suporte */
+window.sendAdminSupportDoc = async function() {
+    const id = window._adminActiveSupportId;
+    if (!id) return;
+    const data = window._adminSupportData;
+    const isOrder = data?.chats?.some(c => c.order_id === id);
+    const type = isOrder ? 'order' : 'ticket';
+    const input = document.getElementById('adminSupportAttachLinkInputDocs');
+    const url   = input?.value?.trim();
+    if (!url || !url.startsWith('http')) {
+        showToast('Cole um link de documento v�lido (come�ando com http).', 'warning');
+        return;
+    }
+    const user = getSavedUser();
+    try {
+        const endpoint = type === 'order' ? `chats?order_id=eq.${id}` : `chats?id=eq.${id}`;
+        const result = await supabaseFetch(endpoint + '&limit=1');
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        messages.push({
+            senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
+            text: `Arquivo: ${url.split('/').pop()}`,
+            file: { name: 'Arquivo Externo', url, size: 0 },
+            timestamp: new Date().toISOString(), type: 'file', isStaff: true
+        });
+        await supabaseFetch(endpoint, { method: 'PATCH', body: JSON.stringify({ messages }) });
+        input.value = '';
+        document.getElementById('adminSupportAttachPanel')?.classList.add('d-none');
+        window.adminSupportSelect(id, type);
+        showToast('Documento enviado!', 'success');
+    } catch (e) { showToast('Erro ao enviar documento.', 'error'); }
+};
+
+/** Envia localiza��o (atual / cadastrada / link do Maps) como Suporte.
+ *  Mesmo comportamento do chat cliente ? vendedor (chip clic�vel do Maps),
+ *  por�m gravando com isStaff e re-renderizando a pr�pria tela do admin. */
+window.sendAdminSupportLocation = async function(kind) {
+    const id = window._adminActiveSupportId;
+    if (!id) return;
+    const data = window._adminSupportData;
+    const isOrder = data?.chats?.some(c => c.order_id === id);
+    const type = isOrder ? 'order' : 'ticket';
+    const user = getSavedUser();
+    const endpoint = type === 'order' ? `chats?order_id=eq.${id}` : `chats?id=eq.${id}`;
+
+    let mapsUrl = '';
+    let caption = '';
+
+    if (kind === 'current') {
+        if (!navigator.geolocation) { showToast('Geolocaliza��o n�o suportada.', 'error'); return; }
+        showToast('Obtendo sua localiza��o...', 'info');
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            await sendAdminSupportLocationMessage(mapsUrl, `Localiza��o atual: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, endpoint, id, type, user);
+        }, () => showToast('N�o foi poss�vel obter a localiza��o.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
+        return;
+    }
+
+    if (kind === 'stored') {
+        const u = getSavedUser() || {};
+        const endereco = [u.endereco, u.cidade, u.estado, u.cep].filter(Boolean).join(', ');
+        mapsUrl = u.maps || (endereco ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}` : '');
+        if (!mapsUrl) { showToast('Voc� n�o tem endere�o cadastrado no perfil.', 'warning'); return; }
+        caption = `?? Meu endere�o cadastrado: ${endereco || mapsUrl}`;
+    } else {
+        // other: link do campo do Maps
+        const input = document.getElementById('adminSupportAttachLinkInputAddress');
+        mapsUrl = (input?.value || '').trim();
+        if (!mapsUrl || !mapsUrl.startsWith('http')) { showToast('Cole um link de endere�o v�lido.', 'warning'); return; }
+        caption = `Endere�o (link): ${mapsUrl}`;
+    }
+
+    await sendAdminSupportLocationMessage(mapsUrl, caption, endpoint, id, type, user);
+};
+
+async function sendAdminSupportLocationMessage(mapsUrl, caption, endpoint, id, type, user) {
+    try {
+        const result = await supabaseFetch(endpoint + '&limit=1');
+        const chat = result?.[0];
+        if (!chat) return;
+        const messages = chat.messages || [];
+        messages.push({
+            senderId: user?.id || 'anon', senderName: `${user?.nome || 'Suporte'} (Suporte)`,
+            text: caption, location: mapsUrl,
             timestamp: new Date().toISOString(), type: 'location', isStaff: true
         });
         await supabaseFetch(endpoint, { method: 'PATCH', body: JSON.stringify({ messages }) });
         document.getElementById('adminSupportAttachPanel')?.classList.add('d-none');
         window.adminSupportSelect(id, type);
-        showToast('Localização enviada!', 'success');
-    } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
-};
+        showToast('Localiza��o enviada!', 'success');
+    } catch (e) { showToast('Erro ao enviar localiza��o.', 'error'); }
+}
 
-/** Seleciona e carrega uma conversa específica dentro da aba "Chats" do admin — abre em tela cheia no lugar da lista */
+/** Seleciona e carrega uma conversa espec�fica dentro da aba "Chats" do admin � abre em tela cheia no lugar da lista */
 window.adminChatsTabSelect = async function(orderId) {
     window._adminActiveChatOrderId = orderId;
     adminChatsTabReplyIndex = null;
     adminChatsTabEditIndex  = null;
     // Igual ao chat cliente <-> vendedor: some com a navbar inferior (footer)
-    // e, além disso, esconde o resto do painel admin (título, cards de
-    // estatística) pra o chat ocupar a tela toda, só ficando a navbar do site.
+    // e, al�m disso, esconde o resto do painel admin (t�tulo, cards de
+    // estat�stica) pra o chat ocupar a tela toda, s� ficando a navbar do site.
     document.body.classList.add('wa-locked', 'admin-chat-fullscreen');
 
-    // Esconde a lista (admin-card) e mostra o chat ocupando toda a área da aba
+    // Esconde a lista (admin-card) e mostra o chat ocupando toda a �rea da aba
     document.getElementById('adminChatsTabListWrap')?.classList.add('d-none');
     const wrap = document.getElementById('adminChatsTabActiveWrap');
     wrap?.classList.remove('d-none');
@@ -2350,7 +2533,7 @@ window.adminChatsTabSelect = async function(orderId) {
             Promise.resolve((window._adminChatsTabData?.orders || adminOrdersCache).find(o => o.id === orderId))
         ]);
         const chat = chatResult?.[0];
-        if (!chat) { showToast('Conversa não encontrada.', 'error'); window.adminChatsTabBack(); return; }
+        if (!chat) { showToast('Conversa n�o encontrada.', 'error'); window.adminChatsTabBack(); return; }
 
         const resolveSenderName = (m) => (m.senderId === order?.buyer_id ? order?.buyer_name : order?.seller_name);
         const resolveSenderAvatar = (m) => {
@@ -2364,7 +2547,7 @@ window.adminChatsTabSelect = async function(orderId) {
         const msgsHtml = (chat.messages || []).map((m, i) => adminChatsTabMsgBubbleHtml(m, i, resolveSenderName, resolveSenderAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
         const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
-        const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '—', class: 'bg-secondary' };
+        const st = ORDER_STATUS_MAP[order?.status] || { text: order?.status || '�', class: 'bg-secondary' };
         const closed = getChatClosed(chat);
 
         activeEl.innerHTML = `
@@ -2377,13 +2560,13 @@ window.adminChatsTabSelect = async function(orderId) {
                 </div>
                 <div class="chat-header-info">
                     <span class="chat-header-name">${order?.product_title || 'Pedido #' + orderId.slice(-6)}</span>
-                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ↔ ${order?.seller_name || '?'} · #${orderId.slice(-6).toUpperCase()} · ${msgCount} mensagens</span>
+                    <span class="chat-header-order-id">${order?.buyer_name || '?'} ? ${order?.seller_name || '?'} � #${orderId.slice(-6).toUpperCase()} � ${msgCount} mensagens</span>
                 </div>
-                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsTabParticipants')" title="Ver usuários da conversa">
+                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants('adminChatsTabParticipants')" title="Ver usu�rios da conversa">
                     <i class="bi bi-people-fill"></i>
                 </button>
                 <div class="dropdown">
-                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Op��es">
                         <i class="bi bi-three-dots-vertical"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -2404,14 +2587,14 @@ window.adminChatsTabSelect = async function(orderId) {
                 <div class="chat-participant-row">
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.buyer_name || '?')}&background=3483fa&color=fff" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                     <div class="chat-participant-info">
-                        <strong>${order?.buyer_name || 'Comprador não identificado'}</strong>
+                        <strong>${order?.buyer_name || 'Comprador n�o identificado'}</strong>
                         <small><i class="bi bi-bag-fill me-1"></i>Comprador</small>
                     </div>
                 </div>
                 <div class="chat-participant-row">
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(order?.seller_name || '?')}&background=22c98e&color=fff" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                     <div class="chat-participant-info">
-                        <strong>${order?.seller_name || 'Vendedor não identificado'}</strong>
+                        <strong>${order?.seller_name || 'Vendedor n�o identificado'}</strong>
                         <small><i class="bi bi-shop me-1"></i>Vendedor</small>
                     </div>
                 </div>
@@ -2422,7 +2605,7 @@ window.adminChatsTabSelect = async function(orderId) {
             ${!closed ? `
                 <div id="adminChatsTabInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
 
-                <!-- Painel de Anexo (mesmo padrão do chat cliente ↔ vendedor / suporte) -->
+                <!-- Painel de Anexo (mesmo padr�o do chat cliente ? vendedor / suporte) -->
                 <div id="adminChatsTabAttachPanel" class="p-3 bg-light border-top d-none">
                     <div class="d-flex gap-2 mb-2">
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setAdminChatsTabAttachType('image')">
@@ -2432,7 +2615,7 @@ window.adminChatsTabSelect = async function(orderId) {
                             <i class="bi bi-file-earmark me-1"></i>Arquivo
                         </button>
                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminChatsTabLocation('${orderId}')">
-                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
+                            <i class="bi bi-geo-alt-fill me-1"></i>Endere�o
                         </button>
                     </div>
                     <div class="input-group input-group-sm mb-2">
@@ -2454,7 +2637,7 @@ window.adminChatsTabSelect = async function(orderId) {
                         <button type="button" class="chat-icon-btn" onclick="window.toggleAdminChatsTabAttachPanel()" title="Anexar imagem ou arquivo">
                             <i class="bi bi-paperclip"></i>
                         </button>
-                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatsTabMessageInput" onclick="window.startVoiceInput('adminChatsTabMessageInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatsTabMessageInput" onclick="window.startVoiceInput('adminChatsTabMessageInput')" title="Gravar �udio"><i class="bi bi-mic"></i></button>
                         <input type="text" id="adminChatsTabMessageInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminChatsTabSend('${orderId}');}">
                         <button type="button" class="chat-send-btn" onclick="window.adminChatsTabSend('${orderId}')"><i class="bi bi-send-fill"></i></button>
@@ -2486,8 +2669,8 @@ window.adminChatsTabSendForm = async function(event, orderId) {
     return window.adminChatsTabSend(orderId);
 };
 
-/** Envia uma mensagem como membro da equipe de suporte, direto na aba "Chats" —
- *  ou salva a edição em andamento, se houver uma (ver window.startAdminChatsTabEdit). */
+/** Envia uma mensagem como membro da equipe de suporte, direto na aba "Chats" �
+ *  ou salva a edi��o em andamento, se houver uma (ver window.startAdminChatsTabEdit). */
 window.adminChatsTabSend = async function(orderId) {
     const input = document.getElementById('adminChatsTabMessageInput');
     const text  = input?.value.trim();
@@ -2516,14 +2699,14 @@ window.adminChatsTabSend = async function(orderId) {
             };
             if (adminChatsTabReplyIndex !== null && messages[adminChatsTabReplyIndex]) {
                 const replySrc = messages[adminChatsTabReplyIndex];
-                newMsg.replyTo = { senderName: replySrc.senderName || (replySrc.isStaff ? 'Suporte' : 'Usuário'), text: replySrc.text || '' };
+                newMsg.replyTo = { senderName: replySrc.senderName || (replySrc.isStaff ? 'Suporte' : 'Usu�rio'), text: replySrc.text || '' };
             }
             messages.push(newMsg);
         }
 
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         window.cancelAdminChatsTabReplyOrEdit();
-        window.adminChatsTabSelect(orderId); // recarrega a conversa já com a mensagem nova
+        window.adminChatsTabSelect(orderId); // recarrega a conversa j� com a mensagem nova
     } catch (e) {
         showToast('Erro ao enviar mensagem.', 'error');
     }
@@ -2531,7 +2714,7 @@ window.adminChatsTabSend = async function(orderId) {
 
 /** Encerra o atendimento a partir da aba "Chats" do admin */
 window.adminChatsTabCloseChat = async function(orderId) {
-    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento será registrada na conversa.')) return;
+    if (!confirm('Encerrar este atendimento?\nUma mensagem de encerramento ser� registrada na conversa.')) return;
     const user = getSavedUser();
 
     try {
@@ -2555,7 +2738,7 @@ window.adminChatsTabCloseChat = async function(orderId) {
         const cached = window._adminChatsTabData?.chats.find(c => c.order_id === orderId);
         if (cached) cached.closed = true;
 
-        window.adminChatsTabSelect(orderId); // recarrega a mesma conversa já como encerrada
+        window.adminChatsTabSelect(orderId); // recarrega a mesma conversa j� como encerrada
         window._adminChatsTabRenderList?.();
     } catch (e) {
         showToast('Erro ao encerrar atendimento.', 'error');
@@ -2564,7 +2747,7 @@ window.adminChatsTabCloseChat = async function(orderId) {
 
 /** Apaga a conversa E o pedido associado, a partir da aba "Chats" do admin */
 window.adminChatsTabDelete = async function(orderId) {
-    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    if (!confirm('Apagar esta conversa e o pedido relacionado permanentemente?\nEsta a��o n�o pode ser desfeita.')) return;
     try {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
@@ -2580,36 +2763,36 @@ window.adminChatsTabDelete = async function(orderId) {
 // ============================================
 // CENTRAL DE SUPORTE (chamados: senha, entrega, conta etc.)
 // ============================================
-// Reaproveita a tabela `chats` (mesma dos chats comprador ↔ vendedor) sem criar
-// nenhuma coluna nova. Um chamado de suporte é uma linha de `chats` onde:
-//  - `order_id` fica sempre NULL (é isso que diferencia um chamado de um chat
+// Reaproveita a tabela `chats` (mesma dos chats comprador ? vendedor) sem criar
+// nenhuma coluna nova. Um chamado de suporte � uma linha de `chats` onde:
+//  - `order_id` fica sempre NULL (� isso que diferencia um chamado de um chat
 //    de pedido de verdade, que sempre tem `order_id` preenchido);
 //  - `buyer_id` / `buyer_name` guardam o solicitante;
-//  - `closed` (mesma coluna já usada pelos chats) guarda o status;
+//  - `closed` (mesma coluna j� usada pelos chats) guarda o status;
 //  - categoria, assunto, e-mail, cargo e pedido relacionado ficam dentro do
-//    próprio JSON de `messages`, numa mensagem de metadados (type: 'ticket_meta')
-//    que fica escondida da conversa exibida pro usuário/admin.
+//    pr�prio JSON de `messages`, numa mensagem de metadados (type: 'ticket_meta')
+//    que fica escondida da conversa exibida pro usu�rio/admin.
 
 const SUPPORT_CATEGORY_LABELS = {
     esqueci_senha:            'Esqueci minha senha',
-    produto_nao_recebido:     'Não recebi o produto',
-    entrega_sem_confirmacao:  'Entreguei, mas o comprador não confirmou',
-    conta_ajuda:               'Dúvida sobre a conta/plataforma',
+    produto_nao_recebido:     'N�o recebi o produto',
+    entrega_sem_confirmacao:  'Entreguei, mas o comprador n�o confirmou',
+    conta_ajuda:               'D�vida sobre a conta/plataforma',
     outro:                     'Outro assunto'
 };
 
-/** Retorna o label legível de um chamado de suporte: categoria → assunto → primeira mensagem → fallback */
+/** Retorna o label leg�vel de um chamado de suporte: categoria ? assunto ? primeira mensagem ? fallback */
 function getTicketLabel(t) {
     return SUPPORT_CATEGORY_LABELS[t?.category] || t?.subject || t?.messages?.[0]?.text || 'Chamado';
 }
 
-/** Converte a linha crua de `chats` (com a mensagem de metadados embutida) num objeto de chamado "achatado" e fácil de usar na UI */
+/** Converte a linha crua de `chats` (com a mensagem de metadados embutida) num objeto de chamado "achatado" e f�cil de usar na UI */
 function normalizeTicket(raw) {
     if (!raw) return null;
     const msgs = raw.messages || [];
     const meta = msgs.find(m => m.type === 'ticket_meta') || {};
-    // Tenta achar o avatar do requerente: primeiro no próprio metadata do
-    // chamado, depois no cache de usuários do admin (buscando pelo buyer_id).
+    // Tenta achar o avatar do requerente: primeiro no pr�prio metadata do
+    // chamado, depois no cache de usu�rios do admin (buscando pelo buyer_id).
     const cachedUser = (window._adminUsersCache || []).find(u => u.id === raw.buyer_id);
     const requesterAvatar = meta.requester_avatar || safeParseImages(cachedUser?.avatar)[0] || null;
     return {
@@ -2639,25 +2822,25 @@ async function fetchSupportTicketsSafe() {
 }
 
 /**
- * Cria um chamado de suporte. Chamado automaticamente sempre que: o usuário
- * pede recuperação de senha, o comprador reporta que não recebeu o produto,
- * o vendedor reporta que entregou mas não teve confirmação, ou o usuário
- * pede ajuda geral pelo formulário "Falar com o Suporte".
+ * Cria um chamado de suporte. Chamado automaticamente sempre que: o usu�rio
+ * pede recupera��o de senha, o comprador reporta que n�o recebeu o produto,
+ * o vendedor reporta que entregou mas n�o teve confirma��o, ou o usu�rio
+ * pede ajuda geral pelo formul�rio "Falar com o Suporte".
  */
 window.createSupportTicket = async function({ category, subject, message = null, orderId = null, overrideEmail = null }) {
     const user = getSavedUser();
     const firstMsgText = message || subject;
     const ticket = {
         id: crypto.randomUUID(),
-        // order_id fica NULL de propósito: é o que marca esta linha como um
+        // order_id fica NULL de prop�sito: � o que marca esta linha como um
         // chamado de suporte (todo chat de pedido de verdade tem order_id).
         order_id:   null,
         buyer_id:   user?.id || null,
         buyer_name: user?.nome || 'Visitante',
         messages: [
             {
-                // "Mensagem" de metadados: não é exibida na conversa, só carrega
-                // os dados extras do chamado dentro do próprio JSON de messages.
+                // "Mensagem" de metadados: n�o � exibida na conversa, s� carrega
+                // os dados extras do chamado dentro do pr�prio JSON de messages.
                 type:              'ticket_meta',
                 category,
                 subject,
@@ -2684,11 +2867,11 @@ window.createSupportTicket = async function({ category, subject, message = null,
     }
 }
 
-/** A tabela `chats` não possui coluna `closed` (apenas as colunas existentes:
+/** A tabela `chats` n�o possui coluna `closed` (apenas as colunas existentes:
  *  id, order_id, seller_id, seller_name, buyer_id, buyer_name, participants,
  *  messages, logistics_agreed, logistics_method, created_at). O status de
- *  encerramento é guardado DENTRO do jsonb `messages` (em messages[0].closed),
- *  para não precisar alterar o banco. */
+ *  encerramento � guardado DENTRO do jsonb `messages` (em messages[0].closed),
+ *  para n�o precisar alterar o banco. */
 function getChatClosed(chat) {
     if (!chat) return false;
     if (typeof chat.closed === 'boolean') return chat.closed;
@@ -2707,11 +2890,11 @@ function withChatClosed(chat, closed) {
 }
 
 /**
- * Abre "Falar com o Suporte". Se o usuário (logado, ou visitante que já abriu
- * um chamado nesta sessão) já tiver um atendimento em aberto, pula direto pra
- * conversa em vez de mostrar o formulário de novo — é assim que vira um
+ * Abre "Falar com o Suporte". Se o usu�rio (logado, ou visitante que j� abriu
+ * um chamado nesta sess�o) j� tiver um atendimento em aberto, pula direto pra
+ * conversa em vez de mostrar o formul�rio de novo � � assim que vira um
  * "chatinho" de verdade: clicou, escolheu o assunto, confirmou, e a partir
- * daí sempre volta pra mesma conversa até o admin encerrar o atendimento.
+ * da� sempre volta pra mesma conversa at� o admin encerrar o atendimento.
  * `presetCategory`/`presetOrderId` (vindos dos atalhos de "esqueci senha" e
  * "problema com o pedido") sempre abrem um chamado novo com o assunto certo.
  */
@@ -2746,12 +2929,12 @@ window.openSupportRequestModal = async function(presetCategory, presetOrderId) {
     modalInstance.show();
 };
 
-/** Envia o formulário de suporte, cria o chamado e já entra na conversa (etapa 2) */
+/** Envia o formul�rio de suporte, cria o chamado e j� entra na conversa (etapa 2) */
 window.submitSupportRequest = async function(event) {
     event.preventDefault();
     const category = document.getElementById('supportReqCategory')?.value || 'outro';
     const email    = document.getElementById('supportReqEmail')?.value.trim();
-    const subject  = SUPPORT_CATEGORY_LABELS[category] || 'Solicitação de suporte';
+    const subject  = SUPPORT_CATEGORY_LABELS[category] || 'Solicita��o de suporte';
     const message  = subject;
     const user     = getSavedUser();
 
@@ -2782,7 +2965,7 @@ window.submitSupportRequest = async function(event) {
     return false;
 };
 
-// -------- Chat do chamado de suporte (visão do usuário que abriu) --------
+// -------- Chat do chamado de suporte (vis�o do usu�rio que abriu) --------
 
 let supportChatPollInterval  = null;
 let supportChatLastSignature = null;
@@ -2791,9 +2974,9 @@ let supportEditIndex         = null;
 let supportAttachType        = 'image'; // 'image' | 'file'
 window._activeSupportTicketId = null;
 
-/** Procura um chamado ainda aberto pertencente ao usuário atual (logado, pelo
+/** Procura um chamado ainda aberto pertencente ao usu�rio atual (logado, pelo
  *  id da conta; visitante, pelo id salvo no localStorage quando abriu o
- *  chamado) — usado pra retomar a conversa em vez de repetir o formulário. */
+ *  chamado) � usado pra retomar a conversa em vez de repetir o formul�rio. */
 async function findMyOpenSupportTicket() {
     const user = getSavedUser();
     try {
@@ -2815,7 +2998,7 @@ async function findMyOpenSupportTicket() {
     }
 }
 
-/** Volta a etapa 1 (formulário) do modal de suporte */
+/** Volta a etapa 1 (formul�rio) do modal de suporte */
 window.showSupportRequestForm = function() {
     stopSupportChatPolling();
     window._activeSupportTicketId = null;
@@ -2830,7 +3013,7 @@ window.showSupportRequestForm = function() {
     if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Falar com o Suporte';
 };
 
-/** Mostra um estado de carregamento rápido enquanto checa se já existe um chamado em aberto */
+/** Mostra um estado de carregamento r�pido enquanto checa se j� existe um chamado em aberto */
 window.showSupportChatLoading = function() {
     document.getElementById('supportRequestForm')?.classList.add('d-none');
     const chatView = document.getElementById('supportChatView');
@@ -2876,7 +3059,7 @@ function stopSupportChatPolling() {
 }
 
 /** Abre um modal listando as pessoas da conversa de suporte (igual ao
- *  botão de participantes dos outros chats): o usuário que abriu o
+ *  bot�o de participantes dos outros chats): o usu�rio que abriu o
  *  chamado e a equipe de atendimento. */
 window.openSupportParticipants = async function() {
     const ticketId = window._activeSupportTicketId;
@@ -2886,7 +3069,7 @@ window.openSupportParticipants = async function() {
     try {
         const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
         const ticket = normalizeTicket(result?.[0]);
-        if (!ticket) { body.innerHTML = '<p class="text-muted text-center">Chamado não encontrado.</p>'; }
+        if (!ticket) { body.innerHTML = '<p class="text-muted text-center">Chamado n�o encontrado.</p>'; }
         else {
             const requesterAvatar = safeParseImages(ticket.requester_avatar)[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
             const roleLabel = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
@@ -2895,14 +3078,14 @@ window.openSupportParticipants = async function() {
                     <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
                     <div class="chat-participant-info">
                         <strong>${ticket.requester_name || 'Visitante'}</strong>
-                        <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel} • Quem abriu o chamado</small>
+                        <small>${ticket.requester_email || 'E-mail n�o informado'} � ${roleLabel} � Quem abriu o chamado</small>
                     </div>
                 </div>
                 <div class="chat-participant-row">
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
                     <div class="chat-participant-info">
                         <strong>Equipe de Suporte</strong>
-                        <small>Atendimento ao cliente • ElectroMarket</small>
+                        <small>Atendimento ao cliente � ElectroMarket</small>
                     </div>
                 </div>`;
         }
@@ -2912,13 +3095,13 @@ window.openSupportParticipants = async function() {
     try { new bootstrap.Modal(document.getElementById('supportParticipantsModal')).show(); } catch (e) {}
 };
 
-/** Fecha o modal de suporte e para o polling — chamado pelo X do modal */
+/** Fecha o modal de suporte e para o polling � chamado pelo X do modal */
 window.closeSupportChatModal = function() {
     stopSupportChatPolling();
 };
 
-/** Corrige a visualização do chat de suporte no Android: quando o teclado
- *  abre, garante que a barra de input continue visível e o modal se ajuste. */
+/** Corrige a visualiza��o do chat de suporte no Android: quando o teclado
+ *  abre, garante que a barra de input continue vis�vel e o modal se ajuste. */
 function bindSupportChatKeyboardFix() {
     const input = document.getElementById('supportChatInput');
     if (!input) return;
@@ -2957,17 +3140,17 @@ async function loadMySupportTicket(ticketId, silent = false) {
         const raw = result?.[0];
         if (!raw) {
             stopSupportChatPolling();
-            // Chamado foi removido (ex: pelo admin) — fecha o modal de suporte
-            // automaticamente pra não deixar a tela travada com mensagem de erro.
+            // Chamado foi removido (ex: pelo admin) � fecha o modal de suporte
+            // automaticamente pra n�o deixar a tela travada com mensagem de erro.
             try { bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'))?.hide(); } catch (e) {}
             try { localStorage.removeItem('electroGuestTicketId'); } catch (e) {}
             return;
         }
         const ticket = normalizeTicket(raw);
 
-        // Se o chamado é de um pedido, busca o pedido pra mostrar o card de
-        // resumo do produto (foto + título + preço) no topo do chat — igual
-        // ao chat de pedido cliente ↔ vendedor.
+        // Se o chamado � de um pedido, busca o pedido pra mostrar o card de
+        // resumo do produto (foto + t�tulo + pre�o) no topo do chat � igual
+        // ao chat de pedido cliente ? vendedor.
         let relatedOrder = null;
         const relatedOrderId = ticket.order_id || null;
         if (relatedOrderId) {
@@ -2998,15 +3181,15 @@ async function loadMySupportTicket(ticketId, silent = false) {
         const statusBar = document.getElementById('supportChatStatusBar');
         if (statusBar) {
             statusBar.innerHTML = ticket.status === 'closed'
-                ? '<span class="admin-row-badge badge-muted"><i class="bi bi-lock-fill me-1"></i>Solicitação Encerrada</span>'
-                : '<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>Solicitação Aberta</span>';
+                ? '<span class="admin-row-badge badge-muted"><i class="bi bi-lock-fill me-1"></i>Solicita��o Encerrada</span>'
+                : '<span class="admin-row-badge badge-open"><i class="bi bi-headset me-1"></i>Solicita��o Aberta</span>';
         }
 
         const headerStatus = document.getElementById('supportChatHeaderStatus');
         if (headerStatus) {
             headerStatus.textContent = ticket.status === 'closed'
-                ? 'Solicitação Encerrada'
-                : 'Solicitação Aberta';
+                ? 'Solicita��o Encerrada'
+                : 'Solicita��o Aberta';
         }
 
         const ticketSummary = document.getElementById('supportChatTicketSummary');
@@ -3027,9 +3210,9 @@ async function loadMySupportTicket(ticketId, silent = false) {
 }
 
 /**
- * Mostra o card de resumo do produto (foto + título + preço) no topo do chat
- * de suporte, igual ao chat de pedido cliente ↔ vendedor. Só aparece quando
- * o chamado está vinculado a um pedido (related_order_id).
+ * Mostra o card de resumo do produto (foto + t�tulo + pre�o) no topo do chat
+ * de suporte, igual ao chat de pedido cliente ? vendedor. S� aparece quando
+ * o chamado est� vinculado a um pedido (related_order_id).
  */
 function renderSupportChatProductCard(order) {
     const el = document.getElementById('supportChatTicketSummary');
@@ -3038,7 +3221,7 @@ function renderSupportChatProductCard(order) {
 
     const img   = order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=%20';
     const title = order.product_title || 'Pedido #' + (order.id || '').slice(-6);
-    const st    = ORDER_STATUS_MAP[order.status] || { text: order.status || '—', class: 'bg-secondary' };
+    const st    = ORDER_STATUS_MAP[order.status] || { text: order.status || '�', class: 'bg-secondary' };
 
     el.classList.remove('d-none');
     el.innerHTML = `
@@ -3055,13 +3238,13 @@ function renderSupportChatProductCard(order) {
         </div>`;
 }
 
-/** Bolha de mensagem na visão do usuário: a mensagem dele fica à direita, e
- *  as respostas da equipe de suporte (isStaff) ficam à esquerda em destaque.
- *  Mesmo conjunto de recursos do chat cliente ↔ vendedor: responder, copiar,
- *  editar/apagar (só nas próprias mensagens) e anexos de imagem/arquivo. */
+/** Bolha de mensagem na vis�o do usu�rio: a mensagem dele fica � direita, e
+ *  as respostas da equipe de suporte (isStaff) ficam � esquerda em destaque.
+ *  Mesmo conjunto de recursos do chat cliente ? vendedor: responder, copiar,
+ *  editar/apagar (s� nas pr�prias mensagens) e anexos de imagem/arquivo. */
 function supportMsgBubbleHtml(m, index) {
     const supportUser = getSavedUser();
-    const myAvatarSrc = normalizeImageUrl(safeParseImages(supportUser?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(supportUser?.nome || 'Você')}&background=22c98e&color=fff&size=40`;
+    const myAvatarSrc = normalizeImageUrl(safeParseImages(supportUser?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(supportUser?.nome || 'Voc�')}&background=22c98e&color=fff&size=40`;
     const supportAvatarSrc = `https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40`;
     return window.renderMsgBubble(m, index, {
         userId: supportUser?.id || '',
@@ -3073,8 +3256,8 @@ function supportMsgBubbleHtml(m, index) {
     });
 }
 
-/** Envia uma nova mensagem do usuário dentro do chamado já aberto — ou salva
- *  a edição em andamento, se houver uma (ver window.startSupportEdit). */
+/** Envia uma nova mensagem do usu�rio dentro do chamado j� aberto � ou salva
+ *  a edi��o em andamento, se houver uma (ver window.startSupportEdit). */
 window.sendMySupportMessage = async function() {
     const ticketId = window._activeSupportTicketId;
     if (!ticketId) return;
@@ -3088,7 +3271,7 @@ window.sendMySupportMessage = async function() {
         const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
         const ticket = result?.[0];
         if (!ticket) return;
-        if (getChatClosed(ticket)) { showToast('Este atendimento já foi encerrado.', 'warning'); loadMySupportTicket(ticketId); return; }
+        if (getChatClosed(ticket)) { showToast('Este atendimento j� foi encerrado.', 'warning'); loadMySupportTicket(ticketId); return; }
 
         const messages = ticket.messages || [];
 
@@ -3108,7 +3291,7 @@ window.sendMySupportMessage = async function() {
                 const repliedMsg = messages[supportReplyIndex];
                 newMessage.replyTo = {
                     text: repliedMsg.text,
-                    senderName: repliedMsg.isStaff ? (repliedMsg.senderName || 'Suporte') : 'Você'
+                    senderName: repliedMsg.isStaff ? (repliedMsg.senderName || 'Suporte') : 'Voc�'
                 };
             }
             messages.push(newMessage);
@@ -3127,7 +3310,7 @@ window.sendMySupportMessage = async function() {
     }
 };
 
-/** Começa a responder a uma mensagem específica do chamado (preview acima do input) */
+/** Come�a a responder a uma mensagem espec�fica do chamado (preview acima do input) */
 window.startSupportReply = async function(index) {
     const ticketId = window._activeSupportTicketId;
     if (!ticketId) return;
@@ -3144,7 +3327,7 @@ window.startSupportReply = async function(index) {
         preview.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="small text-truncate" style="max-width: 85%;">
-                    <strong class="text-primary d-block">Respondendo a ${msg.isStaff ? (msg.senderName || 'Suporte') : 'você mesmo'}</strong>
+                    <strong class="text-primary d-block">Respondendo a ${msg.isStaff ? (msg.senderName || 'Suporte') : 'voc� mesmo'}</strong>
                     <span class="text-muted">${msg.text}</span>
                 </div>
                 <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelSupportReplyOrEdit()"></i>
@@ -3153,7 +3336,7 @@ window.startSupportReply = async function(index) {
     document.getElementById('supportChatInput')?.focus();
 };
 
-/** Começa a editar uma mensagem já enviada pelo próprio usuário */
+/** Come�a a editar uma mensagem j� enviada pelo pr�prio usu�rio */
 window.startSupportEdit = async function(index) {
     const ticketId = window._activeSupportTicketId;
     if (!ticketId) return;
@@ -3179,7 +3362,7 @@ window.startSupportEdit = async function(index) {
     input?.focus();
 };
 
-/** Cancela a resposta/edição em andamento no chamado de suporte */
+/** Cancela a resposta/edi��o em andamento no chamado de suporte */
 window.cancelSupportReplyOrEdit = function() {
     supportReplyIndex = null;
     supportEditIndex  = null;
@@ -3203,11 +3386,11 @@ window.copySupportMessageText = async function(index) {
         await navigator.clipboard.writeText(msg.text);
         showToast('Mensagem copiada!', 'success', 1500);
     } catch (e) {
-        showToast('Não foi possível copiar.', 'error');
+        showToast('N�o foi poss�vel copiar.', 'error');
     }
 };
 
-/** Apaga (soft-delete) uma mensagem própria dentro do chamado de suporte */
+/** Apaga (soft-delete) uma mensagem pr�pria dentro do chamado de suporte */
 window.deleteSupportMessage = async function(index) {
     const ticketId = window._activeSupportTicketId;
     if (!ticketId) return;
@@ -3228,14 +3411,14 @@ window.deleteSupportMessage = async function(index) {
     }
 };
 
-// -------- Anexo de imagem/arquivo no chat de suporte (mesmo painel do chat cliente ↔ vendedor) --------
+// -------- Anexo de imagem/arquivo no chat de suporte (mesmo painel do chat cliente ? vendedor) --------
 
 window.toggleSupportAttachPanel = function() {
-    const panel = document.getElementById('supportChatAttachPanel');
+    const panel = document.getElementById('adminSupportAttachPanel') || document.getElementById('supportChatAttachPanel');
     if (!panel) return;
     panel.classList.toggle('d-none');
     if (!panel.classList.contains('d-none')) {
-        document.getElementById('supportAttachLinkInput')?.focus();
+        document.getElementById('adminSupportAttachLinkInputMedia')?.focus();
     }
 };
 
@@ -3254,7 +3437,7 @@ window.confirmSupportAttach = async function() {
     const input = document.getElementById('supportAttachLinkInput');
     const url   = input?.value?.trim();
     if (!url || !url.startsWith('http')) {
-        showToast('Cole um link válido (começando com http).', 'warning');
+        showToast('Cole um link v�lido (come�ando com http).', 'warning');
         return;
     }
     const user = getSavedUser();
@@ -3291,24 +3474,24 @@ window.confirmSupportAttach = async function() {
 };
 
 /**
- * Atalhos usados dentro do chat do pedido (área de logística) quando o
- * comprador não recebeu o produto, ou o vendedor entregou mas não teve
- * confirmação — abre o chamado já com o pedido vinculado.
+ * Atalhos usados dentro do chat do pedido (�rea de log�stica) quando o
+ * comprador n�o recebeu o produto, ou o vendedor entregou mas n�o teve
+ * confirma��o � abre o chamado j� com o pedido vinculado.
  */
 window.reportOrderProblem = function(orderId, category) {
     window.openSupportRequestModal(category, orderId);
 };
 
-// -------- Visão do administrador sobre um chamado (mesmo design do chat) --------
+// -------- Vis�o do administrador sobre um chamado (mesmo design do chat) --------
 
-/** Abre um chamado de suporte no mesmo layout do chat cliente↔vendedor, sem modal */
+/** Abre um chamado de suporte no mesmo layout do chat cliente?vendedor, sem modal */
 window.adminViewTicket = async function(ticketId) {
     const grid = document.getElementById('productsGrid');
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando chamado...</p></div>';
     try {
         const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
         const ticket = normalizeTicket(result?.[0]);
-        if (!ticket) { showToast('Chamado não encontrado.', 'error'); adminRefreshCurrentView(); return; }
+        if (!ticket) { showToast('Chamado n�o encontrado.', 'error'); adminRefreshCurrentView(); return; }
 
         const resolveSenderName = () => ticket.requester_name;
         const adminUser = getSavedUser();
@@ -3318,8 +3501,8 @@ window.adminViewTicket = async function(ticketId) {
         const msgsHtml = (ticket.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, myAvatar, requesterAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
 
-        // Igual à aba "Chats": some com a navbar inferior e o resto do painel
-        // admin (título, cards de estatística) pra o chamado ocupar a tela toda.
+        // Igual � aba "Chats": some com a navbar inferior e o resto do painel
+        // admin (t�tulo, cards de estat�stica) pra o chamado ocupar a tela toda.
         document.body.classList.add('wa-locked', 'admin-chat-fullscreen');
 
         grid.className = 'admin-panel-active';
@@ -3341,13 +3524,13 @@ window.adminViewTicket = async function(ticketId) {
                                 </div>
                                 <div class="chat-header-info">
                                     <span class="chat-header-name">${ticket.requester_name || 'Visitante'}</span>
-                                    <span class="chat-header-order-id">${roleLabel} · ${reasonLabel}${ticket.order_id ? ' · Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''} · ${msgCount} mensagens</span>
+                                    <span class="chat-header-order-id">${roleLabel} � ${reasonLabel}${ticket.order_id ? ' � Pedido #' + ticket.order_id.slice(-6).toUpperCase() : ''} � ${msgCount} mensagens</span>
                                 </div>
-                                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usuário do chamado">
+                                <button type="button" class="chat-header-close" onclick="window.adminToggleParticipants()" title="Ver usu�rio do chamado">
                                     <i class="bi bi-people-fill"></i>
                                 </button>
                                 <div class="dropdown">
-                                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções">
+                                    <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Op��es">
                                         <i class="bi bi-three-dots-vertical"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -3368,7 +3551,7 @@ window.adminViewTicket = async function(ticketId) {
                                     <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=3483fa&color=fff&size=40'">
                                     <div class="chat-participant-info">
                                         <strong>${ticket.requester_name || 'Visitante'}</strong>
-                                        <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel}</small>
+                                        <small>${ticket.requester_email || 'E-mail n�o informado'} � ${roleLabel}</small>
                                     </div>
                                 </div>
                             </div>
@@ -3386,7 +3569,7 @@ window.adminViewTicket = async function(ticketId) {
                                             <i class="bi bi-file-earmark me-1"></i>Arquivo
                                         </button>
                                         <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendAdminTicketLocation()">
-                                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
+                                            <i class="bi bi-geo-alt-fill me-1"></i>Endere�o
                                         </button>
                                     </div>
                                     <div class="input-group input-group-sm mb-2">
@@ -3407,7 +3590,7 @@ window.adminViewTicket = async function(ticketId) {
                                         <button type="button" class="chat-icon-btn" onclick="window.toggleAdminTicketAttachPanel()" title="Anexar imagem ou arquivo">
                                             <i class="bi bi-paperclip"></i>
                                         </button>
-                                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatInput" onclick="window.startVoiceInput('adminChatInput')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+                                        <button type="button" class="chat-icon-btn" data-voice-input="adminChatInput" onclick="window.startVoiceInput('adminChatInput')" title="Gravar �udio"><i class="bi bi-mic"></i></button>
                                         <input type="text" id="adminChatInput" class="chat-text-input" placeholder="Responder como Suporte..." autocomplete="off"
                                                onkeypress="if(event.key==='Enter'){event.preventDefault(); window.adminSendTicketMessage('${ticketId}');}">
                                         <button type="button" class="chat-send-btn" onclick="window.adminSendTicketMessage('${ticketId}')"><i class="bi bi-send-fill"></i></button>
@@ -3433,7 +3616,7 @@ window.adminViewTicketBack = function() {
     adminRefreshCurrentView();
 };
 
-// -------- Estado de resposta/edição no chamado de suporte (visão admin) --------
+// -------- Estado de resposta/edi��o no chamado de suporte (vis�o admin) --------
 let adminTicketReplyIndex = null;
 let adminTicketEditIndex  = null;
 let adminTicketAttachType = 'image';
@@ -3459,7 +3642,7 @@ window.startAdminTicketReply = async function(index) {
         preview.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="small text-truncate" style="max-width:85%;">
-                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usuário')}</strong>
+                    <strong class="text-primary d-block">Respondendo a ${msg.senderName || (msg.isStaff ? 'Suporte' : 'Usu�rio')}</strong>
                     <span class="text-muted">${msg.text || (msg.image ? '[imagem]' : '')}</span>
                 </div>
                 <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelAdminTicketReplyOrEdit()"></i>
@@ -3520,7 +3703,7 @@ window.sendAdminTicketLocation = async function() {
     if (!ticketId) return;
     const user = getSavedUser();
     const addr = user?.endereco || user?.cidade;
-    if (!addr) { showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info'); return; }
+    if (!addr) { showToast('Cadastre um endere�o no seu perfil para compartilhar.', 'info'); return; }
     const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
     try {
         const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
@@ -3529,15 +3712,15 @@ window.sendAdminTicketLocation = async function() {
         const messages = ticket.messages || [];
         messages.push({
             senderId: user.id, senderName: `${user.nome} (Suporte)`,
-            text: `📍 ${addr}\n${mapsUrl}`,
+            text: `?? ${addr}\n${mapsUrl}`,
             timestamp: new Date().toISOString(), type: 'location', isStaff: true
         });
         await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
         document.getElementById('adminTicketAttachPanel')?.classList.add('d-none');
         window.adminViewTicket(ticketId);
-        showToast('Localização enviada!', 'success');
+        showToast('Localiza��o enviada!', 'success');
     } catch (e) {
-        showToast('Erro ao enviar localização.', 'error');
+        showToast('Erro ao enviar localiza��o.', 'error');
     }
 };
 
@@ -3576,7 +3759,7 @@ window.confirmAdminTicketAttach = async function() {
     }
 };
 
-/** Envia uma resposta da equipe de suporte dentro do chamado (ou salva edição em andamento) */
+/** Envia uma resposta da equipe de suporte dentro do chamado (ou salva edi��o em andamento) */
 window.adminSendTicketMessage = async function(ticketId) {
     const input = document.getElementById('adminChatInput');
     const text  = input?.value.trim();
@@ -3607,7 +3790,7 @@ window.adminSendTicketMessage = async function(ticketId) {
                 isStaff:    true
             };
             if (replyTarget) {
-                newMsg.replyTo = { senderName: replyTarget.senderName || (replyTarget.isStaff ? 'Suporte' : 'Usuário'), text: replyTarget.text || (replyTarget.image ? '[imagem]' : '') };
+                newMsg.replyTo = { senderName: replyTarget.senderName || (replyTarget.isStaff ? 'Suporte' : 'Usu�rio'), text: replyTarget.text || (replyTarget.image ? '[imagem]' : '') };
             }
             messages.push(newMsg);
             adminTicketReplyIndex = null;
@@ -3622,9 +3805,9 @@ window.adminSendTicketMessage = async function(ticketId) {
     }
 };
 
-/** Encerra o chamado de suporte (o requerente pode ver o encerramento se acompanhar o próprio chamado no futuro) */
+/** Encerra o chamado de suporte (o requerente pode ver o encerramento se acompanhar o pr�prio chamado no futuro) */
 window.adminCloseTicket = async function(ticketId) {
-    if (!confirm('Encerrar este chamado?\nUma mensagem de encerramento será registrada.')) return;
+    if (!confirm('Encerrar este chamado?\nUma mensagem de encerramento ser� registrada.')) return;
     const user = getSavedUser();
     try {
         const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
@@ -3650,7 +3833,7 @@ window.adminCloseTicket = async function(ticketId) {
 
 /** Apaga o chamado de suporte permanentemente */
 window.adminDeleteTicket = async function(ticketId) {
-    if (!confirm('Apagar este chamado permanentemente?\nEsta ação não pode ser desfeita.')) return;
+    if (!confirm('Apagar este chamado permanentemente?\nEsta a��o n�o pode ser desfeita.')) return;
     try {
         await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'DELETE' });
         showToast('Chamado removido.', 'success');
@@ -3665,7 +3848,7 @@ window.adminDeleteTicket = async function(ticketId) {
 
 window.shareProduct = function(pid) {
     const doShare = (item) => {
-        if (!item) { showToast('Produto não encontrado.', 'error'); return; }
+        if (!item) { showToast('Produto n�o encontrado.', 'error'); return; }
         const base = window.location.origin + window.location.pathname;
         const url  = `${base}#/produto/${pid}`;
         const text = `Confira: ${item.titulo} no ElectroMarket!`;
@@ -3678,13 +3861,13 @@ window.shareProduct = function(pid) {
     };
     const item = (window.allProductsCache || []).find(x => x.id === pid || x.id == pid);
     if (item) { doShare(item); return; }
-    // Se não achou no cache, busca direto no banco
+    // Se n�o achou no cache, busca direto no banco
     supabaseFetch(`products?id=eq.${encodeURIComponent(pid)}&limit=1`).then(rows => {
         doShare(rows && rows.length ? rows[0] : null);
     }).catch(() => doShare(null));
 };
 
-/** Compartilha o perfil público de um vendedor (loja) via link direto */
+/** Compartilha o perfil p�blico de um vendedor (loja) via link direto */
 window.shareSeller = function(sellerId, sellerName = '') {
     const base = window.location.origin + window.location.pathname;
     const url  = `${base}#/vendedor/${sellerId}`;
@@ -3768,7 +3951,7 @@ window.copyMessageText = async function(index) {
         await navigator.clipboard.writeText(msg.text);
         showToast('Mensagem copiada!', 'success', 1500);
     } catch (e) {
-        showToast('Não foi possível copiar.', 'error');
+        showToast('N�o foi poss�vel copiar.', 'error');
     }
 };
 
@@ -3778,8 +3961,8 @@ window.deleteMessage = async function(index) {
         const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
         const chat = chatResult?.[0];
         if (!chat?.messages[index]) return;
-        // Apaga o conteúdo mas mantém a posição no array (soft delete), pra não
-        // quebrar referências de "respondendo a" em outras mensagens.
+        // Apaga o conte�do mas mant�m a posi��o no array (soft delete), pra n�o
+        // quebrar refer�ncias de "respondendo a" em outras mensagens.
         chat.messages[index].text = '';
         chat.messages[index].image = null;
         chat.messages[index].file = null;

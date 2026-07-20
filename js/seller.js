@@ -764,9 +764,41 @@ window.sendChatMessage = async function(event) {
     }
 };
 
+/** Seleciona imagem do PC, sobe no Imgur (anonymous) e coloca a URL no
+ *  campo de link. O envio só acontece ao clicar em "Enviar". */
+window.sendChatImageFile = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const btn = document.querySelector('#chatAttachPanel label');
+    const original = btn ? btn.innerHTML : '';
+    if (btn) btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando...';
+    const clientId = window.CONFIG?.IMGUR_CLIENT_ID || window.CONFIG_LOCAL_FALLBACK?.IMGUR_CLIENT_ID || '546c25a59c58ad7';
+    try {
+        const fd = new FormData();
+        fd.append('image', file, file.name || 'imagem.jpg');
+        const res = await fetch('https://api.imgur.com/3/image', {
+            method: 'POST',
+            headers: { Authorization: `Client-ID ${clientId}` },
+            body: fd
+        });
+        const json = await res.json().catch(() => null);
+        if (btn) btn.innerHTML = original;
+        if (json?.success && json?.data?.link) {
+            await window.sendChatImage(json.data.link);
+            document.getElementById('chatAttachPanel')?.classList.add('d-none');
+        } else {
+            showToast('Falha ao enviar imagem (tente um link).', 'error');
+        }
+    } catch (e) {
+        if (btn) btn.innerHTML = original;
+        showToast('Erro ao enviar imagem.', 'error');
+    }
+};
+
 window.sendChatImage = async function(urlParam) {
     const rawUrl = urlParam;
-    if (!rawUrl || !rawUrl.startsWith('http')) {
+    if (!rawUrl || !(rawUrl.startsWith('http') || rawUrl.startsWith('data:'))) {
         showToast("Link inválido!", "warning");
         return;
     }
@@ -848,12 +880,88 @@ window.setChatAttachType = function(type) {
     document.querySelectorAll('.chat-attach-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.attachType === type);
     });
-    const input = document.getElementById('chatAttachLinkInput');
-    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem, vídeo ou GIF...' : 'Cole o link do documento...';
+    const imgBox = document.getElementById('attachImageBox');
+    const fileBox = document.getElementById('attachFileBox');
+    const locBox = document.getElementById('attachLocationBox');
+    if (imgBox) imgBox.classList.toggle('d-none', type !== 'image');
+    if (fileBox) fileBox.classList.toggle('d-none', type !== 'file');
+    if (locBox) locBox.classList.toggle('d-none', type !== 'location');
+};
+
+window.abrirDocHost = function(host) {
+    const url = host === 'Google Drive'
+        ? 'https://drive.google.com/u/0/?usp=upload'
+        : 'https://onedrive.live.com/?auth=1&id=root&cid=&action=upload';
+    window.open(url, '_blank', 'noopener');
+    showToast(`Abra o ${host}, copie o link e cole em Documentos.`, 'info');
+};
+
+window.sendChatLocation = function(kind) {
+    const user = getSavedUser();
+    if (!user || !currentChat) return;
+
+    if (kind === 'current') {
+        if (!navigator.geolocation) { showToast('Geolocalização não suportada.', 'error'); return; }
+        showToast('Obtendo sua localização...', 'info');
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const maps = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            await sendLocationMessage(maps, `Localização atual: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        }, () => showToast('Não foi possível obter a localização.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
+        return;
+    }
+
+    if (kind === 'stored') {
+        const u = getSavedUser() || {};
+        const endereco = [u.endereco, u.cidade, u.estado, u.cep].filter(Boolean).join(', ');
+        const maps = u.maps || (endereco ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}` : '');
+        if (!maps) { showToast('Você não tem endereço cadastrado no perfil.', 'warning'); return; }
+        sendLocationMessage(maps, `📍 Meu endereço cadastrado: ${endereco || maps}`);
+        return;
+    }
+
+    // other: usa o campo de link (chamado pelo botão "Enviar" geral)
+    const input = document.getElementById('chatAttachLinkInputLoc');
+    const url = input?.value?.trim();
+    if (!url || !url.startsWith('http')) { showToast('Cole um link de endereço válido.', 'warning'); return; }
+    sendLocationMessage(url, `Endereço (link): ${url}`);
+    input.value = '';
+    document.getElementById('chatAttachPanel')?.classList.add('d-none');
+};
+
+async function sendLocationMessage(mapsUrl, text) {
+    const user = getSavedUser();
+    if (!user || !currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        chat.messages.push({
+            senderId: user.id, senderName: user.nome,
+            text: text,
+            location: mapsUrl,
+            timestamp: new Date().toISOString(), type: 'location'
+        });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadChatMessages(currentChat);
+        document.getElementById('chatAttachPanel')?.classList.add('d-none');
+    } catch { showToast('Erro ao enviar localização.', 'error'); }
+}
+
+window.setChatDocType = function(docType) {
+    const input = document.getElementById('chatAttachLinkInputFile');
+    if (!input) return;
+    const prefixo = docType ? `[${docType}] ` : '';
+    if (!input.value.startsWith('[')) input.value = prefixo + input.value;
+    input.focus();
 };
 
 window.confirmChatAttach = async function() {
-    const input = document.getElementById('chatAttachLinkInput');
+    if (chatAttachType === 'location') {
+        window.sendChatLocation('other');
+        return;
+    }
+    const input = document.getElementById(chatAttachType === 'file' ? 'chatAttachLinkInputFile' : 'chatAttachLinkInput');
     const url   = input?.value?.trim();
     if (!url || !url.startsWith('http')) {
         showToast('Cole um link válido (começando com http).', 'warning');

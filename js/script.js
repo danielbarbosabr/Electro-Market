@@ -1135,32 +1135,57 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                         <i class="bi bi-images"></i>
                         <span>Fotos do Produto</span>
                     </div>
-                    <div class="create-ad-section-body">
-                        <div class="ca-fotos-info mb-2">
-                            <small class="text-muted">Adicione links das imagens (Imgur ou URL direta). A primeira será a foto principal.</small>
+                        <div class="create-ad-section-body">
+                            <div class="ca-fotos-info mb-2">
+                                <small class="text-muted">Envie imagens do seu computador (automático) ou cole um link. A primeira será a foto principal.</small>
+                            </div>
+                            <div id="caFotosContainer">
+                                <div class="ca-foto-row profile-link-inline mb-2" data-idx="0">
+                                    <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </button>
+                                    <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
+                                    </label>
+                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto0" placeholder="Link da imagem principal">
+                                    <div class="ca-foto-preview" id="caFotoPreview0"></div>
+                                </div>
+                                <div class="ca-foto-row profile-link-inline mb-2" data-idx="1">
+                                    <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </button>
+                                    <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
+                                    </label>
+                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto1" placeholder="Link da imagem 2">
+                                    <div class="ca-foto-preview" id="caFotoPreview1"></div>
+                                </div>
+                                <div class="ca-foto-row profile-link-inline mb-2" data-idx="2">
+                                    <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </button>
+                                    <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
+                                    </label>
+                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto2" placeholder="Link da imagem 3">
+                                    <div class="ca-foto-preview" id="caFotoPreview2"></div>
+                                </div>
+                                <div class="ca-foto-row profile-link-inline" data-idx="3">
+                                    <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </button>
+                                    <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
+                                    </label>
+                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto3" placeholder="Link da imagem 4">
+                                    <div class="ca-foto-preview" id="caFotoPreview3"></div>
+                                </div>
+                            </div>
                         </div>
-                        <button type="button" class="ml-btn ml-btn-outline btn-sm mb-2" style="width:auto;display:inline-flex;gap:6px;padding:8px 16px;font-size:0.82rem;" onclick="abrirUploadExterno()">
-                            <i class="bi bi-cloud-upload"></i> Subir imagens no Imgur
-                        </button>
-                        <div id="caFotosContainer">
-                            <div class="ca-foto-row" data-idx="0">
-                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto0" placeholder="Link da imagem principal">
-                                <div class="ca-foto-preview" id="caFotoPreview0"></div>
-                            </div>
-                            <div class="ca-foto-row" data-idx="1">
-                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto1" placeholder="Link da imagem 2">
-                                <div class="ca-foto-preview" id="caFotoPreview1"></div>
-                            </div>
-                            <div class="ca-foto-row" data-idx="2">
-                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto2" placeholder="Link da imagem 3">
-                                <div class="ca-foto-preview" id="caFotoPreview2"></div>
-                            </div>
-                            <div class="ca-foto-row" data-idx="3">
-                                <input type="url" class="create-ad-input ca-foto-input" id="caFoto3" placeholder="Link da imagem 4">
-                                <div class="ca-foto-preview" id="caFotoPreview3"></div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- BOTÃO FIXO -->
@@ -3129,6 +3154,111 @@ window.abrirUploadExterno = function() {
     window.open('https://imgur.com/upload', '_blank');
 };
 
+window.uploadProfilePhoto = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const link = document.getElementById('editAvatarLink');
+    if (link) link.value = 'Enviando...';
+    const url = await uploadImageToHost(file);
+    if (link) link.value = url || '';
+    if (url) showToast('Foto enviada! Clique em SALVAR.', 'success');
+};
+
+window.uploadProfileBanner = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const link = document.getElementById('editBannerLink');
+    if (link) link.value = 'Enviando...';
+    const url = await uploadImageToHost(file);
+    if (link) link.value = url || '';
+    if (url) showToast('Banner enviado! Clique em SALVAR.', 'success');
+};
+
+window.uploadCadPhoto = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const link = document.getElementById('v2CadAvatarLink');
+    if (link) link.value = 'Enviando...';
+    const url = await uploadImageToHost(file);
+    if (link) link.value = url || '';
+    if (url) showToast('Foto enviada!', 'success');
+};
+
+window.uploadCadBanner = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const link = document.getElementById('v2CadBannerLink');
+    if (link) link.value = 'Enviando...';
+    const url = await uploadImageToHost(file);
+    if (link) link.value = url || '';
+    if (url) showToast('Banner enviado!', 'success');
+};
+
+window.uploadProdPhoto = async function(input, n) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const link = document.getElementById('prodLink' + n);
+    if (link) link.value = 'Enviando...';
+    const url = await uploadImageToHost(file);
+    if (link) link.value = url || '';
+    if (url) showToast('Imagem ' + n + ' enviada!', 'success');
+};
+
+/** Faz upload de um arquivo de imagem no Imgur (anonymous) e retorna a URL
+ *  direta. Não usa Base64 e não exige cadastro seu (usa Client ID padrão ou
+ *  o configurado em IMGUR_CLIENT_ID). */
+async function uploadImageToHost(file) {
+    if (!file) return null;
+    const clientId = window.CONFIG?.IMGUR_CLIENT_ID || window.CONFIG_LOCAL_FALLBACK?.IMGUR_CLIENT_ID || '546c25a59c58ad7';
+    try {
+        const fd = new FormData();
+        fd.append('image', file, file.name || 'imagem.jpg');
+        const res = await fetch('https://api.imgur.com/3/image', {
+            method: 'POST',
+            headers: { Authorization: `Client-ID ${clientId}` },
+            body: fd
+        });
+        const json = await res.json();
+        if (json?.success && json?.data?.link) return json.data.link;
+        showToast('Falha ao enviar imagem no Imgur.', 'error');
+        return null;
+    } catch (e) {
+        showToast('Erro ao enviar imagem no Imgur.', 'error');
+        return null;
+    }
+}
+
+/** Lê os arquivos selecionados e preenche os campos de foto (caFoto0..3),
+ *  pulando os já preenchidos. Mostra preview e estado de carregamento. */
+window.handleFotoFiles = async function(input) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    let slot = 0;
+    // acha o primeiro slot vazio
+    while (slot <= 3 && document.getElementById(`caFoto${slot}`).value.trim()) slot++;
+    for (const file of files) {
+        if (slot > 3) break;
+        const field = document.getElementById(`caFoto${slot}`);
+        const preview = document.getElementById(`caFotoPreview${slot}`);
+        field.value = 'Enviando...';
+        const url = await uploadImageToHost(file);
+        if (url) {
+            field.value = url;
+            if (preview) preview.style.backgroundImage = `url('${url}')`;
+        } else {
+            field.value = '';
+            showToast('Falha ao enviar imagem.', 'error');
+        }
+        slot++;
+    }
+    input.value = '';
+};
+
 /**
  * Extrai foto de perfil e banner do campo avatar (que pode ser string única
  * ou array JSON com [avatarUrl, bannerUrl]).
@@ -3385,6 +3515,12 @@ window.showProfileEdit = () => {
     badgeEl.textContent =
         user.tipo === 'ADMIN' ? 'Administrador' : (user.tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
     badgeEl.className = 'profile-links-badge tipo-' + (user.tipo === 'ADMIN' ? 'admin' : (user.tipo === 'VENDEDOR' ? 'vendedor' : 'cliente'));
+
+    // Marca campos já preenchidos (label flutuante sobe)
+    document.querySelectorAll('#profileEditForm .ml-field input, #profileEditForm .ml-field select').forEach(el => {
+        if (el.value && el.value.trim() !== '') el.closest('.ml-field')?.classList.add('filled');
+    });
+
     document.getElementById('profileEditScreen').classList.remove('d-none');
     document.body.style.overflow = 'hidden';
 
@@ -4000,10 +4136,10 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
         </a>` : '';
 
     const locationChipHtml = (msg.type === 'location') ? `
-        <div class="chat-location-chip mb-2">
-            <i class="bi bi-geo-alt-fill" style="color:#e67e22;"></i>
-            <span>Localização compartilhada</span>
-        </div>` : '';
+        <a href="${msg.location || '#'}" target="_blank" rel="noopener" class="chat-location-chip mb-2" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:rgba(230,126,34,0.12);color:#e67e22;padding:6px 10px;border-radius:8px;font-weight:600;">
+            <i class="bi bi-geo-alt-fill"></i>
+            <span>${window.escapeHtml?.(cleanText || 'Localização compartilhada') ?? (cleanText || 'Localização compartilhada')}</span>
+        </a>` : '';
 
     const showTextCaption = cleanText && !(msg.type === 'image' && (cleanText === 'Imagem' || cleanText === 'GIF')) && !(msg.type === 'file' && msg.file) && !(msg.type === 'video');
 
