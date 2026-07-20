@@ -1324,15 +1324,49 @@ async function detectGuestRegion() {
     if (getSavedUser()) return; // Usuário logado já tem cidade/estado cadastrados, não precisa disso
 
     const label = document.getElementById('shippingLabel');
+    if (label && !getSavedUser()) label.textContent = 'Detectando local...';
+
+    // 1) Tenta geolocalização do navegador (mais precisa que IP)
+    if (navigator.geolocation) {
+        await new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                try {
+                    const { latitude, longitude } = pos.coords;
+                    const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=pt-BR`, { headers: { 'Accept': 'application/json' } });
+                    const data = await res.json();
+                    const city = data?.address?.city || data?.address?.town || data?.address?.municipality || '';
+                    const state = data?.address?.state || '';
+                    if (city && state) {
+                        guestDetectedRegion = { cidade: city, estado: state };
+                        if (label && !getSavedUser()) label.textContent = `${city} - ${state}`;
+                        resolve();
+                        return;
+                    }
+                } catch (e) { /* cai no fallback de IP */ }
+                // fallback: IP
+                await fallbackDetectByIp(label);
+                resolve();
+            }, async () => {
+                // usuário negou ou falhou: tenta IP, senão "Faça login"
+                await fallbackDetectByIp(label);
+                resolve();
+            }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+        });
+    } else {
+        await fallbackDetectByIp(label);
+    }
+}
+
+/** Detecção de região via IP (fallback quando a geolocalização não funciona) */
+async function fallbackDetectByIp(label) {
     try {
         const res  = await fetch('https://ipapi.co/json/');
         const data = await res.json();
         if (!data || data.error || !data.city) throw new Error('Sem dados de localização');
-
         guestDetectedRegion = { cidade: data.city, estado: data.region_code };
         if (label && !getSavedUser()) label.textContent = `${data.city} - ${data.region_code}`;
     } catch (e) {
-        console.error('Não foi possível detectar a região pelo IP:', e);
+        console.error('Não foi possível detectar a região:', e);
         if (label && !getSavedUser()) label.textContent = 'Faça login';
     }
 }
@@ -1341,6 +1375,8 @@ async function detectGuestRegion() {
 window.handleShippingInfoClick = function() {
     if (getSavedUser()) {
         window.showProfileEdit();
+    } else if (document.getElementById('shippingLabel')?.textContent.trim() === 'Faça login') {
+        window.showAuthScreen('login');
     } else {
         window.applyGuestRegionFilter();
     }

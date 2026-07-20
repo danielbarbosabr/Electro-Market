@@ -2021,6 +2021,8 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
 .profile-links-card .ml-field input,
 .profile-links-card .ml-field select {
     width: 100%;
+    height: 56px;
+    box-sizing: border-box;
     padding: 18px 14px 8px;
     border: 1px solid #999;
     border-radius: 6px;
