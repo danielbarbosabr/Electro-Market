@@ -2978,7 +2978,7 @@ function updateChatLogistics(order, user) {
         } else if (!userAgreed) {
             if (otherAgreed && order.logistics_type) {
                 const typeText = getLogisticsTypeText(order.logistics_type);
-                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="ml-attach ml-attach-success flex-grow-1" onclick="window.setLogistics('${order.id}','${order.logistics_type}')">Aceitar</button><button class="ml-attach ml-attach-secondary flex-grow-1" onclick="window.resetLogistics('${order.id}')">Recusar</button></div>`;
+                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="ml-btn ml-btn-primary flex-grow-1" onclick="window.setLogistics('${order.id}','${order.logistics_type}')"><i class="bi bi-check-lg me-1"></i>Aceitar</button><button class="ml-btn ml-btn-outline flex-grow-1" onclick="window.resetLogistics('${order.id}')"><i class="bi bi-x-lg me-1"></i>Recusar</button></div>`;
             } else {
                 buttonsHtml += `<div class="logistics-section"><p class="logistics-section-title">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div></div>`;
             }
@@ -3991,31 +3991,19 @@ function bootstrapApp() {
         const prodMatch = window.location.hash.match(/^#\/produto\/(.+)/);
         if (prodMatch) {
             const pid = prodMatch[1];
-            // Aguarda o cache de produtos carregar antes de abrir
-            const tryOpen = () => {
-                if (allProductsCache.find(x => x.id == pid || x.id === pid)) {
-                    window.showDetail(pid);
-                } else {
-                    // Tenta buscar o produto específico
-                    supabaseFetch(`products?id=eq.${encodeURIComponent(pid)}&limit=1`).then(rows => {
-                        if (rows && rows.length > 0) {
-                            if (!allProductsCache.find(x => x.id == rows[0].id)) allProductsCache.push(rows[0]);
-                            window.showDetail(rows[0].id);
-                        } else {
-                            showToast('Produto não encontrado.', 'error');
-                            history.replaceState(null, '', window.location.pathname + window.location.search);
-                        }
-                    });
-                }
-            };
-            if (allProductsCache.length > 0) {
-                tryOpen();
+            const cached = allProductsCache.find(x => x.id == pid || x.id === pid);
+            if (cached) {
+                window.showDetail(pid);
             } else {
-                // Espera o loadPage terminar
-                const check = setInterval(() => {
-                    if (allProductsCache.length > 0) { clearInterval(check); tryOpen(); }
-                }, 100);
-                setTimeout(() => clearInterval(check), 10000);
+                supabaseFetch(`products?id=eq.${encodeURIComponent(pid)}&limit=1`).then(rows => {
+                    if (rows && rows.length > 0) {
+                        if (!allProductsCache.find(x => x.id == rows[0].id)) allProductsCache.push(rows[0]);
+                        window.showDetail(rows[0].id);
+                    } else {
+                        showToast('Produto não encontrado.', 'error');
+                        history.replaceState(null, '', window.location.pathname + window.location.search);
+                    }
+                });
             }
             return;
         }
@@ -4023,13 +4011,12 @@ function bootstrapApp() {
         const sellerMatch = window.location.hash.match(/^#\/vendedor\/(.+)/);
         if (sellerMatch) {
             const sid = sellerMatch[1];
-            // Abre o perfil do vendedor direto, sem recarregar o site
             window.showSellerProfile(sid, '');
         }
     }
     window.addEventListener('hashchange', navigateByHash);
-    // Verifica hash na inicialização (depois que o app carregar)
-    setTimeout(navigateByHash, 500);
+    // Verifica hash na inicialização
+    setTimeout(navigateByHash, 300);
 
     // Init
     updateUI();
@@ -5283,29 +5270,47 @@ window.loadProductReviews = async function(productId) {
     const container = document.getElementById('productReviewsList');
     if (!container) return;
     try {
-        const orders = await supabaseFetch(`orders?product_id=eq.${productId}&status=eq.finished&select=id`);
-        if (!orders || orders.length === 0) {
-            container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Nenhuma opinião ainda.</p></div>';
-            const countEl = document.getElementById('opinionsCount');
-            if (countEl) countEl.textContent = '';
-            return;
+        let avaliacoes = [];
+
+        // Tenta ler da tabela avaliacoes primeiro (persistente)
+        try {
+            const rows = await supabaseFetch(`avaliacoes?product_id=eq.${productId}&select=*`);
+            if (rows && rows.length > 0) {
+                avaliacoes = rows.map(r => ({
+                    rating:         r.rating || 0,
+                    comment:        r.comment || '',
+                    images:         (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) || [],
+                    videos:         (typeof r.videos === 'string' ? JSON.parse(r.videos) : r.videos) || [],
+                    avaliador_nome: r.avaliador_nome || 'Anônimo',
+                    created_at:     r.created_at
+                }));
+            }
+        } catch (e) {
+            // Tabela não existe ou erro na query — fallback para chat
         }
-        const orderIds = orders.map(o => o.id);
-        const chats = await supabaseFetch(`chats?order_id=in.(${orderIds.join(',')})&select=messages`);
-        const avaliacoes = [];
-        (chats || []).forEach(chat => {
-            (chat.messages || []).forEach(m => {
-                if (m.type === 'review') {
-                    avaliacoes.push({
-                        rating:         m.rating || 0,
-                        comment:        m.reviewComment || m.text?.split('\n\n')[1]?.trim() || '',
-                        images:         m.reviewImages || (m.image ? [m.image] : []),
-                        avaliador_nome: m.senderName || 'Anônimo',
-                        created_at:     m.timestamp || chat.created_at
+
+        // Fallback: ler dos chats.messages
+        if (avaliacoes.length === 0) {
+            const orders = await supabaseFetch(`orders?product_id=eq.${productId}&status=eq.finished&select=id`);
+            if (orders && orders.length > 0) {
+                const orderIds = orders.map(o => o.id);
+                const chats = await supabaseFetch(`chats?order_id=in.(${orderIds.join(',')})&select=messages`);
+                (chats || []).forEach(chat => {
+                    (chat.messages || []).forEach(m => {
+                        if (m.type === 'review') {
+                            avaliacoes.push({
+                                rating:         m.rating || 0,
+                                comment:        m.reviewComment || m.text?.split('\n\n')[1]?.trim() || '',
+                                images:         m.reviewImages || (m.image ? [m.image] : []),
+                                avaliador_nome: m.senderName || 'Anônimo',
+                                created_at:     m.timestamp || chat.created_at
+                            });
+                        }
                     });
-                }
-            });
-        });
+                });
+            }
+        }
+
         if (avaliacoes.length === 0) {
             container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Nenhuma opinião ainda.</p></div>';
             const countEl = document.getElementById('opinionsCount');
@@ -5494,7 +5499,8 @@ window.renderChatContainer = function(opts) {
         extraBeforeInput = ''
     } = opts;
 
-    const isClosed = !!(chat.closed || order?.status === 'finished' || order?.status === 'cancelled');
+    const bothReviewed = order?.buyer_reviewed && order?.seller_reviewed;
+    const isClosed = !!(chat.closed || (order?.status === 'finished' && bothReviewed) || order?.status === 'cancelled');
     const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
     const partnerName = partner.name || '';
     const partnerAvatar = partner.avatar || '';

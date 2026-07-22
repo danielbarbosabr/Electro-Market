@@ -620,11 +620,17 @@ window.submitReview = async function() {
         if (cachedOrder) cachedOrder[reviewedField] = true;
 
         // Envia a avaliação como mensagem no chat (armazena toda a review aqui)
+        let reviewedProductId = null;
         try {
             const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
             const chat = chatData?.[0];
             if (chat) {
                 const targetName = isSellerRatingBuyer ? (chat.buyer_name || 'Comprador') : (chat.seller_name || 'Vendedor');
+                // Tenta obter o product_id do pedido
+                try {
+                    const orderRow = await supabaseFetch(`orders?id=eq.${orderId}&select=product_id&limit=1`);
+                    if (orderRow?.[0]?.product_id) reviewedProductId = orderRow[0].product_id;
+                } catch (e) {}
                 const stars = '★'.repeat(currentReviewRating) + '☆'.repeat(5 - currentReviewRating);
                 let reviewText = isSellerRatingBuyer ? `Avaliação do comprador` : `Avaliação do vendedor`;
                 reviewText += `\nNota: ${currentReviewRating}/5\n\n`;
@@ -654,6 +660,29 @@ window.submitReview = async function() {
             }
         } catch (e) {
             console.error('Erro ao enviar avaliação pro chat:', e);
+        }
+
+        // Persiste a avaliação na tabela avaliacoes (independente do chat)
+        try {
+            if (reviewedProductId) {
+                await supabaseFetch('avaliacoes', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        order_id:       orderId,
+                        product_id:     reviewedProductId,
+                        tipo:           mode,
+                        avaliador_id:   user.id,
+                        avaliador_nome: user.nome || 'Usuário',
+                        avaliado_id:    targetId,
+                        rating:         currentReviewRating,
+                        comment:        comment || '',
+                        images:         reviewImages.length > 0 ? JSON.stringify(reviewImages) : '[]',
+                        videos:         '[]'
+                    })
+                });
+            }
+        } catch (e) {
+            console.warn('Erro ao persistir avaliação na tabela:', e);
         }
 
         bootstrap.Modal.getInstance(document.getElementById('reviewModal'))?.hide();

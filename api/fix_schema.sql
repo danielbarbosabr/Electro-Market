@@ -60,6 +60,7 @@ create table if not exists public.notifications (
 create table if not exists public.avaliacoes (
   id             uuid primary key default gen_random_uuid(),
   order_id       uuid,
+  product_id     text,
   tipo           text,
   avaliador_id   uuid,
   avaliador_nome text,
@@ -71,6 +72,7 @@ create table if not exists public.avaliacoes (
 alter table public.avaliacoes add column if not exists avaliado_id uuid;
 alter table public.avaliacoes add column if not exists images jsonb default '[]'::jsonb;
 alter table public.avaliacoes add column if not exists videos jsonb default '[]'::jsonb;
+alter table public.avaliacoes add column if not exists product_id text;
 
 -- ---------- ÍNDICES ----------
 create index if not exists idx_users_email        on public.users (email);
