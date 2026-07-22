@@ -26,7 +26,7 @@ window.productsFetchToken = 0;
 // Formata um valor em reais; se for 0 (ou vazio), mostra "GRÁTIS"
 function formatPreco(valor, opts = {}) {
     const v = parseFloat(valor) || 0;
-    if (v === 0) return opts.htmlGratis !== false ? '<span class="text-success fw-bold">GRÁTIS</span>' : 'GRÁTIS';
+    if (v === 0) return opts.htmlGratis !== false ? '<span class="text-success fw-bold">GRÁTIS</span>' : 'R$ 0,00';
     return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 }
 
@@ -3617,6 +3617,8 @@ window.submitOffer = async function(event) {
             total:                offerValue * qty,
             quantity:             qty,
             status:               'offer_pending',
+            offer_amount:         offerValue,
+            offer_original_price: preco,
             realiza_entrega:      !!(item.realiza_entrega ?? item.realizaEntrega ?? true),
             agree_buyer:          false,
             agree_seller:         false,
