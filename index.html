@@ -59,7 +59,10 @@
                             <span id="navUserName" class="text-white fw-bold small">Usuário</span>
                         </div>
                         <div class="d-flex align-items-center gap-3" style="position:relative;">
-                            <button class="btn btn-theme p-0 border-0 text-white" id="themeToggle" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
+                            <a href="#" class="text-white text-decoration-none position-relative" title="Conversas" onclick="event.preventDefault();window.renderDirectChats()">
+                                <i class="bi bi-chat-dots fs-5"></i>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-none" id="chatBadgeDesktop" style="font-size: 0.6rem;">0</span>
+                            </a>
                             <a href="#" class="text-white text-decoration-none position-relative role-client" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
                                 <i class="bi bi-cart2 fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="cartBadgeDesktop" style="font-size: 0.6rem;">0</span>
@@ -67,9 +70,6 @@
                             <a href="#" class="text-white text-decoration-none position-relative" title="Notificações" onclick="event.preventDefault();window.showNotifications()">
                                 <i class="bi bi-bell fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBadgeDesktop" style="font-size: 0.6rem;">0</span>
-                            </a>
-                            <a href="#" class="text-white text-decoration-none role-logged-in d-none" title="Falar com o Suporte" onclick="event.preventDefault(); window.openSupportRequestModal();">
-                                <i class="bi bi-headset fs-5"></i>
                             </a>
                         </div>
                     </div>
@@ -482,6 +482,7 @@
                             </div>
                         </div>
 
+                        <p class="text-center mt-3 mb-1" style="font-size:0.78rem;color:#555;line-height:1.5;">Ao me cadastrar, eu aceito os <a href="#" onclick="event.preventDefault();window._authReturn='cadastro';window.hideAuthScreen();window.showTermsPage()" style="color:var(--market-color,#3483fa);text-decoration:underline;font-weight:600;">Termos de Uso</a> e a <a href="#" onclick="event.preventDefault();window._authReturn='cadastro';window.hideAuthScreen();window.showPrivacyPage()" style="color:var(--market-color,#3483fa);text-decoration:underline;font-weight:600;">Política de Privacidade</a>.</p>
                         <div class="d-flex gap-2 mt-2">
                             <button type="button" class="ml-btn-outline flex-grow-1" onclick="window.mlCadPrevStep()">Voltar</button>
                             <button type="submit" class="ml-btn-primary flex-grow-1">Criar conta</button>
@@ -638,33 +639,47 @@
                 <div class="modal-body">
                     <form id="announceForm">
                         <div class="mb-3">
-                            <input type="text" class="form-control" id="prodTitle" placeholder="Título do anúncio" required>
-                        </div>
-                        <div class="mb-3">
-                            <select class="form-select" id="prodCondition" required>
-                                <option value="" selected disabled>Condição do produto</option>
-                                <option value="Novo">Novo</option>
-                                <option value="Usado - Como novo">Usado - Como novo</option>
-                                <option value="Usado - Bom estado">Usado - Bom estado</option>
-                                <option value="Usado - Estado regular">Usado - Estado regular</option>
-                                <option value="Para peças ou não funciona">Para peças ou não funciona</option>
-                                <option value="Recondicionado">Recondicionado</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <textarea class="form-control" id="prodDescription" placeholder="Descrição detalhada" rows="3" required></textarea>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <input type="number" class="form-control" id="prodPrice" placeholder="Preço (R$)" max="10000000" min="0" required>
+                            <div class="ml-field">
+                                <input type="text" id="prodTitle" placeholder=" " required>
+                                <label for="prodTitle">Título do anúncio *</label>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <input type="number" class="form-control" id="prodQuantity" placeholder="Quantidade" required>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <select id="prodCondition" required>
+                                    <option value="" selected disabled>Condição do produto</option>
+                                    <option value="Novo">Novo</option>
+                                    <option value="Usado - Como novo">Usado - Como novo</option>
+                                    <option value="Usado - Bom estado">Usado - Bom estado</option>
+                                    <option value="Usado - Estado regular">Usado - Estado regular</option>
+                                    <option value="Para peças ou não funciona">Para peças ou não funciona</option>
+                                    <option value="Recondicionado">Recondicionado</option>
+                                </select>
+                                <label for="prodCondition">Condição *</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <textarea id="prodDescription" placeholder=" " rows="3" required></textarea>
+                                <label for="prodDescription">Descrição detalhada *</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <input type="number" id="prodPrice" placeholder=" " max="10000000" min="0" required>
+                                <label for="prodPrice">Preço (R$)</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <input type="number" id="prodQuantity" placeholder=" " required>
+                                <label for="prodQuantity">Quantidade</label>
                             </div>
                         </div>
                         <input type="hidden" id="prodPrecoOriginal" value="">
                         <div class="mb-3">
-                            <select class="form-select" id="prodCategory" required>
+                            <div class="ml-field">
+                                <select id="prodCategory" required>
                                 <option value="" selected disabled>Onde seu produto se encaixa?</option>
                                 <optgroup label="Games">
                                     <option value="Eletrônicos > Games > Consoles > PlayStation">Consoles > PlayStation</option>
@@ -787,15 +802,19 @@
                                     <option value="Eletrônicos > Cabos e Energia > Filtros de Linha">Filtros de Linha</option>
                                 </optgroup>
                             </select>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="prodDelivery" checked>
-                                <label class="form-check-label small" for="prodDelivery">Eu realizo a entrega</label>
+                                <label for="prodCategory">Categoria *</label>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Fotos do Produto</label>
+                            <div class="create-ad-toggle-row">
+                                <span>Eu realizo a entrega</span>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="prodDelivery" checked>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="ml-select-label">Fotos do Produto</label>
                             <div class="profile-link-inline mb-2">
                                 <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
                                     <i class="bi bi-box-arrow-up-right"></i>
@@ -804,7 +823,10 @@
                                     <i class="bi bi-cloud-upload"></i>
                                     <input type="file" id="prodPhotoFile1" accept="image/*" hidden onchange="window.uploadProdPhoto(this, 1)">
                                 </label>
-                                <input type="url" class="form-control form-control-sm" id="prodLink1" placeholder="Link da imagem 1 (Imgur)">
+                                <div class="ml-field flex-grow-1 mb-0">
+                                    <input type="url" id="prodLink1" placeholder=" ">
+                                    <label for="prodLink1">Link da imagem 1 (opcional)</label>
+                                </div>
                             </div>
                             <div class="profile-link-inline mb-2">
                                 <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
@@ -814,7 +836,10 @@
                                     <i class="bi bi-cloud-upload"></i>
                                     <input type="file" id="prodPhotoFile2" accept="image/*" hidden onchange="window.uploadProdPhoto(this, 2)">
                                 </label>
-                                <input type="url" class="form-control form-control-sm" id="prodLink2" placeholder="Link da imagem 2">
+                                <div class="ml-field flex-grow-1 mb-0">
+                                    <input type="url" id="prodLink2" placeholder=" ">
+                                    <label for="prodLink2">Link da imagem 2 (opcional)</label>
+                                </div>
                             </div>
                             <div class="profile-link-inline">
                                 <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
@@ -824,7 +849,10 @@
                                     <i class="bi bi-cloud-upload"></i>
                                     <input type="file" id="prodPhotoFile3" accept="image/*" hidden onchange="window.uploadProdPhoto(this, 3)">
                                 </label>
-                                <input type="url" class="form-control form-control-sm" id="prodLink3" placeholder="Link da imagem 3">
+                                <div class="ml-field flex-grow-1 mb-0">
+                                    <input type="url" id="prodLink3" placeholder=" ">
+                                    <label for="prodLink3">Link da imagem 3 (opcional)</label>
+                                </div>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success w-100 fw-bold">Publicar Anúncio</button>
@@ -867,6 +895,10 @@
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-client" onclick="window.renderOrderManagement('buyer'); window.closeMobileMenu();">
                     <i class="bi bi-bag"></i> <strong>Minhas Compras</strong>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action role-client d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
+                    <span><i class="bi bi-chat-dots"></i> <strong>Conversas</strong></span>
+                    <span class="badge bg-success rounded-pill d-none" id="chatBadgeMobile">0</span>
                 </a>
 
                 <!-- Menu de Categorias Mobile -->
@@ -928,6 +960,10 @@
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none" onclick="window.renderOrderManagement('seller_sales'); window.closeMobileMenu();">
                     <i class="bi bi-shop"></i> <strong>Minhas Vendas</strong>
                 </a>
+                <a href="#" class="list-group-item list-group-item-action role-seller d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
+                    <span><i class="bi bi-chat-dots"></i> <strong>Conversas</strong></span>
+                    <span class="badge bg-success rounded-pill d-none" id="chatBadgeSellerMobile">0</span>
+                </a>
 
                 <hr class="my-2 opacity-10">
 
@@ -962,6 +998,10 @@
                 <a href="#" class="list-group-item list-group-item-action role-logged-in d-none" onclick="window.openSupportRequestModal(); window.closeMobileMenu();">
                     <i class="bi bi-headset"></i> <strong>Falar com o Suporte</strong>
                 </a>
+                <a href="#" class="list-group-item list-group-item-action role-admin d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
+                    <span><i class="bi bi-chat-dots"></i> <strong>Conversas</strong></span>
+                    <span class="badge bg-success rounded-pill d-none" id="chatBadgeAdminMobile">0</span>
+                </a>
             </div>
         </div>
     </div>
@@ -989,132 +1029,7 @@
                 <p>Selecione um pedido ao lado para ver a conversa</p>
             </div>
 
-            <div id="waChatActive" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;">
-                <div class="chat-header-pro">
-                    <button type="button" class="ml-auth-close" onclick="window.closeWaChat()" aria-label="Fechar" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;flex-shrink:0;">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                    <div class="chat-header-avatar-wrap">
-                        <img id="chatPartnerAvatar" src="" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=User'">
-                        <span id="chatPartnerStatusDot" class="presence-dot"></span>
-                    </div>
-                    <div class="chat-header-info" style="min-width:0;flex:1;">
-                        <span id="chatPartnerNameHeader" class="chat-header-name">Conversa</span>
-                        <span id="chatOrderIdDisplayHeader" class="chat-header-order-id" style="display:block;font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                        <div id="chatProductSummaryInline" style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                            <img id="chatProdImgInline" src="" style="width:18px;height:18px;border-radius:4px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
-                            <span id="chatProdTitleInline" style="font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Produto</span>
-                            <span id="chatProdPriceInline" style="font-size:0.65rem;font-weight:600;color:#00A884;flex-shrink:0;">R$ 0,00</span>
-                        </div>
-                    </div>
-                    <div class="dropdown">
-                        <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções" style="margin-right:4px;">
-                            <i class="bi bi-three-dots-vertical"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.viewChatPartnerProfile()"><i class="bi bi-person-circle me-2"></i>Ver perfil</a></li>
-                            <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.chatCancelOrder(currentChat)"><i class="bi bi-x-circle me-2"></i>Cancelar pedido</a></li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Barra de Status do Pedido -->
-                <div id="orderStatusBar" class="chat-status-bar"></div>
-
-                <!-- Área de Mensagens -->
-                <div id="chatMessagesContainer" class="flex-grow-1 p-3" style="overflow-y: auto;"></div>
-
-                <!-- Barra de Preview (Responder/Editar) -->
-                <div id="chatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-
-                <!-- Opções do pedido (status/logística) — abre pra cima, encostada no input, estilo WhatsApp -->
-                <div id="logisticsAgreementArea">
-                    <div id="logisticsButtons" class="logistics-buttons"></div>
-                </div>
-
-                <!-- Painel de Anexo (abre ao clicar no clipe, sem popups feios de prompt()) -->
-                <div id="chatAttachPanel" class="p-3 bg-light border-top d-none">
-                    <div class="d-flex gap-2 mb-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image')">
-                            <i class="bi bi-play-circle me-1"></i>Mídia
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file')">
-                            <i class="bi bi-file-earmark me-1"></i>Documentos
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="location" onclick="window.setChatAttachType('location')">
-                            <i class="bi bi-geo-alt-fill me-1"></i>Endereço
-                        </button>
-                    </div>
-
-                    <!-- Aba Mídia: link + escolher do PC (imagem) -->
-                    <div id="attachImageBox">
-                        <div class="input-group input-group-sm mb-2">
-                            <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                            <input type="url" id="chatAttachLinkInput" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF...">
-                            <button type="button" class="ml-attach ml-btn-media" onclick="window.confirmChatAttach()"><i class="bi bi-send"></i></button>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <label class="ml-attach ml-btn-pc flex-grow-1" style="cursor:pointer;">
-                                <i class="bi bi-cloud-upload me-1"></i>Escolher do PC
-                                <input type="file" id="chatImageFile" accept="image/*" hidden onchange="window.sendChatImageFile(this)">
-                            </label>
-                            <button type="button" class="ml-attach ml-btn-imgur flex-grow-1" onclick="window.abrirUploadExterno()">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>Imgur
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Aba Documentos: Google Drive / OneDrive -->
-                    <div id="attachFileBox" class="d-none">
-                        <div class="input-group input-group-sm mb-2">
-                            <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                            <input type="url" id="chatAttachLinkInputFile" class="form-control" placeholder="Cole o link do documento...">
-                            <button type="button" class="ml-attach ml-btn-media" onclick="window.confirmChatAttach()"><i class="bi bi-send"></i></button>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="ml-attach ml-btn-drive flex-grow-1" onclick="window.abrirDocHost('Google Drive')"><i class="bi bi-google me-1"></i>Google Drive</button>
-                            <button type="button" class="ml-attach ml-btn-onedrive flex-grow-1" onclick="window.abrirDocHost('OneDrive')"><i class="bi bi-microsoft me-1"></i>OneDrive</button>
-                        </div>
-                    </div>
-
-                    <!-- Aba Endereço: link do Maps + Atual/Cadastrado -->
-                    <div id="attachLocationBox" class="d-none">
-                        <div class="input-group input-group-sm mb-2">
-                            <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
-                            <input type="url" id="chatAttachLinkInputLoc" class="form-control" placeholder="Cole o link do endereço (Google Maps)...">
-                            <button type="button" class="ml-attach ml-btn-media" onclick="window.sendChatLocation('other')"><i class="bi bi-send"></i></button>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="ml-attach ml-btn-loc flex-grow-1" onclick="window.sendChatLocation('current')"><i class="bi bi-geo-alt-fill me-1"></i>Endereço atual</button>
-                            <button type="button" class="ml-attach ml-btn-loc flex-grow-1" onclick="window.sendChatLocation('stored')"><i class="bi bi-house-door me-1"></i>Endereço cadastrado</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Input de Mensagem -->
-                <div class="chat-input-bar">
-                    <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="chat-icon-btn"
-                                onclick="window.toggleChatAttachPanel()" title="Anexar imagem ou arquivo">
-                            <i class="bi bi-paperclip"></i>
-                        </button>
-                        <button type="button" class="chat-icon-btn"
-                                onclick="window.toggleChatActions()" title="Opções do pedido">
-                            <i class="bi bi-plus-circle"></i>
-                        </button>
-                        <button type="button" class="chat-icon-btn" data-voice-input="chatMessageInput"
-                                onclick="window.startVoiceInput('chatMessageInput')" title="Gravar áudio">
-                            <i class="bi bi-mic"></i>
-                        </button>
-                        <input type="text" id="chatMessageInput" class="chat-text-input"
-                               placeholder="Digite sua mensagem..." autocomplete="off"
-                               onkeypress="if(event.key==='Enter'){event.preventDefault();window.sendChatMessage(event)}">
-                        <button type="button" class="chat-send-btn" onclick="window.sendChatMessage(event)">
-                            <i class="bi bi-send-fill"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <div id="waChatActive" class="d-none h-100 flex-column" style="margin:0;border-radius:0;"></div>
         </section>
     </div>
 
@@ -1174,104 +1089,42 @@
          com o Suporte" de novo. -->
     <div class="modal fade" id="supportRequestModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered" id="supportModalDialog">
-            <div class="modal-content" style="border-radius: 16px;">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="supportModalTitle"><i class="bi bi-headset me-2"></i>Falar com o Suporte</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()"></button>
+            <div class="modal-content border-0">
+                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
+                    <h5 class="modal-title fw-bold" id="supportModalTitle">Falar com o Suporte</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()"></button>
                 </div>
 
                 <!-- Etapa 1: escolher o assunto -->
                 <form id="supportRequestForm" onsubmit="return window.submitSupportRequest(event)">
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Qual é o problema?</label>
-                            <select class="form-select" id="supportReqCategory" required>
-                                <option value="esqueci_senha">Esqueci minha senha</option>
-                                <option value="produto_nao_recebido">Não recebi um produto</option>
-                                <option value="entrega_sem_confirmacao">Entreguei, mas o comprador não confirmou</option>
-                                <option value="conta_ajuda">Dúvida sobre minha conta / a plataforma</option>
-                                <option value="outro">Outro assunto</option>
-                            </select>
+                            <div class="ml-field">
+                                <select id="supportReqCategory" required>
+                                    <option value="" selected disabled>Qual é o problema?</option>
+                                    <option value="esqueci_senha">Esqueci minha senha</option>
+                                    <option value="produto_nao_recebido">Não recebi um produto</option>
+                                    <option value="entrega_sem_confirmacao">Entreguei, mas o comprador não confirmou</option>
+                                    <option value="conta_ajuda">Dúvida sobre minha conta / a plataforma</option>
+                                    <option value="outro">Outro assunto</option>
+                                </select>
+                                <label for="supportReqCategory">Qual é o problema?</label>
+                            </div>
                         </div>
-                        <div class="mb-2" id="supportReqEmailWrap">
-                            <label class="form-label small fw-bold">Seu e-mail</label>
-                            <input type="email" class="form-control" id="supportReqEmail" placeholder="seu@email.com">
+                        <div class="mb-3" id="supportReqEmailWrap">
+                            <div class="ml-field">
+                                <input type="email" id="supportReqEmail" placeholder=" " required>
+                                <label for="supportReqEmail">Seu e-mail</label>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="submit" class="btn btn-ml-primary w-100 fw-bold"><i class="bi bi-send-fill me-2"></i>Abrir Chamado</button>
+                        <button type="submit" class="btn btn-success w-100 fw-bold"><i class="bi bi-send-fill me-2"></i>Abrir Chamado</button>
                     </div>
                 </form>
 
-                <!-- Etapa 2: chat do atendimento — ocupa a tela toda (ver #supportModalDialog.modal-fullscreen no CSS) -->
-                <div id="supportChatView" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;">
-                    <div class="chat-header-pro">
-                        <button type="button" class="ml-auth-close" onclick="window.closeSupportChatModal(); try { bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'))?.hide(); } catch(e){}" aria-label="Fechar" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;flex-shrink:0;">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                        <div class="chat-header-avatar-wrap">
-                            <i class="bi bi-headset support-chat-header-icon"></i>
-                        </div>
-                        <div class="chat-header-info">
-                            <span class="chat-header-name">Atendimento do Suporte</span>
-                            <span class="chat-header-order-id" id="supportChatHeaderStatus">Suporte ao cliente</span>
-                        </div>
-                        <button type="button" class="chat-header-close" onclick="window.openSupportParticipants()" title="Ver pessoas da conversa" style="margin-left:4px;">
-                            <i class="bi bi-people-fill"></i>
-                        </button>
-                        <button type="button" class="chat-header-close" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()" aria-label="Fechar" style="margin-left:4px;">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                    <div id="supportChatStatusBar" class="chat-status-bar"></div>
-                    <div id="supportChatTicketSummary" class="chat-ticket-summary d-none"></div>
-                    <div id="supportChatMessages" class="chat-messages support-chat-messages" style="padding:14px;"></div>
-
-                    <!-- Barra de Preview (Responder/Editar) -->
-                    <div id="supportChatInputPreview" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-
-                    <!-- Painel de Anexo (abre ao clicar no clipe) -->
-                    <div id="supportChatAttachPanel" class="p-3 bg-light border-top d-none">
-                        <div class="d-flex gap-2 mb-2">
-                            <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setSupportAttachType('image')">
-                                <i class="bi bi-play-circle me-1"></i>Mídia
-                            </button>
-                            <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setSupportAttachType('file')">
-                                <i class="bi bi-file-earmark me-1"></i>Documentos
-                            </button>
-                            <button type="button" class="btn btn-sm flex-grow-1 chat-attach-tab" onclick="window.sendSupportChatLocation()">
-                                <i class="bi bi-geo-alt-fill me-1"></i>Endereço
-                            </button>
-                        </div>
-                        <div class="input-group input-group-sm mb-2">
-                            <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                            <input type="url" id="supportAttachLinkInput" class="form-control" placeholder="Cole o link da imagem...">
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="window.abrirUploadExterno()">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>Fazer upload (Imgur)
-                            </button>
-                            <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="window.confirmSupportAttach()">
-                                <i class="bi bi-send me-1"></i>Enviar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="modal-footer flex-column align-items-stretch p-2" id="supportChatInputBar">
-                        <div class="d-flex gap-2 align-items-center">
-                            <button type="button" class="chat-icon-btn" onclick="window.toggleSupportAttachPanel()" title="Anexar imagem ou arquivo">
-                                <i class="bi bi-paperclip"></i>
-                            </button>
-                            <button type="button" class="chat-icon-btn" data-voice-input="supportChatInput"
-                                    onclick="window.startVoiceInput('supportChatInput')" title="Gravar áudio">
-                                <i class="bi bi-mic"></i>
-                            </button>
-                            <input type="text" id="supportChatInput" class="chat-text-input" placeholder="Digite sua mensagem..." autocomplete="off"
-                                   onkeypress="if(event.key==='Enter'){event.preventDefault(); window.sendMySupportMessage();}">
-                            <button type="button" class="chat-send-btn" onclick="window.sendMySupportMessage()"><i class="bi bi-send-fill"></i></button>
-                        </div>
-                    </div>
-                </div>
+                <!-- Etapa 2: chat do atendimento — conteúdo é gerado por renderChatContainer() -->
+                <div id="supportChatView" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;"></div>
             </div>
         </div>
     </div>
@@ -1464,6 +1317,15 @@
                             use a <strong>Simulação de Papel</strong> no Painel Admin — sem alterar sua conta de verdade.
                         </div>
                     </div>
+
+                    <div class="mt-3">
+                        <div class="create-ad-toggle-row">
+                            <span>Modo Escuro</span>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="themeSwitchProfile" role="switch" onchange="window.toggleTema()">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1535,9 +1397,23 @@
                 </a>
             </div>
 
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-                <span class="footer-copyright text-white d-none d-md-block">© 2026 Electro<span class="market-text">Market</span>.</span>
-            
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 footer-bottom-row">
+                <div class="d-flex align-items-center gap-2 footer-legal-links">
+                    <span class="footer-copyright text-white">© 2026 Electro<span class="market-text">Market</span>.</span>
+                    <span class="text-white-50">|</span>
+                    <a href="#" class="text-white-50 text-decoration-none role-logged-in d-none" title="Suporte" onclick="event.preventDefault(); window.openSupportRequestModal();">
+                        <i class="bi bi-headset"></i><span class="d-none d-md-inline ms-1">Suporte</span>
+                    </a>
+                    <span class="text-white-50 role-logged-in d-none">|</span>
+                    <a href="#" onclick="event.preventDefault();window.showTermsPage()" class="text-white-50 text-decoration-none" title="Termos de Uso">
+                        <i class="bi bi-file-text"></i><span class="d-none d-md-inline ms-1">Termos de Uso</span>
+                    </a>
+                    <span class="text-white-50">|</span>
+                    <a href="#" onclick="event.preventDefault();window.showPrivacyPage()" class="text-white-50 text-decoration-none" title="Política de Privacidade">
+                        <i class="bi bi-shield-lock"></i><span class="d-none d-md-inline ms-1">Política de Privacidade</span>
+                    </a>
+                </div>
+
                 <div class="footer-tools d-flex gap-4 align-items-center justify-content-center">
                     <span class="small text-white opacity-50 d-none d-md-block">Stack:</span>
                     <a href="https://code.visualstudio.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg" width="20" title="VS Code"></a>
@@ -1545,10 +1421,8 @@
                     <a href="https://vercel.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg" width="20" title="Vercel" style="filter: invert(1) brightness(2);"></a>
                     <a href="https://supabase.com/" target="_blank"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg" width="20" title="Supabase"></a>
                     <a href="https://opencode.ai/" target="_blank"><img src="https://opencode.ai/favicon.ico" width="20" title="OpenCode AI" style="border-radius: 4px; filter: none !important;" onerror="this.onerror=null;this.style.display='none'"></a>
-                    <a href="#" onclick="window.abrirUploadExterno(); event.preventDefault();" title="Imgur" style="color:#fff;font-size:1.1rem;"><i class="bi bi-box-arrow-up-right"></i></a>
+                    <a href="#" onclick="window.abrirUploadExterno(); event.preventDefault();" title="Imgur"><img src="https://th.bing.com/th/id/OIP.gaby1MybArXbC-PvAzcloAHaHa?w=92&w=92&c=1&bgcl=ae3149&r=0&o=7&dpr=1.4&pid=ImgRC&rm=3" width="20" height="20" style="border-radius:3px;" alt="Imgur"></a>
                 </div>
-
-                <span class="text-white-50 d-md-none" style="font-size: 0.6rem;">© 2026 ElectroMarket</span>
             </div>
         </div>
     </footer>

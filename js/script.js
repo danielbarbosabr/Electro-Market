@@ -5,23 +5,23 @@
 //            toggle tema global, melhor gestão de estado
 // ============================================
 
-let allProductsCache = [];
-let cart              = JSON.parse(localStorage.getItem('electroCart'))    || [];
-let likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || [];
-let accessHistory     = JSON.parse(localStorage.getItem('electroHistory')) || [];
-let currentChat       = null;
-let adminOrdersCache  = [];
-let currentOrderViewType = 'buyer';
-let ordersCache       = [];
-let currentReplyIndex   = null;
-let editingMessageIndex = null;
-let riveInstance      = null;
-let chatsCache        = [];
-let notificationsCache = JSON.parse(localStorage.getItem('electroNotifs')) || [];
-let chatPollInterval  = null;
-let ordersPollInterval = null;
-let lastChatSignature = null;
-let productsFetchToken = 0;
+window.allProductsCache = [];
+window.cart              = JSON.parse(localStorage.getItem('electroCart'))    || [];
+window.likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || [];
+window.accessHistory     = JSON.parse(localStorage.getItem('electroHistory')) || [];
+window.currentChat       = null;
+window.adminOrdersCache  = [];
+window.currentOrderViewType = 'buyer';
+window.ordersCache       = [];
+window.currentReplyIndex   = null;
+window.editingMessageIndex = null;
+window.riveInstance      = null;
+window.chatsCache        = [];
+window.notificationsCache = JSON.parse(localStorage.getItem('electroNotifs')) || [];
+window.chatPollInterval  = null;
+window.ordersPollInterval = null;
+window.lastChatSignature = null;
+window.productsFetchToken = 0;
 
 // Formata um valor em reais; se for 0 (ou vazio), mostra "GRÁTIS"
 function formatPreco(valor, opts = {}) {
@@ -41,6 +41,27 @@ const ORDER_STATUS_MAP = {
     'cancelled':       { text: 'Cancelado',                class: 'bg-danger' },
     'dispute':         { text: 'Em Disputa',               class: 'bg-danger' }
 };
+
+function statusToAlertClass(status) {
+    if (status === 'finished') return 'success';
+    if (status === 'cancelled' || status === 'dispute') return 'danger';
+    if (status === 'pending') return 'warning';
+    return 'info';
+}
+window.statusToAlertClass = statusToAlertClass;
+
+const STATUS_BAR_MAP = {
+    'pending':         '<i class="bi bi-hourglass-split me-1"></i>Aguardando Aprovação',
+    'offer_pending':   '<i class="bi bi-tag me-1"></i>Oferta Enviada',
+    'accepted':        '<i class="bi bi-check-circle-fill me-1"></i>Aprovado - Combinar Entrega',
+    'agreement':       '<i class="bi bi-people-fill me-1"></i>Definindo Logística',
+    'shipping':        '<i class="bi bi-truck me-1"></i>Em Transporte',
+    'awaiting_pickup': '<i class="bi bi-geo-alt-fill me-1"></i>Aguardando Retirada',
+    'finished':        '<i class="bi bi-patch-check-fill me-1"></i>Finalizado',
+    'cancelled':       '<i class="bi bi-x-circle-fill me-1"></i>Cancelado',
+    'dispute':         '<i class="bi bi-exclamation-triangle-fill me-1"></i>Em Disputa'
+};
+window.STATUS_BAR_MAP = STATUS_BAR_MAP;
 
 const CONDICOES_PRODUTO = ['Novo', 'Usado - Como novo', 'Usado - Bom estado', 'Usado - Estado regular', 'Para peças ou não funciona', 'Recondicionado'];
 const REGEX_CONDICAO = new RegExp(`^\\[(${CONDICOES_PRODUTO.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\]\\s*`);
@@ -171,11 +192,13 @@ async function supabaseFetch(path, options = {}) {
  */
 window.exitWaOrdersView = function() {
     stopOrdersPolling();
+    stopDirectChatPolling();
     document.getElementById('whatsappOrdersView')?.classList.add('d-none');
     document.getElementById('productGridMain')?.classList.remove('d-none');
     document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
     document.body.style.overflow = '';
     if (typeof window.closeWaChat === 'function') window.closeWaChat();
+    if (typeof window.closeDirectChat === 'function') window.closeDirectChat();
 };
 
 async function loadPage(query = 'eletronicos', forceRefresh = false) {
@@ -1054,20 +1077,24 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                     </div>
                     <div class="create-ad-section-body">
                         <div class="mb-3">
-                            <label class="create-ad-label">Título do anúncio <span class="text-danger">*</span></label>
-                            <input type="text" class="create-ad-input" id="caTitle" placeholder="Ex: iPhone 14 128GB Novo Lacrado" required>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="create-ad-label">Condição <span class="text-danger">*</span></label>
-                                <select class="create-ad-input" id="caCondition" required>
-                                    ${renderCondicoesOptions()}
-                                </select>
+                            <div class="ml-field">
+                                <input type="text" id="caTitle" placeholder=" " required>
+                                <label for="caTitle">Título do anúncio *</label>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="create-ad-label">Descrição <span class="text-danger">*</span></label>
-                            <textarea class="create-ad-input create-ad-textarea" id="caDescription" placeholder="Descreva o produto com detalhes" rows="4" required></textarea>
+                            <div class="ml-field">
+                                <select id="caCondition" required>
+                                    ${renderCondicoesOptions()}
+                                </select>
+                                <label for="caCondition">Condição *</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <textarea id="caDescription" placeholder=" " rows="4" required></textarea>
+                                <label for="caDescription">Descrição *</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1079,20 +1106,22 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                         <span>Preço e Quantidade</span>
                     </div>
                     <div class="create-ad-section-body">
-                        <div class="create-ad-price-row">
-                            <div class="mb-3">
-                                <label class="create-ad-label">Preço (R$) <span class="text-danger">*</span></label>
-                                <input type="number" class="create-ad-input" id="caPrice" placeholder="0,00" min="0" step="0.01" required>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <input type="number" id="caPrice" placeholder=" " min="0" step="0.01" required>
+                                <label for="caPrice">Preço (R$) *</label>
                             </div>
-                            <div class="mb-3">
-                                <label class="create-ad-label">Quantidade <span class="text-danger">*</span></label>
-                                <input type="number" class="create-ad-input" id="caQuantity" placeholder="1" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <div class="ml-field">
+                                <input type="number" id="caQuantity" placeholder=" " min="1" required>
+                                <label for="caQuantity">Quantidade *</label>
                             </div>
-                            <div class="d-flex align-items-center" style="padding-bottom:1px;">
-                                <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" id="caDelivery" checked onchange="document.getElementById('caDeliveryLabel').textContent=this.checked?'Faço entrega':'Não realizo entregas'">
-                                    <label class="form-check-label small" for="caDelivery" id="caDeliveryLabel">Faço entrega</label>
-                                </div>
+                        </div>
+                        <div class="create-ad-toggle-row">
+                            <span id="caDeliveryLabel">Faço entrega</span>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="caDelivery" checked onchange="document.getElementById('caDeliveryLabel').textContent=this.checked?'Faço entrega':'Não realizo entregas'">
                             </div>
                         </div>
                     </div>
@@ -1106,24 +1135,25 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                     </div>
                     <div class="create-ad-section-body">
                         <div class="mb-3">
-                            <label class="create-ad-label">Categoria <span class="text-danger">*</span></label>
-                            <div class="ca-cat-search-wrap">
-                                <input type="text" class="create-ad-input" id="caCatSearch" placeholder="Digite para buscar uma categoria..." autocomplete="off">
+                            <div class="ml-field">
+                                <input type="text" class="create-ad-input" id="caCatSearch" placeholder=" " autocomplete="off">
+                                <label for="caCatSearch">Categoria *</label>
                                 <i class="bi bi-search ca-cat-search-icon"></i>
                             </div>
-                            <div class="ca-cat-list-wrap">
-                                <select class="create-ad-input" id="caCategory" size="6" required>
-                                    ${renderCategoriaOptions()}
-                                </select>
-                            </div>
+                            <select id="caCategory" class="d-none" required>
+                                ${renderCategoriaOptions()}
+                            </select>
+                            <div id="caCatList" class="ca-cat-list"></div>
                             <div id="caSuggestCatWrap" class="ca-suggest-cat-wrap d-none">
-                                <hr class="my-2">
-                                <p class="small text-muted mb-1">Não encontrou a categoria ideal?</p>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" class="form-control" id="caSuggestCatInput" placeholder="Digite o nome da nova categoria">
-                                    <button type="button" class="btn btn-sm btn-ml-secondary" onclick="window.suggestCategory()">Sugerir</button>
+                                <p class="small text-muted mb-2">Não encontrou? Crie uma nova categoria:</p>
+                                <div class="ca-suggest-row">
+                                    <div class="ml-field flex-grow-1 mb-0">
+                                        <input type="text" id="caSuggestCatInput" placeholder=" ">
+                                        <label for="caSuggestCatInput">Nome da nova categoria</label>
+                                    </div>
+                                    <button type="button" class="ml-btn ml-btn-primary" onclick="window.suggestCategory()">Adicionar</button>
                                 </div>
-                                <small class="text-muted">Sua sugestão será analisada pelo administrador.</small>
+                                <small class="text-muted">A categoria será criada e já vinculada a este anúncio.</small>
                             </div>
                         </div>
                     </div>
@@ -1148,7 +1178,10 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                                         <i class="bi bi-cloud-upload"></i>
                                         <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
                                     </label>
-                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto0" placeholder="Link da imagem principal">
+                                    <div class="ml-field flex-grow-1 mb-0">
+                                        <input type="url" id="caFoto0" placeholder=" ">
+                                        <label for="caFoto0">Link da imagem principal (opcional)</label>
+                                    </div>
                                     <div class="ca-foto-preview" id="caFotoPreview0"></div>
                                 </div>
                                 <div class="ca-foto-row profile-link-inline mb-2" data-idx="1">
@@ -1159,7 +1192,10 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                                         <i class="bi bi-cloud-upload"></i>
                                         <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
                                     </label>
-                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto1" placeholder="Link da imagem 2">
+                                    <div class="ml-field flex-grow-1 mb-0">
+                                        <input type="url" id="caFoto1" placeholder=" ">
+                                        <label for="caFoto1">Link da imagem 2 (opcional)</label>
+                                    </div>
                                     <div class="ca-foto-preview" id="caFotoPreview1"></div>
                                 </div>
                                 <div class="ca-foto-row profile-link-inline mb-2" data-idx="2">
@@ -1170,7 +1206,10 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                                         <i class="bi bi-cloud-upload"></i>
                                         <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
                                     </label>
-                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto2" placeholder="Link da imagem 3">
+                                    <div class="ml-field flex-grow-1 mb-0">
+                                        <input type="url" id="caFoto2" placeholder=" ">
+                                        <label for="caFoto2">Link da imagem 3 (opcional)</label>
+                                    </div>
                                     <div class="ca-foto-preview" id="caFotoPreview2"></div>
                                 </div>
                                 <div class="ca-foto-row profile-link-inline" data-idx="3">
@@ -1181,7 +1220,10 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
                                         <i class="bi bi-cloud-upload"></i>
                                         <input type="file" accept="image/*" hidden onchange="window.handleFotoFiles(this)">
                                     </label>
-                                    <input type="url" class="create-ad-input ca-foto-input" id="caFoto3" placeholder="Link da imagem 4">
+                                    <div class="ml-field flex-grow-1 mb-0">
+                                        <input type="url" id="caFoto3" placeholder=" ">
+                                        <label for="caFoto3">Link da imagem 4 (opcional)</label>
+                                    </div>
                                     <div class="ca-foto-preview" id="caFotoPreview3"></div>
                                 </div>
                             </div>
@@ -1202,7 +1244,9 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
     </div>`;
 
     // Inputs de foto com preview automático
-    document.querySelectorAll('.ca-foto-input').forEach(input => {
+    ['0','1','2','3'].forEach(n => {
+        const input = document.getElementById(`caFoto${n}`);
+        if (!input) return;
         input.addEventListener('input', function() {
             const idx = this.closest('.ca-foto-row').dataset.idx;
             const preview = document.getElementById(`caFotoPreview${idx}`);
@@ -1219,20 +1263,34 @@ window.showCreateAdPage = function(editingId, isAdminEdit) {
     const catSearch = document.getElementById('caCatSearch');
     const catSelect = document.getElementById('caCategory');
     if (catSearch && catSelect) {
-        catSearch.addEventListener('input', function() {
-            const term = this.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        // Category list: render filtered items, click to select
+        const catList = document.getElementById('caCatList');
+        function renderCatList(filter) {
+            const term = (filter || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            let html = '';
             Array.from(catSelect.options).forEach(opt => {
                 if (!opt.value) return;
                 const text = opt.text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                 const val = opt.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                const match = text.includes(term) || val.includes(term);
-                opt.style.display = term ? (match ? '' : 'none') : '';
+                if (!term || text.includes(term) || val.includes(term)) {
+                    const sel = opt.value === catSelect.value ? ' ca-cat-list-item-selected' : '';
+                    html += `<div class="ca-cat-list-item${sel}" data-value="${opt.value}">${opt.text}</div>`;
+                }
             });
-            // Mostra/esconde o link "sugerir categoria"
+            catList.innerHTML = html;
             const suggestWrap = document.getElementById('caSuggestCatWrap');
-            const visibleCount = Array.from(catSelect.options).filter(o => o.style.display !== 'none' && o.value).length;
-            suggestWrap.classList.toggle('d-none', visibleCount > 0 || !term);
+            suggestWrap.classList.toggle('d-none', html.length > 0 || !term);
+        }
+        catSearch.addEventListener('input', function() { renderCatList(this.value); });
+        catList.addEventListener('click', function(e) {
+            const item = e.target.closest('.ca-cat-list-item');
+            if (item) {
+                catSelect.value = item.dataset.value;
+                catSearch.value = item.textContent;
+                renderCatList(catSearch.value);
+            }
         });
+        renderCatList('');
     }
 
     // Se for edição, carrega os dados
@@ -1281,22 +1339,33 @@ window.suggestCategory = function() {
     const input = document.getElementById('caSuggestCatInput');
     const nome = input?.value.trim();
     if (!nome) { showToast('Digite o nome da categoria.', 'warning'); return; }
-    const pendentes = JSON.parse(localStorage.getItem('emCategoriasPendentes') || '[]');
-    if (pendentes.some(p => p.nome.toLowerCase() === nome.toLowerCase())) {
-        showToast('Essa categoria já foi sugerida.', 'info');
-        input.value = '';
-        return;
-    }
     const todas = getCategorias();
     if (todas.some(c => c.toLowerCase() === nome.toLowerCase())) {
         showToast('Essa categoria já existe!', 'info');
         input.value = '';
         return;
     }
-    pendentes.push({ nome, data: new Date().toISOString(), sugeridoPor: getSavedUser()?.nome || 'Anônimo' });
-    localStorage.setItem('emCategoriasPendentes', JSON.stringify(pendentes));
-    showToast('Categoria sugerida! O administrador irá analisar.', 'success');
+    // Cria a nova categoria e já vincula ao anúncio atual
+    const sel = document.getElementById('caCategory');
+    if (sel) {
+        const opt = document.createElement('option');
+        opt.value = nome;
+        opt.textContent = nome;
+        sel.appendChild(opt);
+        sel.value = nome;
+    }
+    const search = document.getElementById('caCatSearch');
+    if (search) { search.value = nome; search.dispatchEvent(new Event('input')); }
+    // Persiste para aparecer no select em anúncios futuros
+    try {
+        const aprovadas = JSON.parse(localStorage.getItem('emCategoriasAprovadas') || '[]');
+        if (!aprovadas.includes(nome)) aprovadas.push(nome);
+        localStorage.setItem('emCategoriasAprovadas', JSON.stringify(aprovadas));
+    } catch (e) {}
+    showToast('Categoria "' + nome + '" adicionada ao anúncio!', 'success');
     input.value = '';
+    const wrap = document.getElementById('caSuggestCatWrap');
+    if (wrap) wrap.classList.add('d-none');
 };
 
 function normalizeStr(s) {
@@ -1806,6 +1875,14 @@ window.closeProductDetail = function() {
     if (hero) hero.classList.toggle('d-none', state.heroHidden);
 
     window._preDetailState = null;
+
+    // Se veio da tela de cadastro, volta pra ela
+    if (window._authReturn) {
+        const mode = window._authReturn;
+        window._authReturn = null;
+        window.showAuthScreen(mode);
+    }
+
     // Limpa a URL
     if (window.location.hash.startsWith('#/produto/')) {
         history.pushState(null, '', window.location.pathname + window.location.search);
@@ -1814,6 +1891,111 @@ window.closeProductDetail = function() {
 
 window.prepareEditProduct = function(pid) {
     window.showCreateAdPage(pid);
+};
+
+const TERMS_SECTIONS = [
+    { icon: 'file-text',     title: '01. Termos Gerais', id: 'ts1', html: '<p>Ao acessar ou utilizar a plataforma <strong>Electro Marketing</strong> (doravante "plataforma"), você concorda com estes Termos de Uso. Caso não concorde, não utilize o serviço.</p><p>Estes Termos aplicam-se a todos os usuários da plataforma, sejam eles compradores, vendedores ou visitantes. O uso implica na aceitação integral e irretratável destes Termos.</p><p>A Electro Marketing reserva-se o direito de alterar estes Termos a qualquer momento, sendo responsabilidade do usuário verificar periodicamente as atualizações.</p>' },
+    { icon: 'shop',          title: '02. Sobre a Electro Marketing', id: 'ts2', html: '<p>A Electro Marketing é uma plataforma digital de classificados que funciona como um <strong>marketplace de anúncios</strong>, semelhante ao Facebook Marketplace e a OLX.</p><div class="hl"><strong>Importante:</strong> A Electro Marketing não processa pagamentos, não vende produtos e não intermedia transações financeiras. A plataforma apenas facilita o contato entre compradores e vendedores.</div><p>Funcionamento básico:</p><ul><li>Vendedores anunciam seus produtos ou serviços na plataforma;</li><li>Compradores encontram os anúncios por meio de busca e filtros;</li><li>A negociação acontece diretamente entre comprador e vendedor por meio do chat da plataforma;</li><li>Pagamento, entrega, garantia, troca e demais condições são definidos exclusivamente entre as partes;</li><li>A plataforma apenas facilita o contato entre os usuários.</li></ul>' },
+    { icon: 'person-plus',   title: '03. Cadastro de Usuários', id: 'ts3', html: '<p>Para utilizar determinadas funcionalidades da plataforma, é necessário realizar cadastro. Ao se cadastrar, você declara que:</p><ul><li>É maior de 18 anos ou está devidamente autorizado por responsável legal;</li><li>As informações fornecidas são verdadeiras, completas e atualizadas;</li><li>É responsável pela guarda e sigilo de sua senha de acesso;</li><li>Notificará imediatamente a plataforma em caso de uso não autorizado de sua conta.</li></ul><p>É vedada a criação de múltiplas contas por mesma pessoa, bem como a transferência de contas entre usuários.</p>' },
+    { icon: 'megaphone',     title: '04. Publicação de Anúncios', id: 'ts4', html: '<p>Ao publicar um anúncio, o vendedor declara e garante que:</p><ul><li>É titular ou possui autorização legal para comercializar o produto ou serviço anunciado;</li><li>As informações do anúncio (título, descrição, preço, fotos) são fieis e não enganosas;</li><li>O produto ou serviço atende à legislação vigente;</li><li>As fotos são reais e representam fielmente o item anunciado.</li></ul><p>A Electro Marketing não se responsabiliza pela veracidade dos anúncios, cabendo aos usuários avaliar as condições de cada oferta antes de fechar negócio.</p><p>É proibido publicar anúncios duplicados, com preços manipulados ou com intenção de spam.</p>' },
+    { icon: 'chat-dots',     title: '05. Chat entre Comprador e Vendedor', id: 'ts5', html: '<p>O chat da plataforma é o canal oficial de comunicação entre compradores e vendedores. Ao utilizar o chat, os usuários concordam em:</p><ul><li>Manter comunicação respeitosa e profissional;</li><li>Não utilizar o chat para envio de spam, correntes ou mensagens em massa;</li><li>Não compartilhar dados pessoais sensíveis por meio do chat;</li><li>Compreender que a plataforma não se responsabiliza por acordos feitos entre as partes via chat.</li></ul><div class="hl"><strong>Lembre-se:</strong> Toda negociação, combinando preço, forma de pagamento, prazo de entrega e condições de garantia, é de responsabilidade exclusiva do comprador e do vendedor.</div>' },
+    { icon: 'shield-check',  title: '06. Responsabilidades do Anunciante', id: 'ts6', html: '<p>O anunciante (vendedor) é responsável por:</p><ul><li>Garantir que o produto ou serviço esteja disponível conforme descrito no anúncio;</li><li>Responder às mensagens dos potenciais compradores em prazo razoável;</li><li>Informar condições de pagamento, entrega e garantia de forma clara;</li><li>Cumprir os termos acordados diretamente com o comprador;</li><li>Manter seu anúncio atualizado, removendo-o caso o produto não esteja mais disponível.</li></ul><p>A Electro Marketing não é responsável por descumprimentos de acordos entre comprador e vendedor.</p>' },
+    { icon: 'person',        title: '07. Responsabilidades do Comprador', id: 'ts7', html: '<p>O comprador é responsável por:</p><ul><li>Avaliar cuidadosamente as condições do anúncio antes de efetuar qualquer negócio;</li><li>Entrar em contato com o vendedor para esclarecer dúvidas sobre o produto;</li><li>Verificar a reputação e histórico do vendedor quando disponível;</li><li>Compreender que a plataforma não garante a qualidade, segurança ou legalidade dos produtos anunciados;</li><li>Realizar pagamentos e combinar entregas diretamente com o vendedor.</li></ul>' },
+    { icon: 'exclamation-triangle', title: '08. Conteúdos Proibidos', id: 'ts8', html: '<p>É terminantemente proibido na plataforma a publicação de:</p><ul><li>Produtos ilegais, roubados ou contrabandeados;</li><li>Armas, drogas, substâncias controladas ou materiais que violem a legislação;</li><li>Produtos falsificados ou que infrinjam propriedade intelectual;</li><li>Conteúdo discriminatório, ofensivo, pornográfico ou que incite à violência;</li><li>Spam, correntes, golpes ou qualquer forma de fraude;</li><li>Dados pessoais de terceiros sem autorização;</li><li>Anúncios com preços simbólicos para fins de manipulação ou engano.</li></ul><p>A violação desta cláusula poderá resultar em remoção imediata do conteúdo, suspensão ou banimento da conta.</p>' },
+    { icon: 'lock',          title: '09. Segurança da Conta', id: 'ts9', html: '<p>Cada usuário é responsável por manter a segurança de sua conta. Recomendamos:</p><ul><li>Utilizar senhas fortes e únicas para a plataforma;</li><li>Não compartilhar credenciais de acesso com terceiros;</li><li>Verificar regularmente a atividade da conta;</li><li>Sair da sessão em dispositivos públicos ou compartilhados.</li></ul><p>A Electro Marketing não se responsabiliza por acessos não autorizados decorrentes de negligência do titular da conta.</p>' },
+    { icon: 'flag',          title: '10. Denúncias e Moderação', id: 'ts10', html: '<p>A Electro Marketing disponibiliza mecanismos para que os usuários reportem conteúdos ou comportamentos que violem estes Termos.</p><p>A equipe de moderação analisará as denúncias em prazo razoável e tomará as providências cabíveis, que podem incluir:</p><ul><li>Remoção do conteúdo denunciado;</li><li>Aviso ao usuário infrator;</li><li>Suspensão temporária da conta;</li><li>Banimento permanente da plataforma.</li></ul><p>A decisão de moderação será comunicada ao usuário denunciante quando pertinente.</p>' },
+    { icon: 'x-octagon',     title: '11. Suspensão ou Banimento de Contas', id: 'ts11', html: '<p>A Electro Marketing reserva-se o direito de suspender ou banir contas que:</p><ul><li>Violem qualquer cláusula destes Termos de Uso;</li><li>Apresentem comportamento fraudulento, enganoso ou prejudicial a outros usuários;</li><li>Recebam múltiplas denúncias fundamentadas;</li><li>Utilizem a plataforma para atividades ilegais.</li></ul><p>Em caso de banimento, o usuário não poderá criar nova conta na plataforma. A Electro Marketing não é obrigada a fornecer justificativa detalhada em cada caso.</p>' },
+    { icon: 'shield-lock',   title: '12. Privacidade e LGPD', id: 'ts12', html: '<p>A coleta e o tratamento de dados pessoais seguem a <strong>Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong>.</p><p>Os dados coletados são utilizados exclusivamente para:</p><ul><li>Funcionamento da plataforma (cadastro, anúncios, chat);</li><li>Comunicação entre a plataforma e os usuários;</li><li>Melhoria da experiência de uso;</li><li>Cumprimento de obrigações legais.</li></ul><p>Para mais detalhes, consulte nossa <a href="#" onclick="event.preventDefault();window.showPrivacyPage()" style="color:var(--market-color);text-decoration:underline;">Política de Privacidade</a>.</p>' },
+    { icon: 'shield-exclamation', title: '13. Limitação de Responsabilidade', id: 'ts13', html: '<div class="hl"><strong>Atenção:</strong> A Electro Marketing atua exclusivamente como intermediária tecnológica. A plataforma <strong>não participa</strong> das negociações, pagamentos, entregas ou quaisquer transações entre compradores e vendedores.</div><p>Portanto, a Electro Marketing <strong>não se responsabiliza</strong> por:</p><ul><li>Qualidade, segurança ou legalidade dos produtos anunciados;</li><li>Cumprimento dos acordos entre comprador e vendedor;</li><li>Pagamentos, reembolsos ou estornos;</li><li>Entregas, atrasos ou danos durante o transporte;</li><li>Garantias, trocas ou devoluções de produtos;</li><li>Veracidade das informações prestadas pelos usuários;</li><li>Perdas ou danos diretos ou indiretos decorrentes do uso da plataforma.</li></ul><p>O uso da plataforma é por conta e risco do usuário.</p>' },
+    { icon: 'arrow-repeat',  title: '14. Alterações dos Termos', id: 'ts14', html: '<p>A Electro Marketing poderá alterar estes Termos de Uso a qualquer momento, sem aviso prévio obrigatório.</p><p>As alterações entram em vigor a partir da data de publicação na plataforma. O uso continuado da plataforma após as alterações implica na aceitação das novas condições.</p><p>Recomendamos que os usuários revisem periodicamente esta página.</p>' },
+    { icon: 'headset',       title: '15. Contato e Suporte', id: 'ts15', html: '<p>Em caso de dúvidas, sugestões ou solicitações relacionadas a estes Termos de Uso, entre em contato conosco:</p><ul><li><strong>E-mail:</strong> suporte@electromarketing.com.br</li><li><strong>Suporte na plataforma:</strong> utilize a seção "Falar com o Suporte" disponível no menu</li></ul><p>Nosso time responderá em até 48 horas úteis.</p>' }
+];
+
+const PRIVACY_SECTIONS = [
+    { icon: 'database',     title: '01. Dados Coletados', id: 'ps1', html: '<p>A Electro Marketing coleta os seguintes dados pessoais durante o uso da plataforma:</p><ul><li><strong>Dados de cadastro:</strong> nome completo, CPF, e-mail, telefone, endereço (rua, número, bairro, cidade, UF, CEP);</li><li><strong>Dados de perfil:</strong> foto de perfil, banner, tipo de conta (comprador/vendedor);</li><li><strong>Dados de uso:</strong> histórico de buscas, anúncios visualizados, mensagens enviadas no chat;</li><li><strong>Dados técnicos:</strong> endereço IP, tipo de navegador, sistema operacional, dispositivo.</li></ul>' },
+    { icon: 'bullseye',     title: '02. Finalidade da Coleta', id: 'ps2', html: '<p>Os dados são coletados para:</p><ul><li>Viabilizar o cadastro e o funcionamento da plataforma;</li><li>Exibir anúncios e facilitar o contato entre compradores e vendedores;</li><li>Processar mensagens enviadas pelo chat interno;</li><li>Melhorar a experiência de navegação e personalizar conteúdos;</li><li>Enviar notificações relevantes ao usuário;</li><li>Cumprir obrigações legais e regulatórias.</li></ul><div class="hl" style="background:#e8f4fd;border-left-color:var(--market-color);color:#1a4a7a;">Não utilizamos seus dados para fins de marketing externo sem o seu consentimento explícito.</div>' },
+    { icon: 'share',        title: '03. Compartilhamento de Dados', id: 'ps3', html: '<p>A Electro Marketing <strong>não vende</strong> dados pessoais de usuários a terceiros.</p><p>Os dados podem ser compartilhados apenas nas seguintes situações:</p><ul><li>Quando exigido por lei ou ordem judicial;</li><li>Para fins de segurança e prevenção de fraudes;</li><li>Com prestadores de serviços essenciais (hospedagem, infraestrutura) sob acordos de confidencialidade.</li></ul>' },
+    { icon: 'lock',         title: '04. Armazenamento e Segurança', id: 'ps4', html: '<p>Seus dados são armazenados em servidores seguros com criptografia e proteção contra acessos não autorizados. Adotamos medidas técnicas e administrativas para proteger suas informações, incluindo:</p><ul><li>Criptografia em trânsito (HTTPS/SSL);</li><li>Controle de acesso restrito aos dados;</li><li>Monitoramento regular de segurança;</li><li>Backups periódicos.</li></ul>' },
+    { icon: 'file-earmark-text', title: '05. Seus Direitos (LGPD)', id: 'ps5', html: '<p>Conforme a Lei Geral de Proteção de Dados, você tem direito a:</p><ul><li><strong>Confirmação</strong> da existência de tratamento de dados;</li><li><strong>Acesso</strong> aos seus dados pessoais;</li><li><strong>Correção</strong> de dados incompletos ou desatualizados;</li><li><strong>Anonimização, bloqueio ou eliminação</strong> de dados desnecessários;</li><li><strong>Portabilidade</strong> dos dados;</li><li><strong>Eliminação</strong> dos dados tratados com consentimento;</li><li><strong>Informação</strong> sobre compartilhamento de dados;</li><li><strong>Revogação</strong> do consentimento.</li></ul><p>Para exercer esses direitos, entre em contato pelo e-mail: <strong>privacidade@electromarketing.com.br</strong></p>' },
+    { icon: 'cookie',       title: '06. Cookies', id: 'ps6', html: '<p>A plataforma utiliza cookies para:</p><ul><li>Manter a sessão do usuário ativa;</li><li>Lembrar preferências de navegação e tema;</li><li>Coletar estatísticas de uso para melhoria do serviço.</li></ul><p>Você pode gerenciar as preferências de cookies diretamente nas configurações do seu navegador.</p>' },
+    { icon: 'clock-history', title: '07. Retenção de Dados', id: 'ps7', html: '<p>Os dados pessoais são mantidos enquanto a conta do usuário estiver ativa. Após a exclusão da conta, os dados serão removidos ou anonimizados em até 90 dias, exceto quando exigido por obrigação legal.</p>' },
+    { icon: 'person-x',     title: '08. Menores de Idade', id: 'ps8', html: '<p>A plataforma não é direcionada a menores de 18 anos. Caso um menor seja identificado, sua conta será suspensa e os dados removidos imediatamente.</p>' },
+    { icon: 'arrow-repeat', title: '09. Alterações nesta Política', id: 'ps9', html: '<p>Esta Política de Privacidade pode ser atualizada periodicamente. As alterações serão publicadas nesta página com a data de última atualização.</p>' },
+    { icon: 'envelope',     title: '10. Contato', id: 'ps10', html: '<p>Em caso de dúvidas sobre esta Política de Privacidade ou sobre o tratamento dos seus dados:</p><ul><li><strong>E-mail:</strong> privacidade@electromarketing.com.br</li><li><strong>Suporte:</strong> utilize a seção "Falar com o Suporte" na plataforma</li></ul>' }
+];
+
+function renderTermsPrivacy(sections, title, subtitle) {
+    const toc = sections.map((s, i) =>
+        `<div class="col-6">${String(i + 1).padStart(2, '0')}. <a href="#${s.id}" style="color:var(--market-color);text-decoration:none;">${s.title.replace(/^\d+\.\s*/, '')}</a></div>`
+    ).join('');
+    const body = sections.map(s =>
+        `<div class="create-ad-section" id="${s.id}"><div class="create-ad-section-title"><i class="bi bi-${s.icon}"></i> ${s.title}</div><div class="create-ad-section-body">${s.html}</div></div>`
+    ).join('');
+    return `
+    <div class="detail-page">
+        <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+        <div class="create-ad-wrap">
+            <div class="create-ad-header">
+                <div>
+                    <h4>${title}</h4>
+                    <p class="text-muted small mb-0">${subtitle}</p>
+                </div>
+            </div>
+            <div class="create-ad-form">
+                <div class="create-ad-section">
+                    <div class="create-ad-section-title"><i class="bi bi-list-ul"></i> Sumário</div>
+                    <div class="create-ad-section-body"><div class="row g-2">${toc}</div></div>
+                </div>
+                ${body}
+            </div>
+        </div>
+    </div>`;
+}
+
+window.showTermsPage = function() {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+    if (!grid.classList.contains('create-ad-active') && !grid.classList.contains('product-detail-active') && !grid.classList.contains('offer-page-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+    grid.className = 'offer-page-active';
+    grid.style.display = 'block';
+    grid.innerHTML = renderTermsPrivacy(TERMS_SECTIONS, 'Termos de Uso', 'Última atualização: julho de 2026 · Versão 1.0');
+};
+
+window.showPrivacyPage = function() {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+    if (!grid.classList.contains('create-ad-active') && !grid.classList.contains('product-detail-active') && !grid.classList.contains('offer-page-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+    grid.className = 'offer-page-active';
+    grid.style.display = 'block';
+    grid.innerHTML = renderTermsPrivacy(PRIVACY_SECTIONS, 'Política de Privacidade', 'Última atualização: julho de 2026 · Versão 1.0');
 };
 
 // ============================================
@@ -2063,6 +2245,20 @@ window.showNotifications = async function() {
         window.closeNotifications();
         return;
     }
+    /* Posiciona o rabicho dinamicamente apontando para o sino clicado */
+    const bells = document.querySelectorAll('[onclick*="showNotifications"]');
+    let activeBell = null;
+    bells.forEach(b => { if (b.offsetParent !== null) activeBell = b; });
+    if (activeBell) {
+        const r = activeBell.getBoundingClientRect();
+        const ddWidth = 430;
+        const ddRight = 24;
+        const bellCenterX = r.left + r.width / 2;
+        const ddLeft = window.innerWidth - ddRight - ddWidth;
+        let arrowRight = window.innerWidth - bellCenterX - 8;
+        arrowRight = Math.max(16, Math.min(arrowRight, ddWidth - 24));
+        dropdown.style.setProperty('--notif-arrow-right', arrowRight + 'px');
+    }
     dropdown.classList.add('notif-open');
     await loadNotifications();
     const user = getSavedUser();
@@ -2219,6 +2415,26 @@ function updateNotifBadges() {
     if (mobileBadge) { mobileBadge.textContent = unread; mobileBadge.classList.toggle('d-none', unread === 0); }
 }
 
+window.updateChatBadge = async function() {
+    try {
+        const user = getSavedUser();
+        if (!user) return;
+        const chats = await supabaseFetch('chats?order_id=is.null&select=messages,participants');
+        let totalUnread = 0;
+        chats.forEach(c => {
+            if (!c.participants || !c.participants.includes(user.id)) return;
+            if (c.messages && c.messages[0]?.type === 'ticket_meta') return;
+            const un = c.messages?.filter(m => m.senderId !== user.id && !m.visto).length || 0;
+            totalUnread += un;
+        });
+        const ids = ['chatBadgeDesktop', 'chatBadgeMobile', 'chatBadgeSellerMobile', 'chatBadgeAdminMobile'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = totalUnread; el.classList.toggle('d-none', totalUnread === 0); }
+        });
+    } catch (e) {}
+};
+
 function updateCartBadge() {
     const count = cart.reduce((a, i) => a + (i.qtd || 1), 0);
     document.querySelectorAll('#cartBadgeDesktop, #cartBadgeMobile').forEach(el => {
@@ -2232,30 +2448,6 @@ window.openAddressMap = function(location) {
         return;
     }
     window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(location), '_blank');
-};
-
-window.sendChatLocation = async function() {
-    const user = getSavedUser();
-    const addr = user?.endereco || user?.cidade;
-    if (!addr) {
-        showToast('Cadastre um endereço no seu perfil para compartilhar.', 'info');
-        return;
-    }
-    if (!window.currentChat) { showToast('Nenhum chat aberto.', 'warning'); return; }
-    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr);
-    try {
-        const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
-        const chat = chatResult?.[0];
-        if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
-        chat.messages.push({
-            senderId: user.id, senderName: user.nome,
-            text: `📍 ${addr}\n${mapsUrl}`,
-            timestamp: new Date().toISOString(), type: 'location'
-        });
-        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-        if (typeof loadChatMessages === 'function') loadChatMessages(window.currentChat);
-        showToast('Localização enviada!', 'success');
-    } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
 };
 
 window.sendSupportChatLocation = async function() {
@@ -2524,6 +2716,702 @@ window.buyItem = async function(i) {
 };
 
 // ============================================
+// CHAT UNIFICADO (cliente, vendedor, admin, suporte)
+// ============================================
+
+let chatAttachType = 'image';
+
+window.showChat = async function(orderId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    let order = ordersCache.find(o => o.id === orderId);
+    if (!order) {
+        const result = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        order = result[0];
+    }
+    if (!order) { showToast('Pedido não encontrado.', 'error'); return; }
+    if (window.currentChat !== orderId) window.lastChatSignature = null;
+    window.currentChat = orderId;
+
+    const isBuyerHere  = user.id === order.buyer_id;
+    const isSellerHere = user.id === order.seller_id;
+    const otherId      = isBuyerHere ? order.seller_id : (isSellerHere ? order.buyer_id : null);
+    const otherName    = isBuyerHere ? order.seller_name : (isSellerHere ? order.buyer_name : `${order.buyer_name || 'Comprador'} ↔ ${order.seller_name || 'Vendedor'}`);
+
+    let partnerAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`;
+    let partnerDotClass = '';
+    try {
+        if (otherId) {
+            const partnerData = await supabaseFetch(`users?select=avatar,last_seen&id=eq.${otherId}&limit=1`);
+            const realAvatar = normalizeImageUrl(safeParseImages(partnerData?.[0]?.avatar)[0]);
+            if (realAvatar) partnerAvatar = realAvatar;
+            partnerDotClass = isRecentlyOnline(partnerData?.[0]?.last_seen) ? 'online' : 'offline';
+        }
+    } catch (e) {}
+
+    const msgsId       = `msgs_${orderId}`;
+    const inputId      = `input_${orderId}`;
+    const previewId    = `preview_${orderId}`;
+    const attachId     = `attachPanel_${orderId}`;
+    const attachLinkId = `attachLink_${orderId}`;
+    const statusId     = `statusBar_${orderId}`;
+    const logisticsId  = `logistics_${orderId}`;
+    const logisticsBtnsId = `logisticsBtns_${orderId}`;
+
+    const logisticsAreaHtml = `
+    <div id="${logisticsId}" class="logistics-agreement-area">
+        <div id="${logisticsBtnsId}" class="logistics-buttons"></div>
+    </div>`;
+
+    const html = window.renderChatContainer({
+        chatId: orderId,
+        chat: order,
+        order,
+        partner: { name: otherName, avatar: partnerAvatar },
+        msgsId,
+        inputId,
+        previewId,
+        attachPanelId: attachId,
+        attachLinkId,
+        statusBarId: statusId,
+        onSend: 'window.sendChatMessage(event)',
+        onBack: 'window.closeWaChat()',
+        onClose: 'window.closeWaChat()',
+        onViewProfile: 'window.viewChatPartnerProfile()',
+        onCancelOrder: `window.chatCancelOrder('${orderId}')`,
+        onToggleAttachPanel: 'window.toggleChatAttachPanel()',
+        onConfirmAttach: `window.confirmChatAttach()`,
+        onSendLocation: 'window.sendChatLocation',
+        onSendFile: 'window.sendChatImageFile',
+        onChatActions: 'window.toggleChatActions()',
+        showBackBtn: true,
+        showCloseBtn: false,
+        showProductSummary: true,
+        showAttach: true,
+        extraBeforeInput: logisticsAreaHtml
+    });
+
+    const panel = document.getElementById('waChatActive');
+    if (panel) {
+        panel.innerHTML = html;
+        panel.classList.remove('d-none');
+        panel.classList.add('d-flex');
+    }
+
+    if (partnerDotClass) {
+        document.getElementById(`${msgsId}Dot`)?.classList.add(partnerDotClass);
+    }
+
+    window._chatActiveElements = {
+        input:       document.getElementById(inputId),
+        container:   document.getElementById(msgsId),
+        statusBar:   document.getElementById(statusId),
+        logistics:   document.getElementById(logisticsId),
+        logisticsBtns: document.getElementById(logisticsBtnsId),
+        attachPanel: document.getElementById(attachId),
+        preview:     document.getElementById(previewId)
+    };
+
+    document.getElementById('waEmptyState')?.classList.add('d-none');
+    document.getElementById('whatsappOrdersView')?.classList.add('wa-chat-open');
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
+        el.classList.toggle('active-chat', el.dataset.orderId === orderId);
+    });
+    await loadChatMessages(orderId);
+    if (typeof setupPullToRefresh === 'function') setupPullToRefresh();
+    startChatPolling(orderId);
+};
+
+window.closeWaChat = function() {
+    stopChatPolling();
+    window.currentChat = null;
+    window.lastChatSignature = null;
+    window._chatActiveElements = null;
+    const panel = document.getElementById('waChatActive');
+    if (panel) { panel.innerHTML = ''; panel.classList.add('d-none'); panel.classList.remove('d-flex'); }
+    document.getElementById('waEmptyState')?.classList.remove('d-none');
+    document.getElementById('whatsappOrdersView')?.classList.remove('wa-chat-open');
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
+};
+
+function startChatPolling(orderId) {
+    stopChatPolling();
+    window.chatPollInterval = setInterval(() => {
+        const panel = document.getElementById('waChatActive');
+        if (!panel || panel.classList.contains('d-none') || window.currentChat !== orderId) {
+            stopChatPolling();
+            return;
+        }
+        loadChatMessages(orderId, true);
+    }, 4000);
+}
+
+function stopChatPolling() {
+    if (window.chatPollInterval) {
+        clearInterval(window.chatPollInterval);
+        window.chatPollInterval = null;
+    }
+}
+
+async function loadChatMessages(orderId, silent = false) {
+    const container = window._chatActiveElements?.container || document.getElementById('chatMessagesContainer');
+    if (!container) return;
+    if (!silent) {
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando mensagens...</p></div>';
+    }
+    try {
+        const user = getSavedUser();
+        let order = null;
+        try {
+            const r = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+            order = r?.[0] || null;
+        } catch (e) {}
+        if (order) {
+            const idx = ordersCache.findIndex(o => o.id === orderId);
+            if (idx >= 0) ordersCache[idx] = order; else ordersCache.push(order);
+        } else {
+            order = ordersCache.find(o => o.id === orderId) || null;
+        }
+        let chatResult = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        let chat       = chatResult?.[0];
+        if (!chat && order) {
+            const newChat = {
+                id: crypto.randomUUID(),
+                order_id: orderId,
+                seller_id: order.seller_id,
+                seller_name: order.seller_name,
+                buyer_id: order.buyer_id,
+                buyer_name: order.buyer_name,
+                participants: [order.seller_id, order.buyer_id],
+                messages: [{senderId: 'system', text: `Pedido #${orderId.slice(-8).toUpperCase()}`, timestamp: new Date().toISOString(), type: 'system'}],
+                logistics_agreed: false
+            };
+            await supabaseFetch('chats', {method: 'POST', body: JSON.stringify(newChat)});
+            chat = newChat;
+        }
+        if (!chat?.messages) {
+            if (!silent) container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
+            return;
+        }
+        window.__setupReactionHooks(chat,
+            (c) => supabaseFetch(`chats?order_id=eq.${orderId}`, {method: 'PATCH', body: JSON.stringify({messages: c.messages})}),
+            () => loadChatMessages(orderId, true)
+        );
+        let changed = false;
+        const otherSenderIds = chat.participants.filter(id => id !== user.id);
+        chat.messages.forEach(msg => {
+            if (msg.senderId && otherSenderIds.includes(msg.senderId) && !msg.visto) {
+                msg.visto = true; changed = true;
+            }
+        });
+        if (changed) {
+            supabaseFetch(`chats?order_id=eq.${orderId}`, {method: 'PATCH', body: JSON.stringify({messages: chat.messages})}).catch(() => {});
+        }
+        const signature = JSON.stringify(chat.messages);
+        if (silent && signature === window.lastChatSignature) {
+            updateChatLogistics(order, user);
+            return;
+        }
+        const isNewIncoming = silent && window.lastChatSignature !== null && chat.messages.length > (JSON.parse(window.lastChatSignature || '[]').length || 0);
+        window.lastChatSignature = signature;
+        const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
+        const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome||'Você')}&background=22c98e&color=fff&size=40`;
+        const partnerAvatarSrc = document.getElementById(`msgs_${orderId}Avatar`)?.src || window._chatActiveElements?.container?.closest('.chat-container')?.querySelector('.chat-header-avatar-wrap img')?.src || '';
+        const supportAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40`;
+        container.innerHTML = chat.messages.map((msg, index) => {
+            return window.renderMsgBubble(msg, index, {
+                userId: user.id, myAvatar, partnerAvatar: partnerAvatarSrc, supportAvatar,
+                resolveSenderName: () => msg.senderName || '',
+                actions: {reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage'},
+                useDropdown: true, enableGrouping: true, allMessages: chat.messages
+            });
+        }).join('');
+        if (wasNearBottom) {
+            container.scrollTop = container.scrollHeight;
+        } else if (isNewIncoming) {
+            showToast('Nova mensagem recebida.', 'info', 2000);
+        }
+        updateChatLogistics(order, user);
+    } catch (e) {
+        if (silent) { console.error('Falha ao atualizar mensagens (silencioso):', e); return; }
+        console.error(e);
+        container.innerHTML = `<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i><p>Erro ao carregar mensagens</p><button class="btn btn-primary btn-sm" onclick="loadChatMessages('${orderId}')">Tentar novamente</button></div>`;
+    }
+}
+
+function stripLegacyEmoji(text) {
+    if (!text) return '';
+    return text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu, '').replace(/[ \t]{2,}/g, ' ').trim();
+}
+window.stripLegacyEmoji = stripLegacyEmoji;
+
+function formatLinks(text) {
+    if (!text) return '';
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.replace(urlRegex, url =>
+        `<a href="${url}" target="_blank" class="text-info text-decoration-underline small"><i class="bi bi-link-45deg"></i>${url.substring(0,40)}${url.length>40?'...':''}</a>`
+    );
+}
+window.formatLinks = formatLinks;
+
+function updateChatLogistics(order, user) {
+    const logisticsArea = window._chatActiveElements?.logistics || document.getElementById('logisticsAgreementArea');
+    const logisticsButtons = window._chatActiveElements?.logisticsBtns || document.getElementById('logisticsButtons');
+    if (!logisticsArea || !logisticsButtons) return;
+    const isBuyer = user.id === order.buyer_id;
+    const isSeller = user.id === order.seller_id;
+    let buttonsHtml = '';
+    if (['accepted', 'agreement'].includes(order.status)) {
+        const userAgreed = isBuyer ? order.agree_buyer : order.agree_seller;
+        const otherAgreed = isBuyer ? order.agree_seller : order.agree_buyer;
+        if (order.agree_buyer && order.agree_seller) {
+            if (isSeller) {
+                if (order.logistics_type === 'pickup') {
+                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')"><i class="bi bi-check2-circle me-1"></i>Marcar como Pronto p/ Retirada</button>`;
+                } else {
+                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Marcar que Saiu p/ Entrega</button>`;
+                }
+            } else {
+                buttonsHtml += `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-people-fill me-1"></i>Aguardando envio/retirada pelo vendedor</div>`;
+            }
+        } else if (!userAgreed) {
+            if (otherAgreed && order.logistics_type) {
+                const typeText = getLogisticsTypeText(order.logistics_type);
+                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="btn btn-success flex-grow-1 rounded-pill fw-bold" onclick="window.setLogistics('${order.id}','${order.logistics_type}')">Aceitar</button><button class="btn btn-outline-secondary flex-grow-1 rounded-pill" onclick="window.resetLogistics('${order.id}')">Recusar</button></div>`;
+            } else {
+                buttonsHtml += `<p class="text-center small mb-2" style="color:#666;">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div>`;
+            }
+        } else {
+            buttonsHtml += `<div class="alert alert-info rounded-pill text-center small mb-2"><i class="bi bi-hourglass-split me-1"></i>Proposta enviada! Aguardando o outro lado...</div>`;
+        }
+    } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
+        if (isBuyer) {
+            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button><button class="btn btn-outline-danger w-100 rounded-pill fw-bold mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
+        } else {
+            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div><button class="btn btn-outline-danger w-100 rounded-pill fw-bold mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
+        }
+    } else if (order.status === 'finished') {
+        if (isBuyer) {
+            buttonsHtml += order.buyer_reviewed
+                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este vendedor. Obrigado!</div>`
+                : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}','buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
+        } else {
+            buttonsHtml += order.seller_reviewed
+                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este comprador. Obrigado!</div>`
+                : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}','seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
+        }
+    }
+    logisticsButtons.innerHTML = buttonsHtml;
+    const statusBar = window._chatActiveElements?.statusBar || document.getElementById('orderStatusBar');
+    if (statusBar && order) {
+        const statusMap = {
+            'pending': '<i class="bi bi-hourglass-split me-1"></i>Aguardando Aprovação',
+            'accepted': '<i class="bi bi-check-circle-fill me-1"></i>Aprovado - Combinar Entrega',
+            'agreement': '<i class="bi bi-people-fill me-1"></i>Definindo Logística',
+            'shipping': '<i class="bi bi-truck me-1"></i>Em Transporte',
+            'awaiting_pickup': '<i class="bi bi-geo-alt-fill me-1"></i>Aguardando Retirada',
+            'finished': '<i class="bi bi-patch-check-fill me-1"></i>Finalizado',
+            'cancelled': '<i class="bi bi-x-circle-fill me-1"></i>Cancelado',
+            'dispute': '<i class="bi bi-exclamation-triangle-fill me-1"></i>Em Disputa'
+        };
+        const alertClass = order.status === 'finished' ? 'success' : order.status === 'cancelled' ? 'danger' : 'info';
+        statusBar.innerHTML = `<div class="alert alert-${alertClass} mb-0 py-2 text-center small">${statusMap[order.status] || order.status}</div>`;
+    }
+}
+
+window.sendChatMessage = async function(event) {
+    if (event?.preventDefault) event.preventDefault();
+    const input = window._chatActiveElements?.input || document.getElementById('chatMessageInput');
+    const text = input?.value?.trim();
+    const user = getSavedUser();
+    if ((!text && window.editingMessageIndex === null) || !user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
+        if (window.editingMessageIndex !== null) {
+            chat.messages[window.editingMessageIndex].text = text;
+            chat.messages[window.editingMessageIndex].edited = true;
+        } else {
+            const newMessage = {senderId: user.id, senderName: user.nome, text, timestamp: new Date().toISOString(), type: 'message'};
+            if (window.currentReplyIndex !== null) {
+                const repliedMsg = chat.messages[window.currentReplyIndex];
+                newMessage.replyTo = {text: repliedMsg.text, senderName: repliedMsg.senderName};
+            }
+            chat.messages.push(newMessage);
+        }
+        await supabaseFetch(`chats?id=eq.${chat.id}`, {method: 'PATCH', body: JSON.stringify({messages: chat.messages})});
+        input.value = '';
+        window.cancelReplyOrEdit();
+        await loadChatMessages(window.currentChat);
+    } catch (e) { showToast('Erro ao enviar mensagem.', 'error'); }
+};
+
+window.sendChatImageFile = async function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const btn = input?.closest('.chat-container')?.querySelector('label') || document.querySelector('#chatAttachPanel label');
+    const original = btn ? btn.innerHTML : '';
+    if (btn) btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando...';
+    const clientId = window.CONFIG?.IMGUR_CLIENT_ID || window.CONFIG_LOCAL_FALLBACK?.IMGUR_CLIENT_ID || '546c25a59c58ad7';
+    try {
+        const fd = new FormData();
+        fd.append('image', file, file.name || 'imagem.jpg');
+        const res = await fetch('https://api.imgur.com/3/image', {method: 'POST', headers: {Authorization: `Client-ID ${clientId}`}, body: fd});
+        const json = await res.json().catch(() => null);
+        if (btn) btn.innerHTML = original;
+        if (json?.success && json?.data?.link) {
+            await window.sendChatImage(json.data.link);
+            window._chatActiveElements?.attachPanel?.classList.add('d-none');
+            document.getElementById('chatAttachPanel')?.classList.add('d-none');
+        } else {
+            showToast('Falha ao enviar imagem (tente um link).', 'error');
+        }
+    } catch (e) { if (btn) btn.innerHTML = original; showToast('Erro ao enviar imagem.', 'error'); }
+};
+
+window.sendChatImage = async function(urlParam) {
+    const rawUrl = urlParam;
+    if (!rawUrl || !(rawUrl.startsWith('http') || rawUrl.startsWith('data:'))) { showToast('Link inválido!', 'warning'); return; }
+    const url = normalizeImageUrl(rawUrl);
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+    const isGif = /\.gif$/i.test(url);
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
+        const msg = {senderId: user.id, senderName: user.nome, text: isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem'), timestamp: new Date().toISOString()};
+        if (isVideo) { msg.type = 'video'; msg.video = url; }
+        else { msg.type = 'image'; msg.image = url; }
+        chat.messages.push(msg);
+        await supabaseFetch(`chats?id=eq.${chat.id}`, {method: 'PATCH', body: JSON.stringify({messages: chat.messages})});
+        await loadChatMessages(window.currentChat);
+    } catch (e) { showToast('Erro ao processar o link.', 'error'); }
+};
+
+window.sendChatFile = async function(urlParam) {
+    const url = urlParam;
+    if (!url || !url.startsWith('http')) { showToast('Link inválido!', 'warning'); return; }
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        chat.messages.push({senderId: user.id, senderName: user.nome, text: `Arquivo: ${url.split('/').pop()}`, file: {name:'Arquivo Externo', url, size:0}, timestamp: new Date().toISOString(), type:'file'});
+        await supabaseFetch(`chats?id=eq.${chat.id}`, {method: 'PATCH', body: JSON.stringify({messages: chat.messages})});
+        await loadChatMessages(window.currentChat);
+    } catch { showToast('Erro ao enviar arquivo.', 'error'); }
+};
+
+window.toggleChatAttachPanel = function() {
+    const panel = window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel');
+    if (!panel) return;
+    const logistics = window._chatActiveElements?.logistics || document.getElementById('logisticsAgreementArea');
+    if (logistics) logistics.classList.remove('show-menu');
+    panel.classList.toggle('d-none');
+    if (!panel.classList.contains('d-none')) {
+        const orderId = window.currentChat;
+        (document.getElementById(`attachLink_${orderId}`) || document.getElementById('chatAttachLinkInput'))?.focus();
+    }
+};
+
+window.setChatAttachType = function(type, panelId) {
+    chatAttachType = type;
+    const panel = panelId ? document.getElementById(panelId) : null;
+    const tabs = panel ? panel.querySelectorAll('.chat-attach-tab') : document.querySelectorAll('.chat-attach-tab');
+    tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.attachType === type));
+    if (panel) {
+        const mapping = { image: `${panelId}ImageBox`, file: `${panelId}FileBox`, location: `${panelId}LocationBox` };
+        Object.entries(mapping).forEach(([t, id]) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('d-none', type !== t);
+        });
+    }
+};
+
+window.abrirDocHost = function(host) {
+    const url = host === 'Google Drive' ? 'https://drive.google.com/u/0/?usp=upload' : 'https://onedrive.live.com/?auth=1&id=root&cid=&action=upload';
+    window.open(url, '_blank', 'noopener');
+    showToast(`Abra o ${host}, copie o link e cole em Documentos.`, 'info');
+};
+
+window.sendChatLocation = async function(kind) {
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    if (kind === 'current') {
+        if (!navigator.geolocation) { showToast('Geolocalização não suportada.', 'error'); return; }
+        showToast('Obtendo sua localização...', 'info');
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const {latitude, longitude} = pos.coords;
+            const maps = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            await sendLocationMessage(maps, `Localização atual: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        }, () => showToast('Não foi possível obter a localização.', 'error'), {enableHighAccuracy: true, timeout: 10000});
+        return;
+    }
+    if (kind === 'stored') {
+        const u = getSavedUser() || {};
+        const endereco = [u.endereco, u.cidade, u.estado, u.cep].filter(Boolean).join(', ');
+        const maps = u.maps || (endereco ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}` : '');
+        if (!maps) { showToast('Você não tem endereço cadastrado no perfil.', 'warning'); return; }
+        sendLocationMessage(maps, `📍 Meu endereço cadastrado: ${endereco || maps}`);
+        return;
+    }
+    const input = document.getElementById(`attachLink_${window.currentChat}Loc`) || document.getElementById('chatAttachLinkInputLoc');
+    const url = input?.value?.trim();
+    if (!url || !url.startsWith('http')) { showToast('Cole um link de endereço válido.', 'warning'); return; }
+    sendLocationMessage(url, `Endereço (link): ${url}`);
+    input.value = '';
+    (window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel'))?.classList.add('d-none');
+};
+
+async function sendLocationMessage(mapsUrl, text) {
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        chat.messages.push({senderId: user.id, senderName: user.nome, text, location: mapsUrl, timestamp: new Date().toISOString(), type:'location'});
+        await supabaseFetch(`chats?id=eq.${chat.id}`, {method:'PATCH', body: JSON.stringify({messages: chat.messages})});
+        await loadChatMessages(window.currentChat);
+        (window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel'))?.classList.add('d-none');
+    } catch { showToast('Erro ao enviar localização.', 'error'); }
+}
+
+window.setChatDocType = function(docType) {
+    const orderId = window.currentChat;
+    const input = document.getElementById(`attachLink_${orderId}File`) || document.getElementById('chatAttachLinkInputFile');
+    if (!input) return;
+    const prefixo = docType ? `[${docType}] ` : '';
+    if (!input.value.startsWith('[')) input.value = prefixo + input.value;
+    input.focus();
+};
+
+window.confirmChatAttach = async function() {
+    if (chatAttachType === 'location') { window.sendChatLocation('other'); return; }
+    const orderId = window.currentChat;
+    const suffix = chatAttachType === 'file' ? 'File' : '';
+    const input = document.getElementById(`attachLink_${orderId}${suffix}`) || document.getElementById(chatAttachType === 'file' ? 'chatAttachLinkInputFile' : 'chatAttachLinkInput');
+    const url = input?.value?.trim();
+    if (!url || !url.startsWith('http')) { showToast('Cole um link válido (começando com http).', 'warning'); return; }
+    if (chatAttachType === 'image') await window.sendChatImage(url);
+    else await window.sendChatFile(url);
+    input.value = '';
+    (window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel'))?.classList.add('d-none');
+};
+
+window.openImageFull = function(src) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    modal.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;" onerror="this.onerror=null;this.style.display='none'">`;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+};
+
+function getLogisticsTypeText(type) {
+    if (type === 'pickup') return 'Retirada no Local';
+    if (type === 'seller_delivery') return 'Entrega pelo Vendedor';
+    if (type === 'external_app') return 'App de Entrega';
+    return type;
+}
+
+// ============================================
+// AÇÕES COMPARTILHADAS DE CHAT (reply, edit, delete, copy)
+// ============================================
+
+window.startReply = async function(index) {
+    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+    const msg = chatResult?.[0]?.messages[index];
+    if (!msg) return;
+
+    currentReplyIndex = index;
+    editingMessageIndex = null;
+    
+    const preview = window._chatActiveElements?.preview || document.getElementById('chatInputPreview');
+    preview.classList.remove('d-none');
+    preview.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="small text-truncate" style="max-width: 85%;">
+                <strong class="text-primary d-block">Respondendo a ${msg.senderName}</strong>
+                <span class="text-muted">${msg.text}</span>
+            </div>
+            <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelReplyOrEdit()"></i>
+        </div>`;
+    (window._chatActiveElements?.input || document.getElementById('chatMessageInput'))?.focus();
+};
+
+window.startEdit = async function(index) {
+    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+    const msg = chatResult?.[0]?.messages[index];
+    if (!msg) return;
+
+    editingMessageIndex = index;
+    currentReplyIndex = null;
+
+    const input = window._chatActiveElements?.input || document.getElementById('chatMessageInput');
+    input.value = msg.text;
+    
+    const preview = window._chatActiveElements?.preview || document.getElementById('chatInputPreview');
+    preview.classList.remove('d-none');
+    preview.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="small"><strong class="text-warning">Editando mensagem...</strong></div>
+            <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelReplyOrEdit()"></i>
+        </div>`;
+    input.focus();
+};
+
+window.cancelReplyOrEdit = function() {
+    currentReplyIndex = null;
+    editingMessageIndex = null;
+    const preview = window._chatActiveElements?.preview || document.getElementById('chatInputPreview');
+    if (preview) {
+        preview.classList.add('d-none');
+        preview.innerHTML = '';
+    }
+    const input = window._chatActiveElements?.input || document.getElementById('chatMessageInput');
+    if (input && !currentReplyIndex) input.value = '';
+};
+
+window.copyMessageText = async function(index) {
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const msg = chatResult?.[0]?.messages[index];
+        if (!msg?.text) return;
+        await navigator.clipboard.writeText(msg.text);
+        showToast('Mensagem copiada!', 'success', 1500);
+    } catch (e) {
+        showToast('Não foi possível copiar.', 'error');
+    }
+};
+
+window.deleteMessage = async function(index) {
+    if (!confirm('Apagar esta mensagem para todos?')) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat?.messages[index]) return;
+        chat.messages[index].text = '';
+        chat.messages[index].image = null;
+        chat.messages[index].file = null;
+        chat.messages[index].deleted = true;
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        loadChatMessages(currentChat);
+    } catch (e) {
+        showToast('Erro ao apagar mensagem.', 'error');
+    }
+};
+
+// ============================================
+// AÇÕES DE CHAT DO CLIENTE (pull-to-refresh, chat actions toggle)
+// ============================================
+
+function setupPullToRefresh() {
+    const container = window._chatActiveElements?.container || document.getElementById('chatMessagesContainer');
+    if (!container) return;
+    let startY = 0;
+    
+    container.addEventListener('touchstart', e => startY = e.touches[0].pageY, {passive: true});
+    container.addEventListener('touchend', e => {
+        const moveY = e.changedTouches[0].pageY - startY;
+        if (container.scrollTop === 0 && moveY > 100) {
+            loadChatMessages(currentChat);
+            showToast('Atualizando...', 'info', 1000);
+        }
+    }, {passive: true});
+}
+
+/**
+ * Abre/Fecha a aba superior de processos de entrega
+ */
+window.toggleChatActions = function() {
+    const area = window._chatActiveElements?.logistics || document.getElementById('logisticsAgreementArea');
+    if (area) {
+        const attachPanel = window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel');
+        if (attachPanel) attachPanel.classList.add('d-none');
+        area.classList.toggle('show-menu');
+    }
+};
+
+window.viewChatPartnerProfile = async function() {
+    const user = getSavedUser();
+    let order = ordersCache.find(o => o.id === currentChat);
+    if (!order) {
+        const r = await supabaseFetch(`orders?id=eq.${currentChat}&limit=1`);
+        order = r?.[0];
+    }
+    if (!order) return;
+    const isBuyer = user.id === order.buyer_id;
+    const partnerId = isBuyer ? order.seller_id : order.buyer_id;
+    const partnerName = isBuyer ? order.seller_name : order.buyer_name;
+    let partner = null;
+    try {
+        const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at,last_seen&id=eq.${partnerId}&limit=1`);
+        partner = r?.[0];
+    } catch (e) {}
+    const avatar = normalizeImageUrl(safeParseImages(partner?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}&background=random&size=100`;
+    const rating = partner?.vendedor_rating ? parseFloat(partner.vendedor_rating).toFixed(1) : '—';
+    const ratingCount = partner?.rating_count || 0;
+    const memberSince = partner?.created_at ? new Date(partner.created_at).toLocaleDateString('pt-BR', {month:'long', year:'numeric'}) : '—';
+    const online = isRecentlyOnline(partner?.last_seen);
+    let modalEl = document.getElementById('partnerProfileModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'partnerProfileModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        document.body.appendChild(modalEl);
+    }
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-body text-center p-4">
+                    <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
+                    <div class="position-relative d-inline-block mb-3">
+                        <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=80'">
+                        <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
+                    </div>
+                    <h5 class="fw-bold mb-1">${partner?.nome || partnerName || 'Usuário'}</h5>
+                    <p class="small mb-2 fw-bold ${online ? 'text-success' : 'text-muted'}">${online ? '● Online agora' : '○ Offline'}</p>
+                    <p class="text-muted small mb-3"><i class="bi bi-calendar3 me-1"></i>Na plataforma desde ${memberSince}</p>
+                    <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
+                        <i class="bi bi-star-fill text-warning"></i>
+                        <span class="fw-bold">${rating}</span>
+                        <span class="text-muted small">(${ratingCount} avaliações)</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary rounded-pill fw-bold" onclick="bootstrap.Modal.getInstance(document.getElementById('partnerProfileModal'))?.hide(); window.startDirectChat('${partnerId}');">
+                        <i class="bi bi-chat-dots me-1"></i>Conversar
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(modalEl).show();
+};
+
+window.chatCancelOrder = async function(orderId) {
+    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
+    try {
+        await supabaseFetch(`orders?id=eq.${orderId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
+        });
+        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+        const chat = chatData[0];
+        if (chat) {
+            chat.messages.push({ senderId: 'system', text: 'O pedido foi cancelado por uma das partes.', timestamp: new Date().toISOString(), type: 'system' });
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        showToast('Pedido cancelado!', 'info');
+        window.toggleChatActions();
+        loadChatMessages(orderId);
+    } catch { showToast('Erro ao cancelar.', 'error'); }
+};
+
+// ============================================
 // FAZER OFERTA (estilo eBay: comprador propõe um
 // valor ao vendedor, que aparece em "Solicitações
 // Pendentes" pra ser aceito ou recusado)
@@ -2601,13 +3489,16 @@ window.showOfferPage = function(pid) {
                     </div>
                     <div class="create-ad-section-body">
                         <div class="mb-3">
-                            <label class="create-ad-label">Seu valor (R$) <span class="text-danger">*</span></label>
-                            <input type="number" class="create-ad-input" id="offerAmount" step="0.01" min="0.01"${preco > 0 ? ` max="${preco - 0.01}"` : ''} placeholder="Ex: 150.00" required>
-                            <small class="text-muted">O valor deve ser menor que o preço anunciado.</small>
+                            <div class="ml-field">
+                                <input type="number" id="offerAmount" step="0.01" min="0.01"${preco > 0 ? ` max="${preco - 0.01}"` : ''} placeholder=" " required>
+                                <label for="offerAmount">Seu valor (R$) *</label>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label class="create-ad-label">Quantidade <span class="text-danger">*</span></label>
-                            <input type="number" class="create-ad-input" id="offerQty" min="1" value="1" max="${Math.max(1, item.quantidade ?? 9999)}" required>
+                            <div class="ml-field">
+                                <input type="number" id="offerQty" min="1" value="1" max="${Math.max(1, item.quantidade ?? 9999)}" placeholder=" " required>
+                                <label for="offerQty">Quantidade *</label>
+                            </div>
                         </div>
                         <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i>O vendedor pode aceitar ou recusar sua oferta em até alguns dias. Você será avisado assim que ele responder.</p>
                     </div>
@@ -2728,6 +3619,9 @@ window.toggleTema = function() {
     const themeSwitch = document.getElementById('themeSwitchMobile');
     if (themeSwitch) themeSwitch.checked = modoEscuro;
 
+    const themeSwitchProfile = document.getElementById('themeSwitchProfile');
+    if (themeSwitchProfile) themeSwitchProfile.checked = modoEscuro;
+
     const desktopIcon = document.querySelector('#themeToggle i');
     if (desktopIcon) {
         desktopIcon.className = modoEscuro ? 'bi bi-sun' : 'bi bi-moon-stars';
@@ -2755,6 +3649,9 @@ function bootstrapApp() {
     if (localStorage.getItem('modoEscuro') === 'true') {
         document.body.classList.add('dark-theme');
     }
+    // Sincronizar toggle do perfil com estado atual
+    const themeProfileCheck = document.getElementById('themeSwitchProfile');
+    if (themeProfileCheck) themeProfileCheck.checked = document.body.classList.contains('dark-theme');
 
     syncHeaderHeightVar();
     window.addEventListener('resize', syncHeaderHeightVar);
@@ -3087,6 +3984,7 @@ function bootstrapApp() {
     updateUI();
     renderCart();
     window.setupAutoComplete();
+    window.updateChatBadge();
 
     const user = getEffectiveUser();
     if (user?.tipo === 'VENDEDOR') {
@@ -4145,16 +5043,27 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
     const senderLabel = msg.senderName || (resolveSenderName?.(msg) ?? '') || (isStaff ? 'Suporte' : 'Usuário');
     const avatarForThem = isStaff ? supportAvatar : (partnerAvatar || '');
     const prevMsg = enableGrouping && allMessages[index - 1];
+    const nextMsg = enableGrouping && allMessages[index + 1];
     const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system' && !!prevMsg.isStaff === isStaff;
+    const isGroupContinuation = nextMsg && nextMsg.senderId === msg.senderId && nextMsg.type !== 'system' && !!nextMsg.isStaff === isStaff;
+
+    let bubblePosition = 'msg-single';
+    if (isGrouped && isGroupContinuation) bubblePosition = 'msg-middle';
+    else if (isGrouped) bubblePosition = 'msg-last';
+    else if (isGroupContinuation) bubblePosition = 'msg-first';
+
+    const showAvatar = !isGroupContinuation;
 
     if (msg.deleted) {
         return `
-        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}"${isGrouped ? ' style="margin-top:-4px;"' : ''}>
-            ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
-            <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted">
+        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}">
+            ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
+            <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted ${bubblePosition}">
                 <i class="bi bi-slash-circle me-1"></i><em>Mensagem apagada</em>
             </div>
-            ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${isMe && !showAvatar ? '<div class="msg-avatar-spacer"></div>' : ''}
         </div>`;
     }
 
@@ -4211,9 +5120,10 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
     };
 
     return `
-    <div class="msg-row ${isMe ? 'is-me' : 'is-them'}"${isGrouped ? ' style="margin-top:-4px;"' : ''}>
-        ${!isMe ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
-        <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''}" style="margin-bottom:${reaction ? '10px' : '0'}">
+    <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}">
+        ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+        ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
+        <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''} ${bubblePosition}" style="margin-bottom:${reaction ? '10px' : '0'}">
             <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
                 ${!isGrouped ? `<span class="msg-sender">${senderLabel}${isStaff ? ' <i class="bi bi-patch-check-fill" title="Suporte"></i>' : ''}</span>` : '<span></span>'}
                 ${buildActions()}
@@ -4237,7 +5147,8 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             </div>
             ${reactionBadgeHtml}
         </div>
-            ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${isMe && !showAvatar ? '<div class="msg-avatar-spacer"></div>' : ''}
         </div>`;
 };
 
@@ -4389,4 +5300,942 @@ window.loadProductReviews = async function(productId) {
         container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Erro ao carregar opiniões.</p></div>';
     }
 };
+
+// ============================================
+// CONTAINER DE CHAT UNIFICADO
+// Uma única função que gera toda a estrutura HTML
+// do chat (header, mensagens, input, anexos).
+// Admin, vendedor, cliente e suporte usam a mesma.
+//
+// Todos os callbacks são STRINGS de onclick:
+//   onSend: "window.adminChatsTabSend('${orderId}')"
+// ============================================
+
+window.renderChatContainer = function(opts) {
+    const {
+        chatId,
+        chat = {},
+        order = null,
+        partner = {},
+        msgsId,
+        inputId,
+        previewId,
+        attachPanelId,
+        attachLinkId,
+        participantsId,
+        statusBarId,
+        onSend = '',
+        onBack = '',
+        onClose = '',
+        onDelete = '',
+        onToggleParticipants = '',
+        onToggleAttachPanel = '',
+        onConfirmAttach = '',
+        onSendLocation = '',
+        onSendFile = '',
+        onViewProfile = '',
+        onCancelOrder = '',
+        onChatActions = '',
+        onMute = '',
+        onArchive = '',
+        onBlock = '',
+        onVoiceInput = 'window.startVoiceInput',
+        openImgurFn = 'window.abrirUploadExterno',
+        openDocHostFn = 'window.abrirDocHost',
+        docHostBtn1 = 'Google Drive',
+        docHostBtn2 = 'OneDrive',
+        statusInfo = null,
+        statusText = '',
+        showBackBtn = false,
+        showCloseBtn = false,
+        showAttach = true,
+        showProductSummary = true,
+        showDeleteBtn = false,
+        extraHeaderHtml = '',
+        extraBeforeMessages = '',
+        extraBeforeInput = ''
+    } = opts;
+
+    const isClosed = !!chat.closed;
+    const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
+    const partnerName = partner.name || '';
+    const partnerAvatar = partner.avatar || '';
+
+    const closeBtnHtml = (showCloseBtn && onClose)
+        ? `<button type="button" class="ml-auth-close chat-header-x" onclick="${onClose}" aria-label="Fechar" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;flex-shrink:0;"><i class="bi bi-x-lg"></i></button>`
+        : '';
+
+    const backBtnHtml = showBackBtn && onBack
+        ? `<button type="button" class="chat-header-close chat-header-back" onclick="${onBack}" style="margin-right:4px;"><i class="bi bi-arrow-left"></i></button>`
+        : '';
+
+    const participantsBtnHtml = onToggleParticipants
+        ? `<button type="button" class="chat-header-close" onclick="${onToggleParticipants}" title="Participantes"><i class="bi bi-people-fill"></i></button>`
+        : '';
+
+    const dropdownItems = [];
+    if (onViewProfile) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onViewProfile}"><i class="bi bi-person-circle me-2"></i>Ver perfil</a></li>`);
+    if (!isClosed && onCancelOrder) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onCancelOrder}"><i class="bi bi-x-circle me-2"></i>Cancelar pedido</a></li>`);
+    if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi bi-bell-slash me-2"></i>Silenciar notificações</a></li>`);
+    if (onArchive) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onArchive}"><i class="bi bi-archive me-2"></i>Arquivar conversa</a></li>`);
+    if (showDeleteBtn && onDelete) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDelete}"><i class="bi bi-trash me-2"></i>Apagar conversa</a></li>`);
+    if (onBlock) dropdownItems.push(`<li><hr class="dropdown-divider my-1"></li><li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onBlock}"><i class="bi bi-slash-circle me-2"></i>Bloquear usuário</a></li>`);
+
+    const dropdownHtml = dropdownItems.length > 0
+        ? `<div class="dropdown">
+            <button type="button" class="chat-header-close" data-bs-toggle="dropdown" aria-label="Opções" style="margin-right:4px;"><i class="bi bi-three-dots-vertical"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">${dropdownItems.join('')}</ul>
+           </div>`
+        : '';
+
+    const productSummaryHtml = (showProductSummary && order)
+        ? (() => {
+            const imgs = typeof safeParseImages === 'function' ? safeParseImages(order.images) : [];
+            const imgSrc = typeof normalizeImageUrl === 'function' ? normalizeImageUrl(imgs[0]) || '' : '';
+            const title = order.product_title || order.title || '';
+            const price = order.total != null ? formatPreco(order.total) : '';
+            return `<div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                <img src="${imgSrc}" style="width:18px;height:18px;border-radius:4px;object-fit:cover;flex-shrink:0;" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
+                <span style="font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</span>
+                ${price ? `<span style="font-size:0.65rem;font-weight:600;color:#00A884;flex-shrink:0;">${price}</span>` : ''}
+            </div>`;
+          })()
+        : '';
+
+    const headerHtml = `
+    <div class="chat-header-pro">
+        ${backBtnHtml}
+        <div class="chat-header-avatar-wrap">
+            <img id="${msgsId}Avatar" src="${partnerAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}'">
+            <span id="${msgsId}Dot" class="presence-dot"></span>
+        </div>
+        <div class="chat-header-info" style="min-width:0;flex:1;">
+            <span class="chat-header-name">${partnerName}</span>
+            <span class="chat-header-order-id" style="display:block;font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                #${String(chatId).slice(-6).toUpperCase()} · ${msgCount} mensagem${msgCount === 1 ? '' : 's'}${isClosed ? ' · <i class="bi bi-lock-fill"></i> Encerrado' : ''}
+            </span>
+            ${extraHeaderHtml ? `<div class="mt-1">${extraHeaderHtml}</div>` : ''}
+            ${productSummaryHtml}
+        </div>
+        ${participantsBtnHtml}
+        ${dropdownHtml}
+        ${closeBtnHtml}
+    </div>`;
+
+    const statusBarHtml = `
+    <div id="${statusBarId}" class="chat-status-bar">
+        ${statusInfo ? `<div class="alert alert-${statusInfo.class || 'info'} mb-0 py-2 text-center small">${statusInfo.text}</div>` : ''}
+        ${statusText ? `<div class="mb-0 py-1 text-center">${statusText}</div>` : ''}
+        ${isClosed && !statusInfo ? '<div class="alert alert-secondary mb-0 py-2 text-center small"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</div>' : ''}
+    </div>`;
+
+    const participantsHtml = onToggleParticipants
+        ? `<div id="${participantsId}" class="chat-participants-panel d-none"></div>`
+        : '';
+
+    const attachHtml = showAttach ? `
+    <div id="${previewId}" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
+    <div id="${attachPanelId}" class="p-3 bg-light border-top d-none">
+        <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image','${attachPanelId}')"><i class="bi bi-play-circle me-1"></i>Mídia</button>
+            <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file','${attachPanelId}')"><i class="bi bi-file-earmark me-1"></i>Documentos</button>
+            <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="location" onclick="window.setChatAttachType('location','${attachPanelId}')"><i class="bi bi-geo-alt-fill me-1"></i>Endereço</button>
+        </div>
+        <div id="${attachPanelId}ImageBox">
+            <div class="input-group input-group-sm mb-2 shadow-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-link-45deg text-muted"></i></span>
+                <input type="url" id="${attachLinkId}" class="form-control border-start-0" placeholder="Cole o link da imagem, vídeo ou GIF...">
+                <button type="button" class="ml-attach rounded-start-0" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+            </div>
+            <div class="d-flex gap-2">
+                <label class="ml-attach flex-grow-1" style="cursor:pointer;">
+                    <i class="bi bi-cloud-upload"></i>Escolher arquivos
+                    <input type="file" accept="image/*" hidden onchange="${onSendFile}(this)">
+                </label>
+                <button type="button" class="ml-attach flex-grow-1" onclick="${openImgurFn}()"><i class="bi bi-box-arrow-up-right"></i>Imgur</button>
+            </div>
+        </div>
+        <div id="${attachPanelId}FileBox" class="d-none">
+            <div class="input-group input-group-sm mb-2 shadow-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-link-45deg text-muted"></i></span>
+                <input type="url" id="${attachLinkId}File" class="form-control border-start-0" placeholder="Cole o link do documento...">
+                <button type="button" class="ml-attach rounded-start-0" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn1}')"><i class="bi bi-google"></i>${docHostBtn1}</button>
+                <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn2}')"><i class="bi bi-microsoft"></i>${docHostBtn2}</button>
+            </div>
+        </div>
+        <div id="${attachPanelId}LocationBox" class="d-none">
+            <div class="input-group input-group-sm mb-2 shadow-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-geo-alt-fill text-muted"></i></span>
+                <input type="url" id="${attachLinkId}Loc" class="form-control border-start-0" placeholder="Cole o link do endereço (Google Maps)...">
+                <button type="button" class="ml-attach rounded-start-0" onclick="${onSendLocation}('other')"><i class="bi bi-send"></i></button>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('current')"><i class="bi bi-geo-alt-fill"></i>Endereço atual</button>
+                <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('stored')"><i class="bi bi-house-door"></i>Endereço cadastrado</button>
+            </div>
+        </div>
+    </div>` : '';
+
+    const inputBarHtml = !isClosed ? `
+    <div class="chat-input-bar">
+        <div class="d-flex gap-2 align-items-center">
+            ${showAttach ? `<button type="button" class="chat-icon-btn" onclick="${onToggleAttachPanel}" title="Anexar"><i class="bi bi-paperclip"></i></button>` : ''}
+            ${onChatActions ? `<button type="button" class="chat-icon-btn" onclick="${onChatActions}" title="Opções do pedido"><i class="bi bi-plus-circle"></i></button>` : ''}
+            <button type="button" class="chat-icon-btn" data-voice-input="${inputId}" onclick="${onVoiceInput}('${inputId}')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
+            <input type="text" id="${inputId}" class="chat-text-input" placeholder="Digite sua mensagem..." autocomplete="off"
+                   onkeypress="if(event.key==='Enter'){event.preventDefault();${onSend}}">
+            <button type="button" class="chat-send-btn" onclick="${onSend}"><i class="bi bi-send-fill"></i></button>
+        </div>
+    </div>` : '';
+
+    return `
+    <div class="chat-container" style="height:100%;display:flex;flex-direction:column;">
+        ${headerHtml}
+        ${statusBarHtml}
+        ${participantsHtml}
+        ${extraBeforeMessages}
+        <div id="${msgsId}" class="chat-messages flex-grow-1" style="overflow-y:auto;"></div>
+        ${attachHtml}
+        ${extraBeforeInput}
+        ${inputBarHtml}
+    </div>`;
+};
+
+// ============================================
+// CHAT DIRETO (Conversas Livres — WhatsApp-like)
+// ============================================
+
+/**
+ * Abre a tela de "Conversas" — lista de todos os usuários do sistema,
+ * reutilizando o layout split-panel do whatsappOrdersView.
+ */
+window.renderDirectChats = async function() {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+
+    window.exitWaOrdersView();
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridMain = document.getElementById('productGridMain');
+    if (gridMain) gridMain.classList.add('d-none');
+    const grid = document.getElementById('productsGrid');
+    if (grid) { grid.classList.remove('order-view-active'); grid.innerHTML = ''; grid.style.display = 'none'; }
+
+    const waView = document.getElementById('whatsappOrdersView');
+    const waList = document.getElementById('waContactList');
+    const waTitle = document.getElementById('waSideTitle');
+    const waSearch = document.getElementById('waContactSearch');
+
+    if (waTitle) waTitle.textContent = 'Conversas';
+    if (waSearch) {
+        waSearch.placeholder = 'Buscar pessoa...';
+        waSearch.oninput = function() { window.filterDirectContacts(this.value); };
+    }
+    if (waView) waView.classList.remove('d-none');
+    document.body.classList.add('wa-locked');
+
+    window.closeWaChat();
+
+    waList.innerHTML = '<div class="text-center py-5 w-100"><div class="spinner-border text-success"></div></div>';
+
+    try {
+        const allUsers = await supabaseFetch(`users?select=id,nome,avatar,last_seen&order=nome.asc`);
+        const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
+        const myChats = directChats.filter(c =>
+            c.participants && c.participants.includes(user.id) &&
+            c.messages && c.messages[0]?.type !== 'ticket_meta'
+        );
+
+        const contactMap = {};
+        myChats.forEach(chat => {
+            const otherId = chat.participants.find(p => p !== user.id);
+            if (otherId) contactMap[otherId] = chat;
+        });
+
+        const otherUsers = allUsers.filter(u => u.id !== user.id);
+        if (!otherUsers.length) {
+            waList.innerHTML = `
+                <div class="text-center py-5 px-3" style="color:#999;">
+                    <i class="bi bi-people fs-1 d-block mb-2"></i>
+                    <p class="small mb-0">Nenhum outro usuário encontrado.</p>
+                </div>`;
+            return;
+        }
+
+        const chatsWithMsgs = [];
+        const archivedChats = [];
+        const usersWithoutChat = [];
+
+        otherUsers.forEach(u => {
+            const chat = contactMap[u.id];
+            if (chat) {
+                const lastMsg = chat.messages?.[chat.messages.length - 1];
+                const isArchived = chat.messages?.[0]?.archived === true;
+                if (isArchived) {
+                    archivedChats.push({ user: u, chat, lastMsg });
+                } else {
+                    chatsWithMsgs.push({ user: u, chat, lastMsg });
+                }
+            } else {
+                usersWithoutChat.push(u);
+            }
+        });
+
+        chatsWithMsgs.sort((a, b) => {
+            const ta = a.lastMsg?.timestamp ? new Date(a.lastMsg.timestamp).getTime() : 0;
+            const tb = b.lastMsg?.timestamp ? new Date(b.lastMsg.timestamp).getTime() : 0;
+            return tb - ta;
+        });
+        archivedChats.sort((a, b) => {
+            const ta = a.lastMsg?.timestamp ? new Date(a.lastMsg.timestamp).getTime() : 0;
+            const tb = b.lastMsg?.timestamp ? new Date(b.lastMsg.timestamp).getTime() : 0;
+            return tb - ta;
+        });
+
+        let html = '';
+
+        if (chatsWithMsgs.length > 0) {
+            html += `<div class="wa-contact-section-header">Conversas Recentes</div>`;
+            html += chatsWithMsgs.map(({ user: u, chat, lastMsg }) => {
+                const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=45`;
+                const online = isRecentlyOnline(u.last_seen);
+                const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
+                const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
+                const unread = chat.messages?.filter(m => m.senderId !== user.id && !m.visto).length || 0;
+
+                return `
+                <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')">
+                    <div style="position:relative;flex-shrink:0;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;">
+                        <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:12px;height:12px;border:2px solid #fff;"></span>
+                    </div>
+                    <div class="wa-contact-textbox">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
+                            <small class="text-muted" style="font-size:0.65rem;white-space:nowrap;">${lastTime}</small>
+                        </div>
+                        <div class="wa-contact-text" style="${unread ? 'font-weight:600;color:#111;' : ''}">${truncateText(lastText, 40)}</div>
+                    </div>
+                    ${unread ? `<span class="badge bg-success wa-contact-badge">${unread}</span>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        if (archivedChats.length > 0) {
+            html += `<div class="wa-contact-section-header" style="cursor:pointer;user-select:none;" onclick="document.getElementById('archivedChatsList').classList.toggle('d-none');this.querySelector('.bi')?.classList.toggle('bi-chevron-down');this.querySelector('.bi')?.classList.toggle('bi-chevron-right');">
+                <span><i class="bi bi-chevron-down me-1" style="font-size:0.7rem;"></i>Arquivadas</span>
+                <span class="small text-muted">${archivedChats.length}</span>
+            </div>`;
+            html += `<div id="archivedChatsList">`;
+            html += archivedChats.map(({ user: u, chat, lastMsg }) => {
+                const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=45`;
+                const online = isRecentlyOnline(u.last_seen);
+                const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
+                const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
+
+                return `
+                <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')" style="opacity:0.65;">
+                    <div style="position:relative;flex-shrink:0;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;">
+                    </div>
+                    <div class="wa-contact-textbox">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
+                            <small class="text-muted" style="font-size:0.65rem;white-space:nowrap;">${lastTime}</small>
+                        </div>
+                        <div class="wa-contact-text">${truncateText(lastText, 40)}</div>
+                    </div>
+                </div>`;
+            }).join('');
+            html += `</div>`;
+        }
+
+        if (usersWithoutChat.length > 0) {
+            html += `<div class="wa-contact-section-header">${chatsWithMsgs.length > 0 ? 'Outros Usuários' : 'Todos os Usuários'}</div>`;
+            html += usersWithoutChat.map(u => {
+                const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=45`;
+                const online = isRecentlyOnline(u.last_seen);
+
+                return `
+                <div class="wa-contact" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.startDirectChat('${u.id}')">
+                    <div style="position:relative;flex-shrink:0;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;">
+                        <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:12px;height:12px;border:2px solid #fff;"></span>
+                    </div>
+                    <div class="wa-contact-textbox">
+                        <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
+                        <div class="wa-contact-text">Iniciar conversa</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        waList.innerHTML = html || `
+            <div class="text-center py-5 px-3" style="color:#999;">
+                <i class="bi bi-people fs-1 d-block mb-2"></i>
+                <p class="small mb-0">Nenhum usuário encontrado.</p>
+            </div>`;
+
+        window.closeMobileMenu();
+    } catch (e) {
+        console.error('Erro ao carregar conversas:', e);
+        waList.innerHTML = '<div class="text-center py-5" style="color:#999;"><h6>Erro ao carregar conversas.</h6></div>';
+    }
+};
+
+window.filterDirectContacts = function(query) {
+    const q = query.trim().toLowerCase();
+    let anyVisible = false;
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
+        const name = el.dataset.contactName || '';
+        const show = !q || name.includes(q);
+        el.style.display = show ? '' : 'none';
+        if (show) anyVisible = true;
+    });
+    document.querySelectorAll('#waContactList .wa-contact-section-header').forEach(el => {
+        el.style.display = q ? 'none' : '';
+    });
+    let emptyMsg = document.getElementById('directSearchEmptyMsg');
+    if (!anyVisible && q) {
+        if (!emptyMsg) {
+            emptyMsg = document.createElement('div');
+            emptyMsg.id = 'directSearchEmptyMsg';
+            emptyMsg.className = 'text-center py-4 px-3';
+            emptyMsg.style.color = '#999';
+            emptyMsg.innerHTML = '<i class="bi bi-search fs-4 d-block mb-2"></i><p class="small mb-0">Nenhuma pessoa encontrada.</p>';
+            document.getElementById('waContactList')?.appendChild(emptyMsg);
+        }
+    } else if (emptyMsg) {
+        emptyMsg.remove();
+    }
+};
+
+window.startDirectChat = async function(targetUserId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+
+    showToast('Abrindo conversa...', 'info', 1500);
+
+    try {
+        const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
+        const existing = directChats.find(c =>
+            c.order_id === null &&
+            c.participants && c.participants.includes(user.id) && c.participants.includes(targetUserId) &&
+            c.messages && c.messages[0]?.type !== 'ticket_meta'
+        );
+
+        if (existing) {
+            window.openDirectChat(existing.id);
+            return;
+        }
+
+        const targetData = await supabaseFetch(`users?select=nome,avatar&id=eq.${targetUserId}&limit=1`);
+        const target = targetData?.[0];
+        const targetName = target?.nome || 'Usuário';
+
+        const newChat = {
+            id: crypto.randomUUID(),
+            order_id: null,
+            buyer_id: user.id,
+            seller_id: targetUserId,
+            buyer_name: user.nome,
+            seller_name: targetName,
+            participants: [user.id, targetUserId],
+            messages: [
+                { type: 'direct_chat_meta', createdBy: user.id, createdByName: user.nome },
+                { senderId: user.id, senderName: user.nome, text: `Olá! 👋`, timestamp: new Date().toISOString(), type: 'message' }
+            ]
+        };
+
+        await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
+
+        await window.renderDirectChats();
+        setTimeout(() => window.openDirectChat(newChat.id), 300);
+    } catch (e) {
+        console.error('Erro ao criar conversa:', e);
+        showToast('Erro ao abrir conversa.', 'error');
+    }
+};
+
+window.openDirectChat = async function(chatId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    if (window.currentChat !== chatId) window.lastChatSignature = null;
+    window.currentChat = chatId;
+
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+
+        const otherId = chat.participants.find(p => p !== user.id);
+        let otherName = 'Usuário';
+        let otherAvatar = `https://ui-avatars.com/api/?name=User&background=random&size=40`;
+        let otherLastSeen = null;
+        let otherEmail = '';
+        let otherPhone = '';
+
+        if (otherId) {
+            const otherData = await supabaseFetch(`users?select=nome,avatar,last_seen,email,telefone&id=eq.${otherId}&limit=1`);
+            const other = otherData?.[0];
+            if (other) {
+                otherName = other.nome || otherName;
+                const realAvatar = normalizeImageUrl(safeParseImages(other.avatar)[0]);
+                if (realAvatar) otherAvatar = realAvatar;
+                otherLastSeen = other.last_seen;
+                otherEmail = other.email || '';
+                otherPhone = other.telefone || '';
+            }
+        }
+
+        const msgsId = `dmsgs_${chatId}`;
+        const inputId = `dinput_${chatId}`;
+        const previewId = `dpreview_${chatId}`;
+        const attachId = `dattachPanel_${chatId}`;
+        const attachLinkId = `dattachLink_${chatId}`;
+        const statusBarId = `dstatusBar_${chatId}`;
+
+        const partnerDotClass = isRecentlyOnline(otherLastSeen) ? 'online' : 'offline';
+
+        const html = window.renderChatContainer({
+            chatId,
+            chat,
+            partner: { name: otherName, avatar: otherAvatar },
+            msgsId,
+            inputId,
+            previewId,
+            attachPanelId: attachId,
+            attachLinkId,
+            statusBarId,
+            onSend: 'window.sendDirectChatMessage(event)',
+            onBack: 'window.closeDirectChat()',
+            onClose: 'window.closeDirectChat()',
+            onViewProfile: `window.viewDirectChatPartnerProfile('${otherId}')`,
+            onMute: `window.muteDirectChat('${chatId}')`,
+            onArchive: `window.archiveDirectChat('${chatId}')`,
+            onBlock: `window.blockDirectChatUser('${otherId}')`,
+            onToggleAttachPanel: 'window.toggleChatAttachPanel()',
+            onConfirmAttach: 'window.confirmDirectChatAttach()',
+            onSendLocation: 'window.sendDirectChatLocation',
+            onSendFile: 'window.sendDirectChatImageFile',
+            showBackBtn: true,
+            showCloseBtn: false,
+            showDeleteBtn: true,
+            onDelete: `window.deleteDirectChat('${chatId}')`,
+            showProductSummary: false,
+            showAttach: true,
+            statusInfo: { class: 'secondary mb-0 py-1', text: `<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;">${otherEmail ? `<span><i class="bi bi-envelope-fill me-1" style="font-size:0.65rem;"></i>${otherEmail}</span>` : ''}${otherPhone ? `<span><i class="bi bi-telephone-fill me-1" style="font-size:0.65rem;"></i>${otherPhone}</span>` : ''}</div>` }
+        });
+
+        const panel = document.getElementById('waChatActive');
+        if (panel) {
+            panel.innerHTML = html;
+            panel.classList.remove('d-none');
+            panel.classList.add('d-flex');
+        }
+
+        if (partnerDotClass) {
+            document.getElementById(`${msgsId}Dot`)?.classList.add(partnerDotClass);
+        }
+
+        window._chatActiveElements = {
+            input: document.getElementById(inputId),
+            container: document.getElementById(msgsId),
+            statusBar: document.getElementById(statusBarId),
+            attachPanel: document.getElementById(attachId),
+            preview: document.getElementById(previewId)
+        };
+
+        document.getElementById('waEmptyState')?.classList.add('d-none');
+        document.getElementById('whatsappOrdersView')?.classList.add('wa-chat-open');
+        document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
+            el.classList.toggle('active-chat', el.dataset.directChatId === chatId);
+        });
+
+        await loadDirectChatMessages(chatId);
+        startDirectChatPolling(chatId);
+    } catch (e) {
+        console.error('Erro ao abrir conversa:', e);
+        showToast('Erro ao abrir conversa.', 'error');
+    }
+};
+
+window.closeDirectChat = function() {
+    stopDirectChatPolling();
+    window.currentChat = null;
+    window.lastChatSignature = null;
+    window._chatActiveElements = null;
+    const panel = document.getElementById('waChatActive');
+    if (panel) { panel.innerHTML = ''; panel.classList.add('d-none'); panel.classList.remove('d-flex'); }
+    document.getElementById('waEmptyState')?.classList.remove('d-none');
+    document.getElementById('whatsappOrdersView')?.classList.remove('wa-chat-open');
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
+};
+
+let directChatPollInterval = null;
+
+function startDirectChatPolling(chatId) {
+    stopDirectChatPolling();
+    directChatPollInterval = setInterval(() => {
+        const panel = document.getElementById('waChatActive');
+        if (!panel || panel.classList.contains('d-none') || window.currentChat !== chatId) {
+            stopDirectChatPolling();
+            return;
+        }
+        loadDirectChatMessages(chatId, true);
+    }, 4000);
+}
+
+function stopDirectChatPolling() {
+    if (directChatPollInterval) {
+        clearInterval(directChatPollInterval);
+        directChatPollInterval = null;
+    }
+}
+
+async function loadDirectChatMessages(chatId, silent = false) {
+    const container = window._chatActiveElements?.container;
+    if (!container) return;
+    if (!silent) {
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando mensagens...</p></div>';
+    }
+    try {
+        const user = getSavedUser();
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat?.messages) {
+            if (!silent) container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
+            return;
+        }
+
+        window.__setupReactionHooks(chat,
+            (c) => supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }),
+            () => loadDirectChatMessages(chatId, true)
+        );
+
+        let changed = false;
+        const otherSenderIds = chat.participants.filter(id => id !== user.id);
+        chat.messages.forEach(msg => {
+            if (msg.senderId && otherSenderIds.includes(msg.senderId) && !msg.visto) {
+                msg.visto = true; changed = true;
+            }
+        });
+        if (changed) {
+            supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {});
+            window.updateChatBadge();
+        }
+
+        const signature = JSON.stringify(chat.messages);
+        if (silent && signature === window.lastChatSignature) return;
+        const isNewIncoming = silent && window.lastChatSignature !== null && chat.messages.length > (JSON.parse(window.lastChatSignature || '[]').length || 0);
+        window.lastChatSignature = signature;
+
+        const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
+        const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'Você')}&background=22c98e&color=fff&size=40`;
+
+        const otherId = chat.participants.find(p => p !== user.id);
+        let partnerAvatarSrc = `https://ui-avatars.com/api/?name=User&background=random&size=40`;
+        try {
+            if (otherId) {
+                const pd = await supabaseFetch(`users?select=avatar&id=eq.${otherId}&limit=1`);
+                const ra = normalizeImageUrl(safeParseImages(pd?.[0]?.avatar)[0]);
+                if (ra) partnerAvatarSrc = ra;
+            }
+        } catch (e) {}
+
+        const chatMsgs = chat.messages.filter(m => m.type !== 'direct_chat_meta');
+        container.innerHTML = chatMsgs.map((msg, index) => {
+            return window.renderMsgBubble(msg, index, {
+                userId: user.id, myAvatar, partnerAvatar: partnerAvatarSrc, supportAvatar: partnerAvatarSrc,
+                resolveSenderName: () => msg.senderName || '',
+                actions: { reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage' },
+                useDropdown: true, enableGrouping: true, allMessages: chatMsgs
+            });
+        }).join('');
+
+        if (wasNearBottom) {
+            container.scrollTop = container.scrollHeight;
+        } else if (isNewIncoming) {
+            showToast('Nova mensagem recebida.', 'info', 2000);
+        }
+    } catch (e) {
+        if (silent) return;
+        console.error(e);
+        container.innerHTML = `<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i><p>Erro ao carregar mensagens</p><button class="btn btn-primary btn-sm" onclick="loadDirectChatMessages('${chatId}')">Tentar novamente</button></div>`;
+    }
+}
+
+window.sendDirectChatMessage = async function(event) {
+    if (event?.preventDefault) event.preventDefault();
+    const input = window._chatActiveElements?.input;
+    const text = input?.value?.trim();
+    const user = getSavedUser();
+    if ((!text && window.editingMessageIndex === null) || !user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+
+        if (window.editingMessageIndex !== null) {
+            chat.messages[window.editingMessageIndex].text = text;
+            chat.messages[window.editingMessageIndex].edited = true;
+        } else {
+            const newMessage = { senderId: user.id, senderName: user.nome, text, timestamp: new Date().toISOString(), type: 'message' };
+            if (window.currentReplyIndex !== null) {
+                const repliedMsg = chat.messages[window.currentReplyIndex];
+                newMessage.replyTo = { text: repliedMsg.text, senderName: repliedMsg.senderName };
+            }
+            chat.messages.push(newMessage);
+        }
+
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        input.value = '';
+        window.cancelReplyOrEdit();
+        await loadDirectChatMessages(window.currentChat);
+    } catch (e) { showToast('Erro ao enviar mensagem.', 'error'); }
+};
+
+window.sendDirectChatImageFile = async function(inputFile) {
+    const file = inputFile?.files?.[0];
+    if (inputFile) inputFile.value = '';
+    if (!file) return;
+    const btn = inputFile?.closest('.chat-container')?.querySelector('label') || document.querySelector('#chatAttachPanel label');
+    const original = btn ? btn.innerHTML : '';
+    if (btn) btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando...';
+    const clientId = window.CONFIG?.IMGUR_CLIENT_ID || window.CONFIG_LOCAL_FALLBACK?.IMGUR_CLIENT_ID || '546c25a59c58ad7';
+    try {
+        const fd = new FormData();
+        fd.append('image', file, file.name || 'imagem.jpg');
+        const res = await fetch('https://api.imgur.com/3/image', { method: 'POST', headers: { Authorization: `Client-ID ${clientId}` }, body: fd });
+        const json = await res.json().catch(() => null);
+        if (btn) btn.innerHTML = original;
+        if (json?.success && json?.data?.link) {
+            await window.sendDirectChatImage(json.data.link);
+            window._chatActiveElements?.attachPanel?.classList.add('d-none');
+        } else {
+            showToast('Falha ao enviar imagem (tente um link).', 'error');
+        }
+    } catch (e) { if (btn) btn.innerHTML = original; showToast('Erro ao enviar imagem.', 'error'); }
+};
+
+window.sendDirectChatImage = async function(urlParam) {
+    const rawUrl = urlParam;
+    if (!rawUrl || !(rawUrl.startsWith('http') || rawUrl.startsWith('data:'))) { showToast('Link inválido!', 'warning'); return; }
+    const url = normalizeImageUrl(rawUrl);
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+    const isGif = /\.gif$/i.test(url);
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+        const msg = { senderId: user.id, senderName: user.nome, text: isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem'), timestamp: new Date().toISOString() };
+        if (isVideo) { msg.type = 'video'; msg.video = url; }
+        else { msg.type = 'image'; msg.image = url; }
+        chat.messages.push(msg);
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadDirectChatMessages(window.currentChat);
+    } catch (e) { showToast('Erro ao processar o link.', 'error'); }
+};
+
+window.sendDirectChatFile = async function(urlParam) {
+    const url = urlParam;
+    if (!url || !url.startsWith('http')) { showToast('Link inválido!', 'warning'); return; }
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        chat.messages.push({ senderId: user.id, senderName: user.nome, text: `Arquivo: ${url.split('/').pop()}`, file: { name: 'Arquivo Externo', url, size: 0 }, timestamp: new Date().toISOString(), type: 'file' });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadDirectChatMessages(window.currentChat);
+    } catch { showToast('Erro ao enviar arquivo.', 'error'); }
+};
+
+window.confirmDirectChatAttach = async function() {
+    const suffix = chatAttachType === 'file' ? 'File' : '';
+    const input = document.getElementById(`dattachLink_${window.currentChat}${suffix}`) || document.getElementById(`attachLink_${window.currentChat}${suffix}`);
+    const url = input?.value?.trim();
+    if (!url || !url.startsWith('http')) { showToast('Cole um link válido (começando com http).', 'warning'); return; }
+    if (chatAttachType === 'image') await window.sendDirectChatImage(url);
+    else await window.sendDirectChatFile(url);
+    input.value = '';
+    window._chatActiveElements?.attachPanel?.classList.add('d-none');
+};
+
+window.sendDirectChatLocation = async function(kind) {
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    if (kind === 'current') {
+        if (!navigator.geolocation) { showToast('Geolocalização não suportada.', 'error'); return; }
+        showToast('Obtendo sua localização...', 'info');
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const maps = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            await sendDirectLocationMessage(maps, `Localização atual: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        }, () => showToast('Não foi possível obter a localização.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
+        return;
+    }
+    if (kind === 'stored') {
+        const u = getSavedUser() || {};
+        const endereco = [u.endereco, u.cidade, u.estado, u.cep].filter(Boolean).join(', ');
+        const maps = u.maps || (endereco ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}` : '');
+        if (!maps) { showToast('Você não tem endereço cadastrado no perfil.', 'warning'); return; }
+        sendDirectLocationMessage(maps, `📍 Meu endereço cadastrado: ${endereco || maps}`);
+        return;
+    }
+    const input = document.getElementById(`dattachLink_${window.currentChat}Loc`) || document.getElementById(`attachLink_${window.currentChat}Loc`);
+    const url = input?.value?.trim();
+    if (!url || !url.startsWith('http')) { showToast('Cole um link de endereço válido.', 'warning'); return; }
+    sendDirectLocationMessage(url, `Endereço (link): ${url}`);
+    input.value = '';
+    window._chatActiveElements?.attachPanel?.classList.add('d-none');
+};
+
+async function sendDirectLocationMessage(mapsUrl, text) {
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        chat.messages.push({ senderId: user.id, senderName: user.nome, text, location: mapsUrl, timestamp: new Date().toISOString(), type: 'location' });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadDirectChatMessages(window.currentChat);
+        window._chatActiveElements?.attachPanel?.classList.add('d-none');
+    } catch { showToast('Erro ao enviar localização.', 'error'); }
+}
+
+window.viewDirectChatPartnerProfile = async function(partnerId) {
+    if (!partnerId) return;
+    let partner = null;
+    try {
+        const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at,last_seen&id=eq.${partnerId}&limit=1`);
+        partner = r?.[0];
+    } catch (e) {}
+    const avatar = normalizeImageUrl(safeParseImages(partner?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(partner?.nome || 'User')}&background=random&size=100`;
+    const rating = partner?.vendedor_rating ? parseFloat(partner.vendedor_rating).toFixed(1) : '—';
+    const ratingCount = partner?.rating_count || 0;
+    const memberSince = partner?.created_at ? new Date(partner.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—';
+    const online = isRecentlyOnline(partner?.last_seen);
+    let modalEl = document.getElementById('partnerProfileModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'partnerProfileModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        document.body.appendChild(modalEl);
+    }
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-body text-center p-4">
+                    <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
+                    <div class="position-relative d-inline-block mb-3">
+                        <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=80'">
+                        <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
+                    </div>
+                    <h5 class="fw-bold mb-1">${partner?.nome || 'Usuário'}</h5>
+                    <p class="small mb-2 fw-bold ${online ? 'text-success' : 'text-muted'}">${online ? '● Online agora' : '○ Offline'}</p>
+                    <p class="text-muted small mb-3"><i class="bi bi-calendar3 me-1"></i>Na plataforma desde ${memberSince}</p>
+                    <div class="d-flex justify-content-center align-items-center gap-2">
+                        <i class="bi bi-star-fill text-warning"></i>
+                        <span class="fw-bold">${rating}</span>
+                        <span class="text-muted small">(${ratingCount} avaliações)</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(modalEl).show();
+};
+
+window.muteDirectChat = async function(chatId) {
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        const meta = chat.messages?.[0] || {};
+        meta.muted = !meta.muted;
+        chat.messages[0] = meta;
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        showToast(meta.muted ? 'Conversa silenciada.' : 'Notificações reativadas.', 'info');
+    } catch (e) { showToast('Erro ao alterar notificações.', 'error'); }
+};
+
+window.archiveDirectChat = async function(chatId) {
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        const meta = chat.messages?.[0] || {};
+        meta.archived = !meta.archived;
+        chat.messages[0] = meta;
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        showToast(meta.archived ? 'Conversa arquivada.' : 'Conversa desarquivada.', 'info');
+        window.closeDirectChat();
+        window.renderDirectChats();
+    } catch (e) { showToast('Erro ao arquivar conversa.', 'error'); }
+};
+
+window.blockDirectChatUser = async function(targetId) {
+    if (!confirm('Tem certeza que deseja bloquear este usuário? Ele não poderá enviar mensagens para você.')) return;
+    try {
+        const user = getSavedUser();
+        const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
+        const chat = directChats.find(c =>
+            c.order_id === null &&
+            c.participants && c.participants.includes(user.id) && c.participants.includes(targetId) &&
+            c.messages && c.messages[0]?.type !== 'ticket_meta'
+        );
+        if (chat) {
+            const meta = chat.messages?.[0] || {};
+            meta.blocked_by = user.id;
+            chat.messages[0] = meta;
+            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        }
+        showToast('Usuário bloqueado.', 'info');
+        window.closeDirectChat();
+        window.renderDirectChats();
+    } catch (e) { showToast('Erro ao bloquear usuário.', 'error'); }
+};
+
+window.deleteDirectChat = async function(chatId) {
+    if (!confirm('Tem certeza que deseja apagar esta conversa?\nEssa ação não pode ser desfeita.')) return;
+    try {
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'DELETE' });
+        showToast('Conversa apagada.', 'info');
+        window.closeDirectChat();
+        window.renderDirectChats();
+    } catch (e) {
+        showToast('Erro ao apagar conversa.', 'error');
+    }
+};
+
+function formatChatTime(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) {
+        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays === 1) {
+        return 'Ontem';
+    } else if (diffDays < 7) {
+        return date.toLocaleDateString('pt-BR', { weekday: 'short' });
+    } else {
+        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    }
+}
+
+function truncateText(text, max) {
+    if (!text) return '';
+    return text.length > max ? text.substring(0, max) + '...' : text;
+}
 

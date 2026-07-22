@@ -994,27 +994,32 @@ body.dark-theme .ml-shipping-card {
 /* Botões do painel de anexo: mesmo design dos botões do card do produto
    (curvinha, fonte, peso), só um pouco menores. Só a cor muda. */
 .ml-attach {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.82rem;
-    border-radius: 6px;
-    padding: 9px 10px;
+    gap: 4px;
+    height: 36px;
+    padding: 0 12px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--primary-action);
+    border-radius: 8px;
+    color: var(--primary-action) !important;
     font-weight: 600;
-    border: none;
+    font-size: 0.78rem;
     cursor: pointer;
-    transition: opacity 0.2s;
     text-decoration: none;
     line-height: 1.2;
+    transition: background .15s ease, box-shadow .15s ease, transform .1s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
-.ml-attach:hover { opacity: 0.9; }
-
-.ml-btn-drive   { background: #1fa463; color: #fff; }
-.ml-btn-onedrive{ background: #0364b8; color: #fff; }
-.ml-btn-loc     { background: #ea4335; color: #fff; }
-.ml-btn-media   { background: #3483fa; color: #fff; }
-.ml-btn-pc      { background: #f5b50a; color: #1c1c1c; }
-.ml-btn-imgur   { background: #e91e8c; color: #fff; }
+.ml-attach:hover {
+    background: color-mix(in srgb, var(--primary-action) 10%, transparent);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+.ml-attach:active {
+    transform: scale(0.97);
+}
+.ml-attach i { font-size: 0.9rem; }
 
 .ml-btn-danger {
     background: #dc3545;
@@ -1992,6 +1997,7 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
     align-items: center;
     justify-content: center;
     width: 38px;
+    height: 56px;
     border-radius: 6px;
     background: #3483fa;
     color: #fff;
@@ -1999,6 +2005,7 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
     cursor: pointer;
     font-size: 1rem;
     padding: 0;
+    flex-shrink: 0;
 }
 .profile-link-icon:hover { opacity: 0.9; }
 
@@ -2221,18 +2228,18 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
 .chat-header-pro {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    background: #dbdbdb;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #f0f2f5;
     border-bottom: 1px solid rgba(0,0,0,0.06);
     color: #111b21;
     flex-shrink: 0;
-    min-height: 50px;
+    height: 59px;
 }
 
 .chat-header-avatar-wrap {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     flex-shrink: 0;
     position: relative;
@@ -2246,7 +2253,7 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
     height: 12px;
     border-radius: 50%;
     background: #ccc;
-    border: 2px solid #dbdbdb;
+    border: 2px solid #f0f2f5;
     display: none;
 }
 
@@ -2292,19 +2299,20 @@ body.dark-theme .presence-dot {
 }
 
 .chat-header-name {
-    font-weight: 700;
-    font-size: 1rem;
-    color: #1c1c1c;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 20px;
+    color: #111b21;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .chat-header-order-id {
-    font-size: 0.68rem;
-    color: #00A884;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-size: 13px;
+    color: #667781;
+    font-weight: 400;
+    letter-spacing: 0;
 }
 
 .chat-header-price {
@@ -2331,6 +2339,15 @@ body.dark-theme .presence-dot {
 }
 
 .chat-header-close:hover { background: #e81123; color: #fff; }
+
+/* ---------- Botão voltar/fechar responsivo ----------
+   Desktop: ← (back) aparece, X (close) aparece quando habilitado
+   Mobile:  ← (back) sempre aparece (funciona como "voltar"), X (close) some */
+.chat-header-x { display: flex; }
+.chat-header-back { display: flex; }
+@media (max-width: 768px) {
+    .chat-header-x { display: none !important; }
+}
 
 /* ---------- Resumo do produto ---------- */
 /* ---------- Chat product summary (inline no cabeçalho) ---------- */
@@ -2452,7 +2469,7 @@ body.dark-theme .support-chat-messages {
    de mensagens no meio rola. */
 #supportModalDialog.modal-fullscreen #supportChatView .chat-header-pro,
 #supportModalDialog.modal-fullscreen #supportChatView .chat-status-bar,
-#supportModalDialog.modal-fullscreen #supportChatInputBar {
+#supportModalDialog.modal-fullscreen #supportChatView .chat-input-bar {
     flex-shrink: 0;
 }
 
@@ -2484,18 +2501,27 @@ body.dark-theme .system-chip {
 }
 body.dark-theme .system-chip i { color: #134e49; }
 
-.msg-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 4px; }
+/* ── WhatsApp Web faithful layout ── */
+
+/* Row: avatar and bubble align to TOP (flex-start) so avatar sits at group top */
+.msg-row { display: flex; align-items: flex-start; gap: 2px; margin-bottom: 4px; }
 .msg-row.is-me { justify-content: flex-end; }
 .msg-row.is-them { justify-content: flex-start; }
+.msg-row.msg-grouped { margin-bottom: 2px; gap: 2px; }
+/* Between different senders, more space */
+.msg-row:not(.msg-grouped) + .msg-row:not(.msg-grouped) { margin-top: 6px; }
 
+/* Avatar: sits at the TOP of the row, aligned with the first bubble */
 .msg-avatar {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    margin-bottom: 2px;
+    margin-top: 3px;
 }
+.msg-row.is-them .msg-avatar { margin-right: 0; }
+.msg-row.is-me .msg-avatar { margin-left: 2px; }
 
 .msg-avatar-inline {
     width: 22px;
@@ -2505,69 +2531,96 @@ body.dark-theme .system-chip i { color: #134e49; }
     flex-shrink: 0;
 }
 
-/* Bubble base - WhatsApp style */
+/* Spacer: same width as avatar, keeps grouped messages aligned */
+.msg-avatar-spacer {
+    width: 32px;
+    flex-shrink: 0;
+}
+
+/* ── Bubble base ── */
 .msg-bubble {
-    padding: 6px 9px 6px 9px;
+    padding: 6px 7px 6px 9px;
     min-width: 80px;
     max-width: 72%;
     border-radius: 8px;
-    box-shadow: 0 1px 1px rgba(0,0,0,0.13);
+    box-shadow: 0 1px 0.5px rgba(11,20,26,0.13);
     position: relative;
 }
 
-/* Outgoing (minhas mensagens) - WhatsApp verde claro */
-.msg-bubble.is-me {
-    background: #d9fdd3;
-    color: #111b21;
-    border-radius: 8px 8px 2px 8px;
+/* Outgoing - WhatsApp green */
+.msg-bubble.is-me { background: #d9fdd3; color: #111b21; }
+body.dark-theme .msg-bubble.is-me { background: #005c4b; color: #e9edef; }
+
+/* Incoming - WhatsApp white */
+.msg-bubble.is-them { background: #ffffff; color: #111b21; }
+body.dark-theme .msg-bubble.is-them { background: #202c33; color: #e9edef; }
+
+/* ── Grouped border-radius ──
+   WhatsApp Web rule: the side facing the avatar has 0 radius where
+   the tail connects (first) or where messages join (middle/last).
+   The opposite side is always rounded. Bottom of the group is rounded. */
+
+/* Outgoing (is-me): tail on RIGHT side */
+.msg-bubble.is-me.msg-first,
+.msg-bubble.is-me.msg-single {
+    border-radius: 8px 0 8px 8px;
+}
+.msg-bubble.is-me.msg-middle {
+    border-radius: 8px 0 0 8px;
+}
+.msg-bubble.is-me.msg-last {
+    border-radius: 8px 0 8px 8px;
 }
 
-body.dark-theme .msg-bubble.is-me {
-    background: #005c4b;
-    color: #e9edef;
+/* Incoming (is-them): tail on LEFT side */
+.msg-bubble.is-them.msg-first,
+.msg-bubble.is-them.msg-single {
+    border-radius: 0 8px 8px 8px;
+}
+.msg-bubble.is-them.msg-middle {
+    border-radius: 0 8px 8px 0;
+}
+.msg-bubble.is-them.msg-last {
+    border-radius: 0 8px 8px 8px;
 }
 
-/* Incoming (mensagens do outro) - WhatsApp branco */
-.msg-bubble.is-them {
-    background: #ffffff;
-    color: #111b21;
-    border-radius: 8px 8px 8px 2px;
-}
+/* ── Message tail (rabicho) ──
+   Only on msg-first / msg-single.
+   Shape: sideways triangle pointing TOWARD the avatar (not upward).
+   For outgoing → points RIGHT.  For incoming → points LEFT. */
 
-body.dark-theme .msg-bubble.is-them {
-    background: #202c33;
-    color: #e9edef;
-}
-
-/* Message tail (triângulo) - only on first message in a group */
-.msg-row:not([style*="margin-top:-4px"]) .msg-bubble.is-me::before {
+/* Outgoing tail: right side, pointing RIGHT toward avatar */
+.msg-bubble.is-me.msg-first::before,
+.msg-bubble.is-me.msg-single::before {
     content: "";
     position: absolute;
     top: 0;
     right: -8px;
-    width: 0;
-    height: 0;
-    border: 8px solid;
-    border-color: #d9fdd3 transparent transparent transparent;
+    width: 8px;
+    height: 12px;
+    background: #d9fdd3;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+body.dark-theme .msg-bubble.is-me.msg-first::before,
+body.dark-theme .msg-bubble.is-me.msg-single::before {
+    background: #005c4b;
 }
 
-body.dark-theme .msg-row:not([style*="margin-top:-4px"]) .msg-bubble.is-me::before {
-    border-color: #005c4b transparent transparent transparent;
-}
-
-.msg-row:not([style*="margin-top:-4px"]) .msg-bubble.is-them::before {
+/* Incoming tail: left side, pointing LEFT toward avatar */
+.msg-bubble.is-them.msg-first::before,
+.msg-bubble.is-them.msg-single::before {
     content: "";
     position: absolute;
     top: 0;
     left: -8px;
-    width: 0;
-    height: 0;
-    border: 8px solid;
-    border-color: #ffffff transparent transparent transparent;
+    width: 8px;
+    height: 12px;
+    background: #ffffff;
+    clip-path: polygon(100% 0, 0 50%, 100% 100%);
 }
-
-body.dark-theme .msg-row:not([style*="margin-top:-4px"]) .msg-bubble.is-them::before {
-    border-color: #202c33 transparent transparent transparent;
+body.dark-theme .msg-bubble.is-them.msg-first::before,
+body.dark-theme .msg-bubble.is-them.msg-single::before {
+    background: #202c33;
 }
 
 .msg-sender {
@@ -2617,11 +2670,13 @@ body.dark-theme .msg-bubble.is-staff {
 }
 
 /* Tail for staff messages */
-.msg-row:not([style*="margin-top:-4px"]) .msg-bubble.is-staff.is-them::before {
-    border-color: #ffe9b3 transparent transparent transparent !important;
+.msg-bubble.is-staff.is-them.msg-first::before,
+.msg-bubble.is-staff.is-them.msg-single::before {
+    background: #ffe9b3 !important;
 }
-body.dark-theme .msg-row:not([style*="margin-top:-4px"]) .msg-bubble.is-staff.is-them::before {
-    border-color: #3d2e00 transparent transparent transparent !important;
+body.dark-theme .msg-bubble.is-staff.is-them.msg-first::before,
+body.dark-theme .msg-bubble.is-staff.is-them.msg-single::before {
+    background: #3d2e00 !important;
 }
 
 .msg-bubble.msg-deleted {
@@ -3777,6 +3832,17 @@ footer.main-footer-dock {
     font-size: 0.85rem;
 }
 
+.footer-legal-links {
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+@media (max-width: 767.98px) {
+    .footer-legal-links { font-size: 0.6rem; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .footer-legal-links .footer-copyright { font-size: inherit; }
+    .footer-bottom-row > .footer-tools { order: 1; }
+    .footer-bottom-row > .footer-legal-links { order: 2; }
+}
+
 .footer-link {
     color: #ffffff !important;
     opacity: 0.8;
@@ -4391,6 +4457,58 @@ body.dark-theme .yeti-svgContainer { border-color: #4eb8dd; }
     font-size: 0.95rem;
 }
 
+.ml-field textarea {
+    width: 100%;
+    padding: 18px 14px 8px;
+    border: 1px solid #999;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text-main);
+    outline: none;
+    min-height: 110px;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-family: inherit;
+}
+.ml-field textarea:focus {
+    border-color: #3483fa;
+    box-shadow: 0 0 0 1px #3483fa;
+}
+.ml-field textarea:focus + label,
+.ml-field textarea:not(:placeholder-shown) + label {
+    top: 5px;
+    font-size: 0.7rem;
+    color: #3483fa;
+}
+.ml-field select {
+    width: 100%;
+    padding: 18px 36px 8px 14px;
+    border: 1px solid #999;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text-main);
+    outline: none;
+    height: 56px;
+    box-sizing: border-box;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path fill='%23999' d='M4 6l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+.ml-field select:focus {
+    border-color: #3483fa;
+    box-shadow: 0 0 0 1px #3483fa;
+}
+.ml-field select + label {
+    top: 5px;
+    font-size: 0.7rem;
+    color: #3483fa;
+}
+
 .ml-select-label {
     display: block;
     font-size: 0.75rem;
@@ -4445,6 +4563,20 @@ body.dark-theme .yeti-svgContainer { border-color: #4eb8dd; }
     transition: background .15s ease;
 }
 .ml-btn-outline:hover { background: rgba(52,131,250,0.08); }
+
+/* Texto de aceite de termos estilo Buscapé */
+.ml-terms-buscape-text {
+    font-size: 0.78rem;
+    color: #555;
+    line-height: 1.5;
+    text-align: center;
+    margin: 14px 0 4px;
+}
+.ml-terms-buscape-text a {
+    color: var(--market-color, #3483fa);
+    text-decoration: underline;
+    font-weight: 600;
+}
 
 .ml-auth-divider {
     display: flex;
@@ -4609,20 +4741,6 @@ body.dark-theme .chat-location-chip {
 /* ============================================ */
 /* PAINEL DE ANEXO DO CHAT (imagem / arquivo)    */
 /* ============================================ */
-.chat-attach-tab {
-    background: var(--card-bg);
-    border: 1.5px solid var(--border-light);
-    color: var(--text-muted);
-    font-weight: 600;
-    font-size: 0.82rem;
-    border-radius: 8px;
-    transition: all .15s ease;
-}
-.chat-attach-tab.active {
-    background: var(--primary-blue);
-    border-color: var(--primary-blue);
-    color: #fff;
-}
 
 /* ============================================ */
 /* BOTÕES ESTILO MERCADO LIVRE                  */
@@ -6391,12 +6509,13 @@ body.dark-theme .ml-store-btn-follow:hover {
     border-radius: 12px;
     box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
     border: 1px solid var(--tblr-border);
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(8px);
+    transform: translateY(8px) scale(0.97);
+    transform-origin: top right;
     transition: opacity .2s ease, transform .2s ease, visibility .2s ease;
     z-index: 1050;
 }
@@ -6418,31 +6537,46 @@ body.dark-theme .ml-store-btn-follow:hover {
     color: #fff !important;
 }
 
+/* Rabicho (triângulo) apontando para o sino — Mercado Livre style */
 .notif-dropdown::before {
     content: '';
     position: absolute;
-    top: -6px;
-    right: 22px;
-    width: 12px;
-    height: 12px;
+    top: -8px;
+    right: var(--notif-arrow-right, 22px);
+    width: 16px;
+    height: 16px;
     background: var(--card-bg);
-    border-left: 1px solid var(--tblr-border);
-    border-top: 1px solid var(--tblr-border);
-    transform: rotate(45deg);
-    border-radius: 2px;
-    z-index: -1;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    z-index: 1;
+}
+
+/* Sombra do rabicho — usa um ::after com clip-path maior e sombra,
+   posicionado atrás do ::before para parecer uma única peça */
+.notif-dropdown::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    right: calc(var(--notif-arrow-right, 22px) - 2px);
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    filter: drop-shadow(0 -2px 4px rgba(0,0,0,0.08)) drop-shadow(0 -1px 2px rgba(0,0,0,0.04));
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    z-index: 0;
+    pointer-events: none;
 }
 
 body.dark-theme .notif-dropdown::before {
     background: #1e1e1e;
-    border-left-color: #333;
-    border-top-color: #333;
+}
+body.dark-theme .notif-dropdown::after {
+    filter: drop-shadow(0 -2px 4px rgba(0,0,0,0.3)) drop-shadow(0 -1px 2px rgba(0,0,0,0.2));
 }
 
 .notif-dropdown.notif-open {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
 }
 
 .notif-dropdown-header {
@@ -6706,7 +6840,8 @@ body.dark-theme .notif-item {
         border: none;
         box-shadow: none;
     }
-    .notif-dropdown::before {
+    .notif-dropdown::before,
+    .notif-dropdown::after {
         display: none;
     }
     .notif-dropdown.notif-open {
@@ -6892,6 +7027,7 @@ body.dark-theme .create-ad-section-title {
 
 .create-ad-input {
     width: 100%;
+    height: 56px;
     padding: 10px 13px;
     font-size: 0.88rem;
     border: 1.5px solid var(--tblr-border);
@@ -6914,8 +7050,14 @@ body.dark-theme .create-ad-section-title {
 }
 
 .create-ad-textarea {
+    height: auto;
     min-height: 100px;
     resize: vertical;
+}
+
+select.create-ad-input[size] {
+    height: auto;
+    padding: 6px 10px;
 }
 
 select.create-ad-input {
@@ -6923,25 +7065,8 @@ select.create-ad-input {
     appearance: auto;
 }
 
-/* Linha de Preço/Quantidade com melhor alinhamento */
-.create-ad-price-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 14px;
-    align-items: end;
-}
-
-.create-ad-price-row .mb-3 {
-    margin-bottom: 0 !important;
-}
-
 /* Busca de categoria */
-.ca-cat-search-wrap {
-    position: relative;
-    margin-bottom: 10px;
-}
-
-.ca-cat-search-wrap .create-ad-input {
+#caCatSearch {
     padding-right: 36px;
 }
 
@@ -6955,28 +7080,63 @@ select.create-ad-input {
     pointer-events: none;
 }
 
-.ca-cat-list-wrap select.create-ad-input {
-    min-height: 140px;
-    padding: 8px;
-    line-height: 1.6;
+.ca-cat-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #999;
+    border-radius: 6px;
+    background: var(--input-bg);
+    margin-top: 4px;
 }
-
-.ca-cat-list-wrap select.create-ad-input option {
-    padding: 6px 10px;
-    border-radius: 4px;
+.ca-cat-list-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    transition: background 0.15s;
 }
-
-.ca-cat-list-wrap select.create-ad-input option:checked {
+.ca-cat-list-item:hover {
     background: var(--market-color);
     color: #fff;
+}
+.ca-cat-list-item-selected {
+    background: var(--market-color);
+    color: #fff;
+    font-weight: 600;
+}
+
+.create-ad-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 16px;
+    border: 1px solid #999;
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-main);
+    margin-top: 4px;
 }
 
 .ca-suggest-cat-wrap {
     margin-top: 8px;
 }
 
-.ca-suggest-cat-wrap .input-group {
-    max-width: 420px;
+.ca-suggest-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: stretch;
+}
+.ca-suggest-row .ml-field {
+    margin-bottom: 0;
+}
+
+.ca-suggest-row .ml-btn {
+    white-space: nowrap;
+    padding: 0 16px;
+    font-size: 0.85rem;
+    height: 56px;
 }
 
 /* Fotos - melhor alinhamento */
@@ -7087,8 +7247,5 @@ body.dark-theme .create-ad-input:focus {
     }
     .create-ad-footer {
         padding: 8px 0 0;
-    }
-    .ca-cat-list-wrap select.create-ad-input {
-        min-height: 120px;
     }
 }

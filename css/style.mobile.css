@@ -281,13 +281,15 @@
     .chat-header-pro {
         gap: 8px;
         padding: 10px 12px;
+        height: 59px;
     }
     .chat-header-avatar-wrap {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
     }
     .chat-header-name {
-        font-size: 0.92rem;
+        font-size: 16px;
+        font-weight: 500;
     }
     /* A sub-linha (ex: "Comprador ? Vendedor � #ABC123 � N mensagens") corta
        com ellipsis em vez de estourar o cabe�alho em telas de 360px. */
