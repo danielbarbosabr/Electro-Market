@@ -1088,10 +1088,10 @@ window.adminViewChat = async function(orderId) {
                             onClose: closed ? '' : `window.adminCloseChat('${orderId}')`,
                             onDelete: `window.adminDeleteChat('${orderId}')`,
                             onToggleParticipants: `window.adminToggleParticipants()`,
-                            showBackBtn: true,
-                            showCloseBtn: false,
+            showBackBtn: true,
+            showCloseBtn: true,
                             showAttach: false,
-                            showDeleteBtn: order?.status === 'finished'
+                            showDeleteBtn: true
                         })}
                     </section>
                 </div>
@@ -1642,7 +1642,7 @@ window.renderAdminSupportTab = function(chats, tickets, orders, users) {
                     </div>
                     <div class="wa-contact-badge text-end" style="flex-shrink:0;">
                         <small class="text-muted" style="font-size:0.65rem;">${timeStr}</small>
-                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${c.closed ? 'bi-lock-fill' : (c.type === 'ticket' ? 'bi-headset' : 'bi-bag-fill')} me-1"></i>${c.closed ? 'Enc.' : (c.type === 'ticket' ? 'Solicitação Aberta' : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'))}</span></div>
+                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${c.closed ? 'bi-lock-fill' : (c.type === 'ticket' ? 'bi-headset' : 'bi-bag-fill')} me-1"></i>${c.closed ? 'Enc.' : (c.type === 'ticket' ? getTicketLabel(c.ticket).slice(0,24) : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'))}</span></div>
                     </div>
                 </div>`;
         };
@@ -1840,8 +1840,8 @@ window.adminSupportSelect = async function(id, type) {
                 showBackBtn: true,
                 showCloseBtn: false,
                 showAttach: ticket.status !== 'closed',
-                showDeleteBtn: ticket.status === 'closed',
-                statusInfo: { text: ticket.status === 'closed' ? '<i class="bi bi-lock-fill me-1"></i>Solicitação Encerrada' : '<i class="bi bi-headset me-1"></i>Solicitação Aberta', class: ticket.status === 'closed' ? 'secondary' : 'info' },
+                showDeleteBtn: true,
+                statusInfo: { text: ticket.status === 'closed' ? '<i class="bi bi-lock-fill me-1"></i>Encerrado' : `<i class="bi bi-headset me-1"></i>${getTicketLabel(ticket).slice(0,30)}`, class: ticket.status === 'closed' ? 'secondary' : 'info' },
                 statusText: '',
                 extraHeaderHtml: ''
             });
@@ -2777,7 +2777,7 @@ function getTicketLabel(t) {
 function normalizeTicket(raw) {
     if (!raw) return null;
     const msgs = raw.messages || [];
-    const meta = msgs.find(m => m.type === 'ticket_meta') || {};
+    const meta = msgs.find(m => m && m.type === 'ticket_meta') || {};
     // Tenta achar o avatar do requerente: primeiro no próprio metadata do
     // chamado, depois no cache de usuários do admin (buscando pelo buyer_id).
     const cachedUser = (window._adminUsersCache || []).find(u => u.id === raw.buyer_id);
@@ -2793,7 +2793,7 @@ function normalizeTicket(raw) {
         requester_role:  meta.requester_role,
         requester_avatar: normalizeImageUrl(requesterAvatar),
         order_id:        meta.related_order_id || null,
-        messages:        msgs.filter(m => m.type !== 'ticket_meta')
+        messages:        msgs.filter(m => m && m.type !== 'ticket_meta')
     };
 }
 
@@ -2801,7 +2801,11 @@ function normalizeTicket(raw) {
 async function fetchSupportTicketsSafe() {
     try {
         const rows = await supabaseFetch('chats?order_id=is.null&select=*&order=id.desc');
-        return rows.map(normalizeTicket);
+        return rows.filter(r => {
+            const msgs = r.messages;
+            if (typeof msgs === 'string') { try { return JSON.parse(msgs).some(m => m && m.type === 'ticket_meta'); } catch(e) { return false; } }
+            return Array.isArray(msgs) && msgs.some(m => m && m.type === 'ticket_meta');
+        }).map(normalizeTicket);
     } catch (e) {
         console.warn('Erro ao buscar chamados de suporte:', e);
         return [];
@@ -2893,16 +2897,6 @@ window.openSupportRequestModal = async function(presetCategory, presetOrderId) {
     if (!modalEl) return;
     const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
 
-    if (!presetCategory) {
-        modalInstance.show();
-        window.showSupportChatLoading();
-        const existing = await findMyOpenSupportTicket();
-        if (existing) {
-            window.enterSupportChatMode(existing.id);
-            return;
-        }
-    }
-
     window.showSupportRequestForm();
 
     const emailInput = document.getElementById('supportReqEmail');
@@ -2946,7 +2940,7 @@ window.submitSupportRequest = async function(event) {
         document.getElementById('supportRequestForm')?.reset();
         window._supportReqOrderId = null;
         showToast('Chamado aberto! Continue a conversa por aqui.', 'success');
-        window.enterSupportChatMode(ticketId);
+        window.enterSupportChatMode(ticketId, subject);
     } else {
         showToast('Erro ao abrir chamado. Tente novamente em instantes.', 'error');
     }
@@ -3022,7 +3016,7 @@ window.showSupportChatLoading = function() {
 };
 
 /** Entra na etapa 2 (conversa) do modal de suporte, pro chamado indicado */
-window.enterSupportChatMode = function(ticketId) {
+window.enterSupportChatMode = function(ticketId, subjectLabel) {
     window._activeSupportTicketId = ticketId;
     window.currentChat = ticketId;
     supportChatLastSignature = null;
@@ -3064,7 +3058,7 @@ window.enterSupportChatMode = function(ticketId) {
             showCloseBtn: false,
             showAttach: true,
             showProductSummary: false,
-            statusInfo: { text: '<i class="bi bi-headset me-1"></i>Solicitação Aberta', class: 'info' }
+            statusInfo: { text: `<i class="bi bi-headset me-1"></i>${subjectLabel || 'Solicitação Aberta'}`, class: 'info' }
         });
         chatView.classList.remove('d-none');
     }
@@ -3227,9 +3221,11 @@ async function loadMySupportTicket(ticketId, silent = false) {
 
         const statusBar = window._chatActiveElements?.statusBar;
         if (statusBar) {
+            const meta = (raw.messages || []).find(m => m?.type === 'ticket_meta');
+            const label = meta?.subject || SUPPORT_CATEGORY_LABELS[meta?.category] || 'Solicitação Aberta';
             statusBar.innerHTML = ticket.status === 'closed'
                 ? '<div class="alert alert-secondary mb-0 py-2 text-center small"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</div>'
-                : '<div class="alert alert-info mb-0 py-2 text-center small"><i class="bi bi-headset me-1"></i>Solicitação Aberta</div>';
+                : `<div class="alert alert-info mb-0 py-2 text-center small"><i class="bi bi-headset me-1"></i>${label}</div>`;
         }
 
         const inputBar = window._chatActiveElements?.input?.closest('.chat-input-bar');
@@ -3577,8 +3573,8 @@ window.adminViewTicket = async function(ticketId) {
                                 showBackBtn: true,
                                 showCloseBtn: false,
                                 showAttach: ticket.status !== 'closed',
-                                showDeleteBtn: false,
-                                statusInfo: { text: ticket.status === 'closed' ? '<i class="bi bi-lock-fill me-1"></i>Chamado Encerrado' : '<i class="bi bi-headset me-1"></i>Chamado Aberto', class: ticket.status === 'closed' ? 'secondary' : 'info' },
+                                showDeleteBtn: true,
+                                statusInfo: { text: ticket.status === 'closed' ? '<i class="bi bi-lock-fill me-1"></i>Encerrado' : `<i class="bi bi-headset me-1"></i>${getTicketLabel(ticket).slice(0,30)}`, class: ticket.status === 'closed' ? 'secondary' : 'info' },
                                 statusText: '',
                                 extraHeaderHtml: ''
                             })}
