@@ -5277,30 +5277,34 @@ window.loadProductReviews = async function(productId) {
     try {
         let avaliacoes = [];
 
-        // Tenta ler da tabela avaliacoes primeiro (persistente)
-        try {
-            const rows = await supabaseFetch(`avaliacoes?product_id=eq.${productId}&select=*`);
-            if (rows && rows.length > 0) {
-                avaliacoes = rows.map(r => ({
-                    rating:          r.rating || 0,
-                    comment:         r.comment || '',
-                    images:          (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) || [],
-                    videos:          (typeof r.videos === 'string' ? JSON.parse(r.videos) : r.videos) || [],
-                    avaliador_nome:  r.avaliador_nome || 'Anônimo',
-                    avaliador_avatar: r.avaliador_avatar || '',
-                    avaliador_id:    r.avaliador_id || '',
-                    created_at:      r.created_at
-                }));
+        // 1) Pega os pedidos deste produto
+        const orders = await supabaseFetch(`orders?product_id=eq.${productId}&select=id`);
+        const orderIds = orders && orders.length > 0 ? orders.map(o => o.id) : [];
+
+        // 2) Tenta ler da tabela avaliacoes primeiro (persistente)
+        if (orderIds.length > 0) {
+            try {
+                const rows = await supabaseFetch(`avaliacoes?order_id=in.(${orderIds.join(',')})&select=*`);
+                if (rows && rows.length > 0) {
+                    avaliacoes = rows.map(r => ({
+                        rating:          r.rating || 0,
+                        comment:         r.comment || '',
+                        images:          (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) || [],
+                        videos:          (typeof r.videos === 'string' ? JSON.parse(r.videos) : r.videos) || [],
+                        avaliador_nome:  r.avaliador_nome || 'Anônimo',
+                        avaliador_avatar: r.avaliador_avatar || '',
+                        avaliador_id:    r.avaliador_id || '',
+                        created_at:      r.created_at
+                    }));
+                }
+            } catch (e) {
+                // Tabela não disponível — fallback para chat
             }
-        } catch (e) {
-            // Tabela não existe ou erro na query — fallback para chat
         }
 
-        // Fallback: ler dos chats.messages
-        if (avaliacoes.length === 0) {
-            const orders = await supabaseFetch(`orders?product_id=eq.${productId}&status=eq.finished&select=id`);
-            if (orders && orders.length > 0) {
-                const orderIds = orders.map(o => o.id);
+        // 3) Fallback: ler dos chats.messages (pra avaliações antigas que não foram pra tabela)
+        if (avaliacoes.length === 0 && orderIds.length > 0) {
+            try {
                 const chats = await supabaseFetch(`chats?order_id=in.(${orderIds.join(',')})&select=messages`);
                 (chats || []).forEach(chat => {
                     (chat.messages || []).forEach(m => {
@@ -5316,7 +5320,7 @@ window.loadProductReviews = async function(productId) {
                         }
                     });
                 });
-            }
+            } catch (e) {}
         }
 
         if (avaliacoes.length === 0) {

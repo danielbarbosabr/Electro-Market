@@ -310,7 +310,6 @@ window.removeOrderFromHistory = async function(orderId, type) {
     try {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
-        
         showToast('Pedido removido do histórico!', 'info');
         window.renderOrderManagement(type);
     } catch (err) { 
@@ -617,21 +616,8 @@ window.submitReview = async function() {
         const cachedOrder = ordersCache.find(o => o.id === orderId);
         if (cachedOrder) cachedOrder[reviewedField] = true;
 
-        // Tenta obter o product_id do pedido (cache ou banco)
-        let reviewedProductId = null;
-        try {
-            if (cachedOrder?.product_id) {
-                reviewedProductId = cachedOrder.product_id;
-            } else {
-                const orderRow = await supabaseFetch(`orders?id=eq.${orderId}&select=product_id&limit=1`);
-                if (orderRow?.[0]?.product_id) reviewedProductId = orderRow[0].product_id;
-            }
-        } catch (e) {}
-
-        // Avatar do avaliador
+        // Envia a avaliação como mensagem no chat
         const reviewerAvatar = (() => { try { const links = safeParseImages(user.avatar); return links[0] || ''; } catch { return ''; } })();
-
-        // Envia a avaliação como mensagem no chat (old system)
         try {
             const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
             const chat = chatData?.[0];
@@ -669,26 +655,23 @@ window.submitReview = async function() {
             console.error('Erro ao enviar avaliação pro chat:', e);
         }
 
-        // Persiste a avaliação na tabela avaliacoes (independente do chat)
+        // Salva na tabela avaliacoes (persistente, sobrevive à exclusão do chat)
         try {
             await supabaseFetch('avaliacoes', {
                 method: 'POST',
                 body: JSON.stringify({
-                    order_id:         orderId,
-                    product_id:       reviewedProductId || null,
-                    tipo:             mode,
-                    avaliador_id:     user.id,
-                    avaliador_nome:   user.nome || 'Usuário',
-                    avaliador_avatar: reviewerAvatar,
-                    avaliado_id:      targetId,
-                    rating:           currentReviewRating,
-                    comment:          comment || '',
-                    images:           reviewImages.length > 0 ? JSON.stringify(reviewImages) : '[]',
-                    videos:           '[]'
+                    order_id:       orderId,
+                    tipo:           mode,
+                    avaliador_nome: user.nome || 'Usuário',
+                    avaliado_id:    targetId,
+                    rating:         currentReviewRating,
+                    comment:        comment || '',
+                    images:         reviewImages.length > 0 ? JSON.stringify(reviewImages) : '[]',
+                    videos:         '[]'
                 })
             });
         } catch (e) {
-            console.warn('Erro ao persistir avaliação na tabela:', e);
+            console.warn('Erro ao salvar avaliação na tabela:', e);
         }
 
         bootstrap.Modal.getInstance(document.getElementById('reviewModal'))?.hide();

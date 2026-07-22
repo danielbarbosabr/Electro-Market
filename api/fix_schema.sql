@@ -58,22 +58,24 @@ create table if not exists public.notifications (
 
 -- ---------- AVALIACOES ----------
 create table if not exists public.avaliacoes (
-  id             uuid primary key default gen_random_uuid(),
-  order_id       uuid,
-  product_id     text,
-  tipo           text,
-  avaliador_id   uuid,
-  avaliador_nome text,
-  avaliado_id    uuid,
-  rating         numeric,
-  comment        text,
-  created_at     timestamptz default now()
+  id               uuid primary key default gen_random_uuid(),
+  order_id         text,
+  product_id       text,
+  tipo             text,
+  avaliador_nome   text,
+  avaliado_id      text,
+  rating           numeric,
+  comment          text,
+  created_at       timestamptz default now()
 );
-alter table public.avaliacoes add column if not exists avaliado_id uuid;
+alter table public.avaliacoes add column if not exists avaliado_id text;
 alter table public.avaliacoes add column if not exists images jsonb default '[]'::jsonb;
 alter table public.avaliacoes add column if not exists videos jsonb default '[]'::jsonb;
 alter table public.avaliacoes add column if not exists product_id text;
 alter table public.avaliacoes add column if not exists avaliador_avatar text default '';
+-- Corrige tipos que são TEXT no app mas foram criados como UUID
+alter table public.avaliacoes alter column order_id type text using order_id::text;
+alter table public.avaliacoes alter column avaliado_id type text using avaliado_id::text;
 
 -- ---------- ÍNDICES ----------
 create index if not exists idx_users_email        on public.users (email);
