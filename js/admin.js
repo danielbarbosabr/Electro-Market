@@ -1792,6 +1792,16 @@ window.adminSupportSelect = async function(id, type) {
             };
             const myAvatar = normalizeImageUrl(safeParseImages(adminUser?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminUser?.nome || 'Suporte')}&background=ffc107&color=1c1c1c&size=40`;
             const requesterAvatar = safeParseImages(ticket.requester_avatar)[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
+            let deleteOtherCallback = '';
+            if (ticket.order_id) {
+                const orderResult = await supabaseFetch(`orders?id=eq.${ticket.order_id}&select=seller_id,buyer_id&limit=1`);
+                const orderData = orderResult?.[0];
+                const otherId = orderData?.seller_id && orderData.seller_id !== ticket.requester_id ? orderData.seller_id
+                    : (orderData?.buyer_id && orderData.buyer_id !== ticket.requester_id ? orderData.buyer_id : null);
+                if (otherId) {
+                    deleteOtherCallback = `window.adminDeleteUserAccount('${otherId}', 'Participante')`;
+                }
+            }
             window.__setupReactionHooks(ticket,
                 c => supabaseFetch(`chats?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }),
                 () => window.adminSupportSelect(id, type)
@@ -1823,6 +1833,10 @@ window.adminSupportSelect = async function(id, type) {
                 onConfirmAttach: `window.confirmAdminSupportAttach('${id}')`,
                 onSendLocation: `window.sendAdminSupportLocation('${id}')`,
                 onSendFile: 'window.sendAdminSupportFile',
+                onCloseTicket: ticket.status !== 'closed' ? `window.adminSupportCloseTicket('${id}')` : '',
+                onChangeStatus: `window.adminChangeTicketStatus('${id}')`,
+                onDeleteRequester: `window.adminDeleteUserAccount('${ticket.requester_id}', '${(ticket.requester_name || 'Solicitante').replace(/'/g, "\\'")}')`,
+                onDeleteOtherAccount: deleteOtherCallback,
                 showBackBtn: true,
                 showCloseBtn: false,
                 showAttach: ticket.status !== 'closed',
@@ -1905,11 +1919,11 @@ function supportAttachPanelHtml(prefix) {
                 </button>
             </div>
             <div class="d-flex gap-2">
-                <label class="ml-attach ml-btn-pc flex-grow-1" style="cursor:pointer;">
-                    <i class="bi bi-cloud-upload me-1"></i>Escolher do PC
+                <label class="ml-attach flex-grow-1" style="cursor:pointer;">
+                    <i class="bi bi-cloud-upload me-1"></i>Escolher arquivos
                     <input type="file" accept="image/*,video/*" class="d-none" onchange="window.sendAdminSupportImageFile(this)">
                 </label>
-                <button type="button" class="ml-attach ml-btn-imgur flex-grow-1" onclick="window.abrirUploadExterno()">
+                <button type="button" class="ml-attach flex-grow-1" onclick="window.abrirUploadExterno()">
                     <i class="bi bi-box-arrow-up-right me-1"></i>Imgur
                 </button>
             </div>
@@ -2193,6 +2207,104 @@ window.adminSupportDelete = async function(id, type) {
         window.adminSupportBack();
         adminRefreshCurrentView();
     } catch(e) { showToast('Erro ao remover.', 'error'); }
+};
+
+window.adminChangeTicketStatus = async function(ticketId) {
+    const statuses = [
+        { id: 'open', label: 'Aberto', icon: 'bi-unlock' },
+        { id: 'in_progress', label: 'Em Andamento', icon: 'bi-hourglass-split' },
+        { id: 'awaiting_response', label: 'Aguardando Resposta', icon: 'bi-clock' },
+        { id: 'resolved', label: 'Resolvido', icon: 'bi-check-circle' },
+        { id: 'closed', label: 'Encerrado', icon: 'bi-lock-fill' }
+    ];
+    let modalEl = document.getElementById('statusPickerModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'statusPickerModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        document.body.appendChild(modalEl);
+    }
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-header border-0 pb-0 position-relative">
+                    <h5 class="modal-title fw-bold" style="font-size:1rem;">Alterar status do chamado</h5>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="modal-body pt-2">
+                    ${statuses.map(s => `
+                        <button class="ml-attach w-100 mb-2" style="justify-content:flex-start;" onclick="window.adminSetTicketStatus('${ticketId}','${s.id}')" data-bs-dismiss="modal">
+                            <i class="${s.icon} me-2"></i>${s.label}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(modalEl).show();
+};
+
+window.adminSetTicketStatus = async function(ticketId, newStatus) {
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const chat = result?.[0];
+        if (!chat) return;
+        const closed = newStatus === 'closed' || newStatus === 'resolved';
+        const messages = chat.messages || [];
+        if (messages[0] && messages[0].type === 'ticket_meta') {
+            messages[0].closed = closed;
+            messages[0].status = newStatus;
+        }
+        const user = getSavedUser();
+        messages.push({
+            senderId: 'system', type: 'system',
+            text: `Status alterado para "${newStatus}" por ${user?.nome || 'Suporte'}.`,
+            timestamp: new Date().toISOString()
+        });
+        await supabaseFetch(`chats?id=eq.${ticketId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ messages, closed })
+        });
+        showToast(`Status alterado para "${newStatus}"`, 'success');
+        window.adminSupportSelect(ticketId, 'ticket');
+        if (window._adminSupportBuildList) window._adminSupportBuildList();
+    } catch (e) { showToast('Erro ao alterar status.', 'error'); }
+};
+
+window.adminDeleteTicketAccounts = async function(ticketId) {
+    if (!confirm('Tem certeza que deseja DELETAR AS CONTAS dos envolvidos? Esta ação não pode ser desfeita.')) return;
+    try {
+        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+        const chat = result?.[0];
+        if (!chat) return;
+        const meta = (chat.messages || []).find(m => m.type === 'ticket_meta') || {};
+        const userIds = [chat.buyer_id];
+        if (meta.related_order_id) {
+            const orderData = await supabaseFetch(`orders?id=eq.${meta.related_order_id}&limit=1`);
+            const order = orderData?.[0];
+            if (order) {
+                if (order.buyer_id && !userIds.includes(order.buyer_id)) userIds.push(order.buyer_id);
+                if (order.seller_id && !userIds.includes(order.seller_id)) userIds.push(order.seller_id);
+            }
+        }
+        for (const uid of userIds) {
+            if (uid) await supabaseFetch(`users?id=eq.${uid}`, { method: 'DELETE' });
+        }
+        showToast(`${userIds.length} conta(s) deletada(s).`, 'warning');
+        window.adminSupportBack();
+        adminRefreshCurrentView();
+    } catch (e) { showToast('Erro ao deletar contas.', 'error'); }
+};
+
+window.adminDeleteUserAccount = async function(userId, label) {
+    if (!userId) { showToast('Usuário não identificado.', 'error'); return; }
+    if (!confirm(`Tem certeza que deseja DELETAR a conta de "${label}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+        await supabaseFetch(`users?id=eq.${userId}`, { method: 'DELETE' });
+        showToast(`Conta de "${label}" deletada.`, 'warning');
+        window.adminSupportBack();
+        adminRefreshCurrentView();
+    } catch (e) { showToast('Erro ao deletar conta.', 'error'); }
 };
 
 window.toggleAdminSupportAttachPanel = function() {
@@ -2810,7 +2922,8 @@ window.submitSupportRequest = async function(event) {
     const category = document.getElementById('supportReqCategory')?.value || 'outro';
     const email    = document.getElementById('supportReqEmail')?.value.trim();
     const subject  = SUPPORT_CATEGORY_LABELS[category] || 'Solicitação de suporte';
-    const message  = subject;
+    const desc     = document.getElementById('supportReqDescription')?.value.trim();
+    const message  = desc || subject;
     const user     = getSavedUser();
 
     if (!user && !email) { showToast('Informe seu e-mail para podermos retornar.', 'warning'); return false; }
@@ -2887,7 +3000,15 @@ window.showSupportRequestForm = function() {
     document.body.classList.remove('support-chat-fullscreen');
     document.querySelector('#supportRequestModal .modal-header')?.classList.remove('d-none');
     const title = document.getElementById('supportModalTitle');
-    if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Falar com o Suporte';
+    if (title) title.innerHTML = 'Falar com o Suporte';
+    window.toggleSupportDescriptionField();
+};
+
+window.toggleSupportDescriptionField = function() {
+    const cat = document.getElementById('supportReqCategory')?.value;
+    const wrap = document.getElementById('supportReqDescWrap');
+    if (!wrap) return;
+    wrap.style.display = (!cat || cat === 'outro') ? '' : 'none';
 };
 
 /** Mostra um estado de carregamento rápido enquanto checa se já existe um chamado em aberto */
@@ -3401,6 +3522,16 @@ window.adminViewTicket = async function(ticketId) {
         const adminUser = getSavedUser();
         const myAvatar = normalizeImageUrl(safeParseImages(adminUser?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminUser?.nome || 'Suporte')}&background=ffc107&color=1c1c1c&size=40`;
         const requesterAvatar = safeParseImages(ticket.requester_avatar)[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
+        let deleteOtherAccount = '';
+        if (ticket.order_id) {
+            const orderResult = await supabaseFetch(`orders?id=eq.${ticket.order_id}&select=seller_id,buyer_id&limit=1`);
+            const orderData = orderResult?.[0];
+            const otherId = orderData?.seller_id && orderData.seller_id !== ticket.requester_id ? orderData.seller_id
+                : (orderData?.buyer_id && orderData.buyer_id !== ticket.requester_id ? orderData.buyer_id : null);
+            if (otherId) {
+                deleteOtherAccount = `window.adminDeleteUserAccount('${otherId}', 'Participante')`;
+            }
+        }
         window.__setupReactionHooks(ticket, c => supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }), () => window.adminViewTicket(ticketId));
         const msgsHtml = (ticket.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, myAvatar, requesterAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
@@ -3434,6 +3565,10 @@ window.adminViewTicket = async function(ticketId) {
                                 onBack: 'window.adminViewTicketBack()',
                                 onClose: ticket.status !== 'closed' ? `window.adminCloseTicket('${ticketId}')` : '',
                                 onDelete: `window.adminDeleteTicket('${ticketId}')`,
+                                onCloseTicket: ticket.status !== 'closed' ? `window.adminCloseTicket('${ticketId}')` : '',
+                                onChangeStatus: `window.adminChangeTicketStatus('${ticketId}')`,
+                                onDeleteRequester: `window.adminDeleteUserAccount('${ticket.requester_id}', '${(ticket.requester_name || 'Solicitante').replace(/'/g, "\\'")}')`,
+                                onDeleteOtherAccount: deleteOtherAccount,
                                 onToggleParticipants: 'window.adminToggleParticipants()',
                                 onToggleAttachPanel: 'window.toggleAdminTicketAttachPanel()',
                                 onConfirmAttach: 'window.confirmAdminTicketAttach()',

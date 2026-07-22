@@ -2966,39 +2966,41 @@ function updateChatLogistics(order, user) {
         const otherAgreed = isBuyer ? order.agree_seller : order.agree_buyer;
         if (order.agree_buyer && order.agree_seller) {
             if (isSeller) {
-                if (order.logistics_type === 'pickup') {
-                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')"><i class="bi bi-check2-circle me-1"></i>Marcar como Pronto p/ Retirada</button>`;
-                } else {
-                    buttonsHtml += `<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Marcar que Saiu p/ Entrega</button>`;
-                }
+                    buttonsHtml += `${order.logistics_type === 'pickup'
+                        ? `<button class="ml-attach w-100 mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')"><i class="bi bi-check2-circle me-1"></i>Marcar como Pronto p/ Retirada</button>`
+                        : order.logistics_type === 'external_app'
+                        ? `<div class="external-delivery-section"><p class="fw-bold text-center mb-2" style="font-size:0.82rem;">Solicitar entrega via app</p><div class="d-flex gap-2 mb-2"><button class="ml-attach flex-grow-1" onclick="window.requestExternalDelivery('uber','${order.id}')"><i class="bi bi-uber"></i>Uber</button><button class="ml-attach flex-grow-1" onclick="window.requestExternalDelivery('99','${order.id}')"><i class="bi bi-phone"></i>99</button></div><div class="input-group input-group-sm"><input type="text" id="trackingInput_${order.id}" class="form-control" placeholder="Cole o código de rastreio..."><button class="ml-attach" onclick="window.sendTrackingCode('${order.id}')"><i class="bi bi-send"></i></button></div></div><button class="ml-attach w-100 mt-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Já solicitei — Marcar que Saiu p/ Entrega</button>`
+                        : `<button class="ml-attach w-100 mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Marcar que Saiu p/ Entrega</button>`
+                    }`;
             } else {
                 buttonsHtml += `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-people-fill me-1"></i>Aguardando envio/retirada pelo vendedor</div>`;
             }
         } else if (!userAgreed) {
             if (otherAgreed && order.logistics_type) {
                 const typeText = getLogisticsTypeText(order.logistics_type);
-                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="btn btn-success flex-grow-1 rounded-pill fw-bold" onclick="window.setLogistics('${order.id}','${order.logistics_type}')">Aceitar</button><button class="btn btn-outline-secondary flex-grow-1 rounded-pill" onclick="window.resetLogistics('${order.id}')">Recusar</button></div>`;
+                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="ml-attach ml-attach-success flex-grow-1" onclick="window.setLogistics('${order.id}','${order.logistics_type}')">Aceitar</button><button class="ml-attach ml-attach-secondary flex-grow-1" onclick="window.resetLogistics('${order.id}')">Recusar</button></div>`;
             } else {
-                buttonsHtml += `<p class="text-center small mb-2" style="color:#666;">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div>`;
+                buttonsHtml += `<div class="logistics-section"><p class="logistics-section-title">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div></div>`;
             }
         } else {
             buttonsHtml += `<div class="alert alert-info rounded-pill text-center small mb-2"><i class="bi bi-hourglass-split me-1"></i>Proposta enviada! Aguardando o outro lado...</div>`;
         }
     } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
         if (isBuyer) {
-            buttonsHtml += `<button class="btn btn-success w-100 rounded-pill fw-bold mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button><button class="btn btn-outline-danger w-100 rounded-pill fw-bold mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
+            buttonsHtml += `<button class="ml-attach ml-attach-success w-100 mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
         } else {
-            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div><button class="btn btn-outline-danger w-100 rounded-pill fw-bold mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
+            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
         }
     } else if (order.status === 'finished') {
+        const reviewedLocal = (uid) => { try { return !!localStorage.getItem(`reviewed_${order.id}_${uid}`); } catch (e) { return false; } };
         if (isBuyer) {
-            buttonsHtml += order.buyer_reviewed
-                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este vendedor. Obrigado!</div>`
-                : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}','buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
+            buttonsHtml += (order.buyer_reviewed || reviewedLocal(user.id))
+                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Avaliação recebida pelo vendedor</div>`
+                : `<button class="ml-attach ml-attach-warning w-100 mb-2" onclick="window.openReviewModal('${order.id}','buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
         } else {
-            buttonsHtml += order.seller_reviewed
-                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Você avaliou este comprador. Obrigado!</div>`
-                : `<button class="btn btn-warning w-100 rounded-pill fw-bold mb-2" onclick="window.openReviewModal('${order.id}','seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
+            buttonsHtml += (order.seller_reviewed || reviewedLocal(user.id))
+                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Avaliação recebida pelo comprador</div>`
+                : `<button class="ml-attach ml-attach-warning w-100 mb-2" onclick="window.openReviewModal('${order.id}','seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
         }
     }
     logisticsButtons.innerHTML = buttonsHtml;
@@ -3219,6 +3221,52 @@ function getLogisticsTypeText(type) {
     return type;
 }
 
+window.requestExternalDelivery = async function(app, orderId) {
+    try {
+        const data = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+        const order = data?.[0];
+        if (!order) return showToast('Pedido não encontrado', 'danger');
+        const sellerData = await supabaseFetch(`users?id=eq.${order.seller_id}&limit=1`);
+        const buyerData = await supabaseFetch(`users?id=eq.${order.buyer_id}&limit=1`);
+        const seller = sellerData?.[0];
+        const buyer = buyerData?.[0];
+        const pickup = seller?.endereco || 'Endereço do vendedor';
+        const dropoff = buyer?.endereco || 'Endereço do comprador';
+        const text = `Retirada: ${pickup}\nEntrega: ${dropoff}`;
+        await navigator.clipboard.writeText(text);
+        showToast('Endereços copiados!', 'success');
+        if (app === 'uber') {
+            window.open('https://m.uber.com/', '_blank');
+        } else {
+            window.open('https://99app.com/', '_blank');
+        }
+    } catch (e) {
+        showToast('Erro ao abrir app de entrega', 'danger');
+    }
+};
+
+window.sendTrackingCode = async function(orderId) {
+    const input = document.getElementById(`trackingInput_${orderId}`);
+    if (!input || !input.value.trim()) return showToast('Cole o código de rastreio', 'warning');
+    const user = getSavedUser();
+    if (!user) return;
+    const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
+    const chat = chatData?.[0];
+    if (!chat) return;
+    const msg = {
+        senderId: user.id,
+        senderName: user.nome,
+        text: `🔗 Código de rastreio: ${input.value.trim()}`,
+        timestamp: new Date().toISOString(),
+        type: 'tracking'
+    };
+    chat.messages.push(msg);
+    await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+    input.value = '';
+    showToast('Código de rastreio enviado!', 'success');
+    loadChatMessages(orderId);
+};
+
 // ============================================
 // AÇÕES COMPARTILHADAS DE CHAT (reply, edit, delete, copy)
 // ============================================
@@ -3370,7 +3418,7 @@ window.viewChatPartnerProfile = async function() {
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
                 <div class="modal-body text-center p-4">
-                    <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                     <div class="position-relative d-inline-block mb-3">
                         <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=80'">
                         <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
@@ -3383,7 +3431,10 @@ window.viewChatPartnerProfile = async function() {
                         <span class="fw-bold">${rating}</span>
                         <span class="text-muted small">(${ratingCount} avaliações)</span>
                     </div>
-                    <button class="btn btn-sm btn-outline-primary rounded-pill fw-bold" onclick="bootstrap.Modal.getInstance(document.getElementById('partnerProfileModal'))?.hide(); window.startDirectChat('${partnerId}');">
+                    <button class="ml-attach w-100 mb-2" onclick="window.showUserReviews('${partnerId}','${partner?.nome || partnerName || 'Usuário'}')">
+                        <i class="bi bi-star me-1"></i>Ver avaliações
+                    </button>
+                    <button class="ml-attach ml-attach-secondary w-100" onclick="bootstrap.Modal.getInstance(document.getElementById('partnerProfileModal'))?.hide(); window.startDirectChat('${partnerId}');">
                         <i class="bi bi-chat-dots me-1"></i>Conversar
                     </button>
                 </div>
@@ -5240,8 +5291,22 @@ window.loadProductReviews = async function(productId) {
             return;
         }
         const orderIds = orders.map(o => o.id);
-        const avaliacoes = await supabaseFetch(`avaliacoes?order_id=in.(${orderIds.join(',')})&order=created_at.desc&limit=20`);
-        if (!avaliacoes || avaliacoes.length === 0) {
+        const chats = await supabaseFetch(`chats?order_id=in.(${orderIds.join(',')})&select=messages`);
+        const avaliacoes = [];
+        (chats || []).forEach(chat => {
+            (chat.messages || []).forEach(m => {
+                if (m.type === 'review') {
+                    avaliacoes.push({
+                        rating:         m.rating || 0,
+                        comment:        m.reviewComment || m.text?.split('\n\n')[1]?.trim() || '',
+                        images:         m.reviewImages || (m.image ? [m.image] : []),
+                        avaliador_nome: m.senderName || 'Anônimo',
+                        created_at:     m.timestamp || chat.created_at
+                    });
+                }
+            });
+        });
+        if (avaliacoes.length === 0) {
             container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Nenhuma opinião ainda.</p></div>';
             const countEl = document.getElementById('opinionsCount');
             if (countEl) countEl.textContent = '';
@@ -5292,12 +5357,80 @@ window.loadProductReviews = async function(productId) {
                     <div class="opinion-date">${date}</div>
                     ${a.comment ? `<p class="opinion-comment">${a.comment}</p>` : ''}
                     ${images}
-                    ${video}
                 </div>`;
         }).join('');
     } catch (e) {
         console.error('Erro ao carregar avaliações:', e);
         container.innerHTML = '<div class="text-center py-5"><p class="text-muted mb-0">Erro ao carregar opiniões.</p></div>';
+    }
+};
+
+window.showUserReviews = async function(userId, userName) {
+    try {
+        const chats = await supabaseFetch(`chats?participants=cs.{${userId}}&select=messages,created_at&limit=100`);
+        const avaliacoes = [];
+        (chats || []).forEach(chat => {
+            (chat.messages || []).forEach(m => {
+                if (m.type === 'review' && m.avaliadoId === userId) {
+                    avaliacoes.push({
+                        rating:         m.rating || 0,
+                        comment:        m.reviewComment || '',
+                        images:         m.reviewImages || [],
+                        avaliador_nome: m.senderName || 'Anônimo',
+                        created_at:     m.timestamp || chat.created_at
+                    });
+                }
+            });
+        });
+        avaliacoes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const total = avaliacoes.length;
+        const avg = total > 0 ? (avaliacoes.reduce((s, a) => s + (a.rating || 0), 0) / total).toFixed(1) : '—';
+        let modalEl = document.getElementById('userReviewsModal');
+        if (!modalEl) {
+            modalEl = document.createElement('div');
+            modalEl.id = 'userReviewsModal';
+            modalEl.className = 'modal fade';
+            modalEl.tabIndex = -1;
+            document.body.appendChild(modalEl);
+        }
+        const starsHtml = (n) => Array.from({length:5}, (_,i) => `<i class="bi ${i < n ? 'bi-star-fill' : 'bi-star'}" style="color:#3483fa;font-size:0.85rem;"></i>`).join('');
+        modalEl.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg" style="border-radius:16px;max-height:80vh;">
+                    <div class="modal-header border-0 pb-0 position-relative">
+                        <h5 class="modal-title fw-bold" style="font-size:1.05rem;">Avaliações de ${userName}</h5>
+                        <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="modal-body pt-2">
+                        ${total > 0 ? `
+                        <div class="text-center mb-3 pb-2 border-bottom">
+                            <span class="fw-bold" style="font-size:1.5rem;color:#3483fa;">${avg}</span>
+                            <div class="my-1">${starsHtml(Math.round(parseFloat(avg)))}</div>
+                            <span class="text-muted small">${total} avaliaç${total === 1 ? 'ão' : 'ões'}</span>
+                        </div>
+                        ${avaliacoes.map(a => {
+                            const date = new Date(a.created_at).toLocaleDateString('pt-BR');
+                            const imgs = a.images && Array.isArray(a.images) && a.images.length > 0
+                                ? `<div class="d-flex gap-1 mt-1">${a.images.slice(0,3).map(url => `<img src="${url}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer;" onclick="window.openImageFull('${url}')" onerror="this.style.display='none'">`).join('')}</div>` : '';
+                            return `
+                            <div class="mb-3 pb-2 ${a !== avaliacoes[avaliacoes.length-1] ? 'border-bottom' : ''}">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="fw-bold small">${a.avaliador_nome || 'Anônimo'}</span>
+                                    <span class="text-muted" style="font-size:0.7rem;">${date}</span>
+                                </div>
+                                <div class="mb-1">${starsHtml(Math.round(a.rating || 0))}</div>
+                                ${a.comment ? `<p class="small mb-1" style="color:var(--text-color);">${a.comment}</p>` : ''}
+                                ${imgs}
+                            </div>`;
+                        }).join('')}
+                        ` : `<div class="text-center py-4"><p class="text-muted mb-0">Nenhuma avaliação ainda.</p></div>`}
+                    </div>
+                </div>
+            </div>`;
+        new bootstrap.Modal(modalEl).show();
+    } catch (e) {
+        console.error('Erro ao carregar avaliações do usuário:', e);
+        showToast('Erro ao carregar avaliações.', 'error');
     }
 };
 
@@ -5339,6 +5472,11 @@ window.renderChatContainer = function(opts) {
         onMute = '',
         onArchive = '',
         onBlock = '',
+        onCloseTicket = '',
+        onChangeStatus = '',
+        onDeleteAccounts = '',
+        onDeleteRequester = '',
+        onDeleteOtherAccount = '',
         onVoiceInput = 'window.startVoiceInput',
         openImgurFn = 'window.abrirUploadExterno',
         openDocHostFn = 'window.abrirDocHost',
@@ -5356,7 +5494,7 @@ window.renderChatContainer = function(opts) {
         extraBeforeInput = ''
     } = opts;
 
-    const isClosed = !!chat.closed;
+    const isClosed = !!(chat.closed || order?.status === 'finished' || order?.status === 'cancelled');
     const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
     const partnerName = partner.name || '';
     const partnerAvatar = partner.avatar || '';
@@ -5379,7 +5517,12 @@ window.renderChatContainer = function(opts) {
     if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi bi-bell-slash me-2"></i>Silenciar notificações</a></li>`);
     if (onArchive) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onArchive}"><i class="bi bi-archive me-2"></i>Arquivar conversa</a></li>`);
     if (showDeleteBtn && onDelete) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDelete}"><i class="bi bi-trash me-2"></i>Apagar conversa</a></li>`);
+    if (onCloseTicket) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onCloseTicket}"><i class="bi bi-lock me-2"></i>Encerrar chamado</a></li>`);
+    if (onChangeStatus) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onChangeStatus}"><i class="bi bi-arrow-repeat me-2"></i>Alterar status</a></li>`);
     if (onBlock) dropdownItems.push(`<li><hr class="dropdown-divider my-1"></li><li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onBlock}"><i class="bi bi-slash-circle me-2"></i>Bloquear usuário</a></li>`);
+    if (onDeleteAccounts) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteAccounts}"><i class="bi bi-person-x-fill me-2"></i>Deletar contas</a></li>`);
+    if (onDeleteRequester) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteRequester}"><i class="bi bi-person-x-fill me-2"></i>Deletar conta do solicitante</a></li>`);
+    if (onDeleteOtherAccount) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteOtherAccount}"><i class="bi bi-person-x-fill me-2"></i>Deletar conta do outro participante</a></li>`);
 
     const dropdownHtml = dropdownItems.length > 0
         ? `<div class="dropdown">
@@ -5426,7 +5569,7 @@ window.renderChatContainer = function(opts) {
     <div id="${statusBarId}" class="chat-status-bar">
         ${statusInfo ? `<div class="alert alert-${statusInfo.class || 'info'} mb-0 py-2 text-center small">${statusInfo.text}</div>` : ''}
         ${statusText ? `<div class="mb-0 py-1 text-center">${statusText}</div>` : ''}
-        ${isClosed && !statusInfo ? '<div class="alert alert-secondary mb-0 py-2 text-center small"><i class="bi bi-lock-fill me-1"></i>Atendimento encerrado</div>' : ''}
+        ${isClosed && !statusInfo ? `<div class="alert alert-secondary mb-0 py-2 text-center small"><i class="bi bi-lock-fill me-1"></i>${order?.status === 'finished' ? 'Pedido finalizado' : order?.status === 'cancelled' ? 'Pedido cancelado' : 'Atendimento encerrado'}</div>` : ''}
     </div>`;
 
     const participantsHtml = onToggleParticipants
@@ -6136,7 +6279,7 @@ window.viewDirectChatPartnerProfile = async function(partnerId) {
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
                 <div class="modal-body text-center p-4">
-                    <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                     <div class="position-relative d-inline-block mb-3">
                         <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=80'">
                         <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
@@ -6144,11 +6287,14 @@ window.viewDirectChatPartnerProfile = async function(partnerId) {
                     <h5 class="fw-bold mb-1">${partner?.nome || 'Usuário'}</h5>
                     <p class="small mb-2 fw-bold ${online ? 'text-success' : 'text-muted'}">${online ? '● Online agora' : '○ Offline'}</p>
                     <p class="text-muted small mb-3"><i class="bi bi-calendar3 me-1"></i>Na plataforma desde ${memberSince}</p>
-                    <div class="d-flex justify-content-center align-items-center gap-2">
+                    <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
                         <i class="bi bi-star-fill text-warning"></i>
                         <span class="fw-bold">${rating}</span>
                         <span class="text-muted small">(${ratingCount} avaliações)</span>
                     </div>
+                    <button class="ml-attach w-100 mb-2" onclick="window.showUserReviews('${partnerId}','${partner?.nome || 'Usuário'}')">
+                        <i class="bi bi-star me-1"></i>Ver avaliações
+                    </button>
                 </div>
             </div>
         </div>`;

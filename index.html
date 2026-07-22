@@ -587,42 +587,80 @@
     <div class="modal fade" id="reviewModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0" style="border-radius:16px;">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="reviewModalTitle">Avalie o vendedor</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header border-0 pb-0 position-relative">
+                    <h5 class="modal-title fw-bold" id="reviewModalTitle" style="font-size:1.1rem;">Avalie o vendedor</h5>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                 </div>
-                <div class="modal-body text-center pt-2">
-                    <p class="text-muted small mb-1">Como foi sua experiência com</p>
-                    <p class="fw-bold mb-3" id="reviewTargetName">o vendedor</p>
-                    <div id="reviewStars" class="d-flex justify-content-center gap-2 mb-3" style="font-size:2.2rem;">
+                <div class="modal-body pt-2">
+                    <p class="text-muted text-center mb-1" style="font-size:0.85rem;">Como foi sua experiência com</p>
+                    <p class="fw-bold text-center mb-3" id="reviewTargetName" style="font-size:1rem;">o vendedor</p>
+                    <div id="reviewStars" class="d-flex justify-content-center gap-2 mb-4" style="font-size:2.2rem;">
                         <i class="bi bi-star review-star" data-value="1" onclick="window.setReviewStars(1)"></i>
                         <i class="bi bi-star review-star" data-value="2" onclick="window.setReviewStars(2)"></i>
                         <i class="bi bi-star review-star" data-value="3" onclick="window.setReviewStars(3)"></i>
                         <i class="bi bi-star review-star" data-value="4" onclick="window.setReviewStars(4)"></i>
                         <i class="bi bi-star review-star" data-value="5" onclick="window.setReviewStars(5)"></i>
                     </div>
-                    <div class="text-start mb-3">
-                        <label class="small text-muted fw-bold mb-1">Comentário <span class="text-muted fw-normal">(opcional)</span></label>
-                        <textarea id="reviewComment" class="form-control form-control-sm" rows="3" placeholder="Conte sua experiência com o produto..."></textarea>
+                    <div class="mb-3">
+                        <div class="ml-field">
+                            <textarea id="reviewComment" class="form-control" placeholder=" " rows="3"></textarea>
+                            <label for="reviewComment">Comentário <span class="text-muted fw-normal">(opcional)</span></label>
+                        </div>
                     </div>
-                    <div class="text-start mb-3">
-                        <label class="small text-muted fw-bold mb-1">Imagens do produto <span class="text-muted fw-normal">(opcional — cole links)</span></label>
-                        <input type="url" id="reviewImage1" class="form-control form-control-sm mb-1" placeholder="https://i.imgur.com/...">
-                        <input type="url" id="reviewImage2" class="form-control form-control-sm mb-1" placeholder="https://i.imgur.com/...">
-                        <input type="url" id="reviewImage3" class="form-control form-control-sm" placeholder="https://i.imgur.com/...">
-                        <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i><a href="https://imgur.com/upload" target="_blank" class="text-decoration-none">Upload no Imgur</a> e cole o link direto</small>
-                    </div>
-                    <div class="text-start mb-3">
-                        <label class="small text-muted fw-bold mb-1">Vídeo <span class="text-muted fw-normal">(opcional — link do YouTube)</span></label>
-                        <input type="url" id="reviewVideo" class="form-control form-control-sm" placeholder="https://youtube.com/watch?v=...">
+                    <small class="text-muted d-block mb-2" style="font-size:0.78rem;">Imagens da avaliação (opcional)</small>
+                    <div id="reviewFotosContainer">
+                        <div class="ca-foto-row profile-link-inline mb-2" data-idx="1">
+                            <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </button>
+                            <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                <i class="bi bi-cloud-upload"></i>
+                                <input type="file" accept="image/*" hidden onchange="window.handleReviewImageUpload(this)">
+                            </label>
+                            <div class="ml-field flex-grow-1 mb-0">
+                                <input type="url" id="reviewImage1" placeholder=" ">
+                                <label for="reviewImage1">Imagem 1 (opcional)</label>
+                            </div>
+                            <div class="ca-foto-preview" id="reviewFotoPreview1"></div>
+                        </div>
+                        <div class="ca-foto-row profile-link-inline mb-2" data-idx="2">
+                            <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </button>
+                            <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                <i class="bi bi-cloud-upload"></i>
+                                <input type="file" accept="image/*" hidden onchange="window.handleReviewImageUpload(this)">
+                            </label>
+                            <div class="ml-field flex-grow-1 mb-0">
+                                <input type="url" id="reviewImage2" placeholder=" ">
+                                <label for="reviewImage2">Imagem 2 (opcional)</label>
+                            </div>
+                            <div class="ca-foto-preview" id="reviewFotoPreview2"></div>
+                        </div>
+                        <div class="ca-foto-row profile-link-inline" data-idx="3">
+                            <button type="button" class="profile-link-icon profile-link-icon-ghost" onclick="abrirUploadExterno()" title="Subir no Imgur">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </button>
+                            <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                <i class="bi bi-cloud-upload"></i>
+                                <input type="file" accept="image/*" hidden onchange="window.handleReviewImageUpload(this)">
+                            </label>
+                            <div class="ml-field flex-grow-1 mb-0">
+                                <input type="url" id="reviewImage3" placeholder=" ">
+                                <label for="reviewImage3">Imagem 3 (opcional)</label>
+                            </div>
+                            <div class="ca-foto-preview" id="reviewFotoPreview3"></div>
+                        </div>
                     </div>
                     <input type="hidden" id="reviewOrderId">
                     <input type="hidden" id="reviewTargetId">
                     <input type="hidden" id="reviewMode">
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary flex-grow-1" data-bs-dismiss="modal">Agora não</button>
-                        <button type="button" class="btn btn-success flex-grow-1 fw-bold" onclick="window.submitReview()">Enviar Avaliação</button>
-                    </div>
+                    <button type="button" class="ml-btn ml-btn-primary w-100" onclick="window.submitReview()">
+                        <i class="bi bi-check-lg me-2"></i>Enviar Avaliação
+                    </button>
+                    <button type="button" class="ml-btn ml-btn-outline w-100 mt-2" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-2"></i>Agora não
+                    </button>
                 </div>
             </div>
         </div>
@@ -998,10 +1036,6 @@
                 <a href="#" class="list-group-item list-group-item-action role-logged-in d-none" onclick="window.openSupportRequestModal(); window.closeMobileMenu();">
                     <i class="bi bi-headset"></i> <strong>Falar com o Suporte</strong>
                 </a>
-                <a href="#" class="list-group-item list-group-item-action role-admin d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
-                    <span><i class="bi bi-chat-dots"></i> <strong>Conversas</strong></span>
-                    <span class="badge bg-success rounded-pill d-none" id="chatBadgeAdminMobile">0</span>
-                </a>
             </div>
         </div>
     </div>
@@ -1013,7 +1047,7 @@
             <div class="wa-side__header">
                 <h6 id="waSideTitle" class="mb-0">Minhas Vendas</h6>
                 <button type="button" class="ml-auth-close ms-auto" aria-label="Fechar e voltar ao início"
-                        onclick="window.goHome(); window.updateMobileNavActive('eletronicos');" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                        onclick="window.goHome(); window.updateMobileNavActive('eletronicos');" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="wa-side__search">
                 <i class="bi bi-search"></i>
@@ -1037,9 +1071,9 @@
     <div class="modal fade" id="orderDetailsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header position-relative">
                     <h5 class="modal-title">Detalhes do Pedido</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <div class="modal-body" id="orderDetailsContent"></div>
             </div>
@@ -1060,7 +1094,7 @@
                         <section class="wa-side">
                             <div class="wa-side__header">
                                 <h6 class="mb-0">Todas as Conversas</h6>
-                                <button type="button" class="ml-auth-close ms-auto" aria-label="Fechar" data-bs-dismiss="modal" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                                <button type="button" class="ml-auth-close ms-auto" aria-label="Fechar" data-bs-dismiss="modal" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                             </div>
                             <div class="wa-side__search">
                                 <i class="bi bi-search"></i>
@@ -1089,18 +1123,18 @@
          com o Suporte" de novo. -->
     <div class="modal fade" id="supportRequestModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered" id="supportModalDialog">
-            <div class="modal-content border-0">
-                <div class="modal-header text-white" style="background-color: var(--primary-blue);">
-                    <h5 class="modal-title fw-bold" id="supportModalTitle">Falar com o Suporte</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()"></button>
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-header border-0 pb-0 justify-content-center position-relative">
+                    <h5 class="modal-title fw-bold" id="supportModalTitle" style="font-size:1.1rem;">Falar com o Suporte</h5>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                 </div>
 
                 <!-- Etapa 1: escolher o assunto -->
                 <form id="supportRequestForm" onsubmit="return window.submitSupportRequest(event)">
-                    <div class="modal-body">
+                    <div class="modal-body pt-2">
                         <div class="mb-3">
                             <div class="ml-field">
-                                <select id="supportReqCategory" required>
+                                <select id="supportReqCategory" required onchange="window.toggleSupportDescriptionField()">
                                     <option value="" selected disabled>Qual é o problema?</option>
                                     <option value="esqueci_senha">Esqueci minha senha</option>
                                     <option value="produto_nao_recebido">Não recebi um produto</option>
@@ -1111,15 +1145,20 @@
                                 <label for="supportReqCategory">Qual é o problema?</label>
                             </div>
                         </div>
+                        <div class="mb-3" id="supportReqDescWrap">
+                            <div class="ml-field">
+                                <textarea id="supportReqDescription" class="form-control" placeholder=" " rows="3"></textarea>
+                                <label for="supportReqDescription">Descreva seu problema</label>
+                            </div>
+                        </div>
                         <div class="mb-3" id="supportReqEmailWrap">
                             <div class="ml-field">
                                 <input type="email" id="supportReqEmail" placeholder=" " required>
                                 <label for="supportReqEmail">Seu e-mail</label>
                             </div>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="submit" class="btn btn-success w-100 fw-bold"><i class="bi bi-send-fill me-2"></i>Abrir Chamado</button>
+                        <button type="submit" class="ml-btn ml-btn-primary w-100"><i class="bi bi-send-fill me-2"></i>Abrir Chamado</button>
+                        <button type="button" class="ml-btn ml-btn-outline w-100 mt-2" data-bs-dismiss="modal" onclick="window.closeSupportChatModal()"><i class="bi bi-x-lg me-2"></i>Cancelar</button>
                     </div>
                 </form>
 
@@ -1133,9 +1172,9 @@
     <div class="modal fade" id="supportParticipantsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
-                <div class="modal-header text-white" style="background-color: var(--primary-blue, #0d6efd);">
+                <div class="modal-header text-white position-relative" style="background-color: var(--primary-blue, #0d6efd);">
                     <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i> Pessoas da conversa</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;color:#fff;"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <div class="modal-body p-3" id="supportParticipantsBody">
                     <div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div></div>

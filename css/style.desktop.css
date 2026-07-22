@@ -1021,6 +1021,35 @@ body.dark-theme .ml-shipping-card {
 }
 .ml-attach i { font-size: 0.9rem; }
 
+.ml-attach-success {
+    border-color: #198754;
+    color: #198754 !important;
+}
+.ml-attach-success:hover {
+    background: color-mix(in srgb, #198754 10%, transparent);
+}
+.ml-attach-secondary {
+    border-color: var(--border-light);
+    color: var(--text-muted) !important;
+}
+.ml-attach-secondary:hover {
+    background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+}
+.ml-attach-danger {
+    border-color: #dc3545;
+    color: #dc3545 !important;
+}
+.ml-attach-danger:hover {
+    background: color-mix(in srgb, #dc3545 10%, transparent);
+}
+.ml-attach-warning {
+    border-color: #fd7e14;
+    color: #fd7e14 !important;
+}
+.ml-attach-warning:hover {
+    background: color-mix(in srgb, #fd7e14 10%, transparent);
+}
+
 .ml-btn-danger {
     background: #dc3545;
     color: #fff;
@@ -2880,31 +2909,43 @@ body.dark-theme .chat-send-btn:hover { background: #008f72; }
     overflow: hidden;
 }
 
-#logisticsAgreementArea {
+/* Área de logística: escondida por padrão, aparece ao clicar no + */
+#logisticsAgreementArea, [id^="logistics_"] {
     background: #f7f7f7;
     border-top: 1px solid rgba(0,0,0,0.08);
     padding: 16px 14px;
     max-height: 60vh;
     overflow-y: auto;
-    display: none; /* Escondido por padrão */
+    display: none;
     animation: slideUpChat 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
     color: #222;
 }
 
-#logisticsAgreementArea.show-menu { display: block !important; }
+#logisticsAgreementArea.show-menu, [id^="logistics_"].show-menu { display: block !important; }
 
 @keyframes slideUpChat {
     from { transform: translateY(12px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
 }
 
+.logistics-section {
+    width: 100%;
+}
+.logistics-section-title {
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+}
 .logistics-options-row {
     display: flex;
     gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 .logistics-option-btn {
@@ -2912,20 +2953,28 @@ body.dark-theme .chat-send-btn:hover { background: #008f72; }
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    background: none;
-    border: none;
-    width: 82px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border-light);
+    border-radius: 10px;
+    padding: 12px 14px 10px;
+    min-width: 100px;
     color: var(--text-color);
+    transition: border-color .15s ease, box-shadow .15s ease;
+    cursor: pointer;
+}
+.logistics-option-btn:hover {
+    border-color: var(--primary-action);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 .logistics-option-btn .icon-circle {
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;
+    font-size: 1.15rem;
     color: #fff;
     box-shadow: 0 3px 8px rgba(0,0,0,0.2);
     transition: transform 0.15s ease;
@@ -2939,6 +2988,24 @@ body.dark-theme .chat-send-btn:hover { background: #008f72; }
     text-align: center;
     line-height: 1.2;
     color: #222;
+}
+
+.external-delivery-section {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border-light);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+.external-delivery-section .input-group .form-control {
+    font-size: 0.82rem;
+    border: 1.5px solid var(--border-light);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+}
+.external-delivery-section .input-group .ml-attach {
+    border-radius: 0 8px 8px 0;
+    border-left: none;
 }
 
 .chat-container {
@@ -3162,9 +3229,7 @@ body.dark-theme .support-chat-messages {
 }
 
 .logistics-buttons {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    display: block;
 }
 
 /* ============================================ */
@@ -5224,13 +5289,29 @@ body.dark-theme .chat-icon-btn:hover {
     background: rgba(255,255,255,0.08);
 }
 
-body.dark-theme #logisticsAgreementArea {
+body.dark-theme #logisticsAgreementArea, body.dark-theme [id^="logistics_"] {
     background: var(--card-bg);
     border-top-color: var(--border-light);
     color: var(--text-main);
 }
 
 body.dark-theme .logistics-option-btn .option-label {
+    color: var(--text-main);
+}
+body.dark-theme .logistics-option-btn {
+    background: var(--card-bg);
+    border-color: var(--border-light);
+}
+body.dark-theme .logistics-option-btn:hover {
+    border-color: var(--primary-action);
+}
+body.dark-theme .external-delivery-section {
+    background: var(--card-bg);
+    border-color: var(--border-light);
+}
+body.dark-theme .external-delivery-section .input-group .form-control {
+    background: var(--card-bg);
+    border-color: var(--border-light);
     color: var(--text-main);
 }
 

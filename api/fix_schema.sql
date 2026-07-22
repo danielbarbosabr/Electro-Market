@@ -42,6 +42,10 @@ create table if not exists public.users (
   updated_at      timestamptz  default now()
 );
 
+-- Garante colunas de avaliação de comprador (se a tabela users já existia antes)
+alter table public.users add column if not exists comprador_rating      numeric default 0;
+alter table public.users add column if not exists comprador_rating_count integer default 0;
+
 -- ---------- NOTIFICATIONS ----------
 create table if not exists public.notifications (
   id         uuid primary key default gen_random_uuid(),

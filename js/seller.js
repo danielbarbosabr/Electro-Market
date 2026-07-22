@@ -522,7 +522,10 @@ window.openReviewModal = async function(orderId, mode = 'buyer_rates_seller') {
         if (!order) return;
 
         const isSellerRatingBuyer = mode === 'seller_rates_buyer';
-        if (isSellerRatingBuyer ? order.seller_reviewed : order.buyer_reviewed) return; // já avaliado
+        const alreadyReviewed = isSellerRatingBuyer ? order.seller_reviewed : order.buyer_reviewed;
+        if (alreadyReviewed) return;
+        // Fallback local para coluna que pode não existir no banco
+        try { if (localStorage.getItem(`reviewed_${orderId}_${getSavedUser()?.id}`)) return; } catch (e) {}
 
         document.getElementById('reviewOrderId').value    = orderId;
         document.getElementById('reviewMode').value        = mode;
@@ -577,78 +580,70 @@ window.submitReview = async function() {
     const img1 = document.getElementById('reviewImage1')?.value.trim() || '';
     const img2 = document.getElementById('reviewImage2')?.value.trim() || '';
     const img3 = document.getElementById('reviewImage3')?.value.trim() || '';
-    const video = document.getElementById('reviewVideo')?.value.trim() || '';
     const reviewImages = [img1, img2, img3].filter(Boolean);
-    const reviewVideo = video || '';
+    const reviewVideo = '';
 
     try {
-        // Salva o registro individual da avaliação (histórico, separado das curtidas de produto)
-        await supabaseFetch('avaliacoes', {
-            method: 'POST',
-            body: JSON.stringify({
-                id:             crypto.randomUUID(),
-                order_id:       orderId,
-                tipo:           mode,
-                avaliador_id:   user.id,
-                avaliador_nome: user.nome,
-                avaliado_id:    targetId,
-                rating:         currentReviewRating,
-                comment:        comment || null,
-                images:         reviewImages.length > 0 ? reviewImages : null,
-                videos:         reviewVideo ? [reviewVideo] : null,
-                created_at:     new Date().toISOString()
-            })
-        });
-
-        // Recalcula a média de quem está sendo avaliado com base na avaliação nova
+        // Atualiza a média de quem está sendo avaliado (se a coluna existir)
         const ratingField = isSellerRatingBuyer ? 'comprador_rating'       : 'vendedor_rating';
         const countField   = isSellerRatingBuyer ? 'comprador_rating_count' : 'rating_count';
 
-        const targetData = await supabaseFetch(`users?select=${ratingField},${countField}&id=eq.${targetId}&limit=1`);
-        const target    = targetData?.[0] || {};
-        const prevCount = parseInt(target[countField]) || 0;
-        const prevAvg   = parseFloat(target[ratingField]) || 0;
-        const newCount  = prevCount + 1;
-        const newAvg    = ((prevAvg * prevCount) + currentReviewRating) / newCount;
+        try {
+            const targetData = await supabaseFetch(`users?select=${ratingField},${countField}&id=eq.${targetId}&limit=1`);
+            const target    = targetData?.[0] || {};
+            const prevCount = parseInt(target[countField]) || 0;
+            const prevAvg   = parseFloat(target[ratingField]) || 0;
+            const newCount  = prevCount + 1;
+            const newAvg    = ((prevAvg * prevCount) + currentReviewRating) / newCount;
 
-        await supabaseFetch(`users?id=eq.${targetId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ [ratingField]: newAvg, [countField]: newCount })
-        });
+            await supabaseFetch(`users?id=eq.${targetId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ [ratingField]: newAvg, [countField]: newCount })
+            });
+        } catch (e2) {
+            // coluna não existe no banco (ex: comprador_rating) — ignora
+        }
 
-        // Marca o pedido como já avaliado (nesse sentido), pra não pedir de novo
+        // Marca o pedido como já avaliado (se a coluna existir)
         const reviewedField = isSellerRatingBuyer ? 'seller_reviewed' : 'buyer_reviewed';
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ [reviewedField]: true })
-        });
+        try {
+            await supabaseFetch(`orders?id=eq.${orderId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ [reviewedField]: true })
+            });
+        } catch (e3) {
+            // coluna não existe no banco — ignora
+        }
+        // Fallback local para evitar re-avaliação (caso coluna não exista)
+        try { localStorage.setItem(`reviewed_${orderId}_${user.id}`, '1'); } catch (e3) {};
         const cachedOrder = ordersCache.find(o => o.id === orderId);
         if (cachedOrder) cachedOrder[reviewedField] = true;
 
-        // Envia a avaliação como mensagem no chat
+        // Envia a avaliação como mensagem no chat (armazena toda a review aqui)
         try {
             const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
             const chat = chatData?.[0];
             if (chat) {
                 const targetName = isSellerRatingBuyer ? (chat.buyer_name || 'Comprador') : (chat.seller_name || 'Vendedor');
                 const stars = '★'.repeat(currentReviewRating) + '☆'.repeat(5 - currentReviewRating);
-                let reviewText = isSellerRatingBuyer ? `Avaliação do vendedor` : `Avaliação do comprador`;
+                let reviewText = isSellerRatingBuyer ? `Avaliação do comprador` : `Avaliação do vendedor`;
                 reviewText += `\nNota: ${currentReviewRating}/5\n\n`;
                 if (comment) reviewText += `${comment}\n\n`;
                 reviewText += `— ${user.nome || 'Usuário'}`;
                 const newMsg = {
-                    senderId:   user.id,
-                    senderName: user.nome || 'Usuário',
-                    text:       reviewText,
-                    timestamp:  new Date().toISOString(),
-                    type:       'review'
+                    senderId:     user.id,
+                    senderName:   user.nome || 'Usuário',
+                    text:         reviewText,
+                    timestamp:    new Date().toISOString(),
+                    type:         'review',
+                    avaliadoId:   targetId,
+                    avaliadoNome: targetName,
+                    rating:       currentReviewRating,
+                    reviewComment: comment || ''
                 };
                 if (reviewImages.length > 0) {
                     newMsg.image = reviewImages[0];
                     newMsg.reviewImages = reviewImages;
-                }
-                if (reviewVideo) {
-                    newMsg.reviewVideo = reviewVideo;
                 }
                 chat.messages = chat.messages || [];
                 chat.messages.push(newMsg);
@@ -674,10 +669,11 @@ window.submitReview = async function() {
         document.getElementById('reviewImage1').value = '';
         document.getElementById('reviewImage2').value = '';
         document.getElementById('reviewImage3').value = '';
-        document.getElementById('reviewVideo').value = '';
+        const videoEl = document.getElementById('reviewVideo');
+        if (videoEl) videoEl.value = '';
     } catch (e) {
-        console.error('Erro ao enviar avaliação:', e);
-        showToast('Erro ao enviar avaliação. Tente novamente.', 'error');
+        console.error('[Review] Erro ao enviar avaliação:', e);
+        showToast('Erro ao enviar avaliação: ' + (e?.message || e?.details || e?.error || 'Tente novamente.'), 'error');
     }
 };
 
@@ -764,6 +760,29 @@ window.renderSellerPanel = async function() {
                 <button class="btn btn-primary mt-3" onclick="window.renderSellerPanel()">Tentar novamente</button>
             </div>`;
     }
+};
+
+window.handleReviewImageUpload = async function(input) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    let slot = 1;
+    while (slot <= 3 && document.getElementById(`reviewImage${slot}`).value.trim()) slot++;
+    for (const file of files) {
+        if (slot > 3) break;
+        const field = document.getElementById(`reviewImage${slot}`);
+        const preview = document.getElementById(`reviewFotoPreview${slot}`);
+        field.value = 'Enviando...';
+        const url = await uploadImageToHost(file);
+        if (url) {
+            field.value = url;
+            if (preview) preview.style.backgroundImage = `url('${url}')`;
+        } else {
+            field.value = '';
+            showToast('Falha ao enviar imagem.', 'error');
+        }
+        slot++;
+    }
+    input.value = '';
 };
 
 // ============================================
