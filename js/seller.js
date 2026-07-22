@@ -230,10 +230,10 @@ window.renderSellerRequests = async function() {
                     ${buyer.telefone ? `<p class="small mb-1"><i class="bi bi-telephone-fill me-2 text-muted"></i>${buyer.telefone}</p>` : ''}
                     ${buyer.endereco ? `<p class="small mb-2"><i class="bi bi-geo-alt-fill me-2 text-muted"></i>${buyer.endereco}${buyer.cep ? `, CEP ${buyer.cep}` : ''} — ${buyer.cidade || ''}/${buyer.estado || ''}</p>` : `<p class="small mb-2 text-muted"><i class="bi bi-geo-alt-fill me-2"></i>Endereço não informado</p>`}
                     <div class="d-flex gap-2 mt-2">
-                        <button class="ml-btn ml-btn-primary flex-grow-1" style="width:auto;" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                        <button class="ml-attach ml-attach-success flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
                             <i class="bi bi-check-lg me-1"></i>${isOffer ? 'Aceitar Oferta' : 'Aceitar'}
                         </button>
-                        <button class="ml-btn ml-btn-outline flex-grow-1" style="width:auto;" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                        <button class="ml-attach ml-attach-danger flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
                             <i class="bi bi-x-lg me-1"></i>${isOffer ? 'Recusar Oferta' : 'Recusar'}
                         </button>
                     </div>

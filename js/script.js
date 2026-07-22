@@ -2969,10 +2969,10 @@ function updateChatLogistics(order, user) {
         if (order.agree_buyer && order.agree_seller) {
             if (isSeller) {
                     buttonsHtml += `${order.logistics_type === 'pickup'
-                        ? `<button class="ml-btn ml-btn-primary w-100 mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')"><i class="bi bi-check2-circle me-1"></i>Marcar como Pronto p/ Retirada</button>`
+                        ? `<button class="ml-attach w-100 mb-2" onclick="window.advanceLogisticsStatus('${order.id}','awaiting_pickup')"><i class="bi bi-check2-circle me-1"></i>Marcar como Pronto p/ Retirada</button>`
                         : order.logistics_type === 'external_app'
-                        ? `<div class="external-delivery-section"><p class="fw-bold text-center mb-2" style="font-size:0.82rem;">Solicitar entrega via app</p><div class="d-flex gap-2 mb-2"><button class="ml-btn ml-btn-primary flex-grow-1" style="width:auto;" onclick="window.requestExternalDelivery('uber','${order.id}')"><i class="bi bi-uber"></i>Uber</button><button class="ml-btn ml-btn-outline flex-grow-1" style="width:auto;" onclick="window.requestExternalDelivery('99','${order.id}')"><i class="bi bi-phone"></i>99</button></div><div class="input-group input-group-sm"><input type="text" id="trackingInput_${order.id}" class="form-control" placeholder="Cole o código de rastreio..."><button class="ml-btn ml-btn-primary" style="width:auto;padding:6px 12px;height:100%;" onclick="window.sendTrackingCode('${order.id}')"><i class="bi bi-send"></i></button></div></div><button class="ml-btn ml-btn-outline w-100 mt-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Já solicitei — Marcar que Saiu p/ Entrega</button>`
-                        : `<button class="ml-btn ml-btn-primary w-100 mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Marcar que Saiu p/ Entrega</button>`
+                        ? `<div class="external-delivery-section"><p class="fw-bold text-center mb-2" style="font-size:0.82rem;">Solicitar entrega via app</p><div class="d-flex gap-2 mb-2"><button class="ml-attach flex-grow-1" onclick="window.requestExternalDelivery('uber','${order.id}')"><i class="bi bi-uber"></i>Uber</button><button class="ml-attach flex-grow-1" onclick="window.requestExternalDelivery('99','${order.id}')"><i class="bi bi-phone"></i>99</button></div><div class="input-group input-group-sm"><input type="text" id="trackingInput_${order.id}" class="form-control" placeholder="Cole o código de rastreio..."><button class="ml-attach" onclick="window.sendTrackingCode('${order.id}')"><i class="bi bi-send"></i></button></div></div><button class="ml-attach w-100 mt-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Já solicitei — Marcar que Saiu p/ Entrega</button>`
+                        : `<button class="ml-attach w-100 mb-2" onclick="window.advanceLogisticsStatus('${order.id}','shipping')"><i class="bi bi-truck me-1"></i>Marcar que Saiu p/ Entrega</button>`
                     }`;
             } else {
                 buttonsHtml += `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-people-fill me-1"></i>Aguardando envio/retirada pelo vendedor</div>`;
@@ -2980,7 +2980,7 @@ function updateChatLogistics(order, user) {
         } else if (!userAgreed) {
             if (otherAgreed && order.logistics_type) {
                 const typeText = getLogisticsTypeText(order.logistics_type);
-                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="ml-btn ml-btn-primary flex-grow-1" onclick="window.setLogistics('${order.id}','${order.logistics_type}')"><i class="bi bi-check-lg me-1"></i>Aceitar</button><button class="ml-btn ml-btn-outline flex-grow-1" onclick="window.resetLogistics('${order.id}')"><i class="bi bi-x-lg me-1"></i>Recusar</button></div>`;
+                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="ml-attach ml-attach-success flex-grow-1" onclick="window.setLogistics('${order.id}','${order.logistics_type}')"><i class="bi bi-check-lg me-1"></i>Aceitar</button><button class="ml-attach ml-attach-danger flex-grow-1" onclick="window.resetLogistics('${order.id}')"><i class="bi bi-x-lg me-1"></i>Recusar</button></div>`;
             } else {
                 buttonsHtml += `<div class="logistics-section"><p class="logistics-section-title">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div></div>`;
             }
@@ -2989,20 +2989,20 @@ function updateChatLogistics(order, user) {
         }
     } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
         if (isBuyer) {
-            buttonsHtml += `<button class="ml-btn ml-btn-primary w-100 mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button><button class="ml-btn ml-btn-outline w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
+            buttonsHtml += `<button class="ml-attach ml-attach-success w-100 mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
         } else {
-            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div><button class="ml-btn ml-btn-primary w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
+            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
         }
     } else if (order.status === 'finished') {
         const reviewedLocal = (uid) => { try { return !!localStorage.getItem(`reviewed_${order.id}_${uid}`); } catch (e) { return false; } };
         if (isBuyer) {
             buttonsHtml += (order.buyer_reviewed || reviewedLocal(user.id))
                 ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Avaliação recebida pelo vendedor</div>`
-                : `<button class="ml-btn ml-btn-primary w-100 mb-2" onclick="window.openReviewModal('${order.id}','buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
+                : `<button class="ml-attach ml-attach-warning w-100 mb-2" onclick="window.openReviewModal('${order.id}','buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
         } else {
             buttonsHtml += (order.seller_reviewed || reviewedLocal(user.id))
                 ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Avaliação recebida pelo comprador</div>`
-                : `<button class="ml-btn ml-btn-primary w-100 mb-2" onclick="window.openReviewModal('${order.id}','seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
+                : `<button class="ml-attach ml-attach-warning w-100 mb-2" onclick="window.openReviewModal('${order.id}','seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
         }
     }
     logisticsButtons.innerHTML = buttonsHtml;
