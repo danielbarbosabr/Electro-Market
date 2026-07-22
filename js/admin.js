@@ -3852,8 +3852,7 @@ window.shareProduct = function(pid) {
         if (!item) { showToast('Produto não encontrado.', 'error'); return; }
         const base = window.location.origin + window.location.pathname;
         const url  = `${base}#/produto/${pid}`;
-        const img  = item.img ? (Array.isArray(item.img) ? item.img[0] : item.img) : '';
-        const text = `Confira: ${item.titulo} no ElectroMarket!${img ? '\n' + img : ''}`;
+        const text = `Confira: ${item.titulo} no ElectroMarket!`;
 
         if (navigator.share) {
             navigator.share({ title: 'ElectroMarket', text, url }).catch(console.error);
