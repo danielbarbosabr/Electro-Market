@@ -1263,8 +1263,22 @@ body.dark-theme .opinions-bar-fill {
 .opinion-card-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 4px;
+}
+
+.opinion-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.opinion-author-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .opinion-author {

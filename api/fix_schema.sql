@@ -73,6 +73,7 @@ alter table public.avaliacoes add column if not exists avaliado_id uuid;
 alter table public.avaliacoes add column if not exists images jsonb default '[]'::jsonb;
 alter table public.avaliacoes add column if not exists videos jsonb default '[]'::jsonb;
 alter table public.avaliacoes add column if not exists product_id text;
+alter table public.avaliacoes add column if not exists avaliador_avatar text default '';
 
 -- ---------- ÍNDICES ----------
 create index if not exists idx_users_email        on public.users (email);

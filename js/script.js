@@ -5282,12 +5282,14 @@ window.loadProductReviews = async function(productId) {
             const rows = await supabaseFetch(`avaliacoes?product_id=eq.${productId}&select=*`);
             if (rows && rows.length > 0) {
                 avaliacoes = rows.map(r => ({
-                    rating:         r.rating || 0,
-                    comment:        r.comment || '',
-                    images:         (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) || [],
-                    videos:         (typeof r.videos === 'string' ? JSON.parse(r.videos) : r.videos) || [],
-                    avaliador_nome: r.avaliador_nome || 'Anônimo',
-                    created_at:     r.created_at
+                    rating:          r.rating || 0,
+                    comment:         r.comment || '',
+                    images:          (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) || [],
+                    videos:          (typeof r.videos === 'string' ? JSON.parse(r.videos) : r.videos) || [],
+                    avaliador_nome:  r.avaliador_nome || 'Anônimo',
+                    avaliador_avatar: r.avaliador_avatar || '',
+                    avaliador_id:    r.avaliador_id || '',
+                    created_at:      r.created_at
                 }));
             }
         } catch (e) {
@@ -5308,6 +5310,7 @@ window.loadProductReviews = async function(productId) {
                                 comment:        m.reviewComment || m.text?.split('\n\n')[1]?.trim() || '',
                                 images:         m.reviewImages || (m.image ? [m.image] : []),
                                 avaliador_nome: m.senderName || 'Anônimo',
+                                avaliador_avatar: m.avaliadorAvatar || '',
                                 created_at:     m.timestamp || chat.created_at
                             });
                         }
@@ -5358,11 +5361,15 @@ window.loadProductReviews = async function(productId) {
             const video = a.videos && Array.isArray(a.videos) && a.videos[0]
                 ? `<a href="${a.videos[0]}" target="_blank" class="opinion-video-link"><i class="bi bi-play-circle-fill me-1" style="color:#ff0000;"></i>Ver vídeo</a>` : '';
             const date = new Date(a.created_at).toLocaleDateString('pt-BR');
+            const avatarUrl = a.avaliador_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((a.avaliador_nome||'U').slice(0,2))}&background=3483fa&color=fff&size=36`;
             return `
                 <div class="opinion-card">
                     <div class="opinion-card-header">
-                        <span class="opinion-author">${a.avaliador_nome || 'Anônimo'}</span>
-                        <span class="opinion-stars">${stars}</span>
+                        <img src="${avatarUrl}" class="opinion-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent((a.avaliador_nome||'U').slice(0,2))}&background=3483fa&color=fff&size=36'">
+                        <div class="opinion-author-info">
+                            <span class="opinion-author">${a.avaliador_nome || 'Anônimo'}</span>
+                            <span class="opinion-stars">${stars}</span>
+                        </div>
                     </div>
                     <div class="opinion-date">${date}</div>
                     ${a.comment ? `<p class="opinion-comment">${a.comment}</p>` : ''}

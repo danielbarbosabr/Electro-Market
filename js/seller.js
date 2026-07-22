@@ -308,9 +308,7 @@ window.updateOrderStatus = async function(orderId, newStatus) {
 window.removeOrderFromHistory = async function(orderId, type) {
     if (!confirm('Deseja remover este registro do seu histórico?')) return;
     try {
-        // Primeiro remove o chat (devido a restrições de chave estrangeira)
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
-        // Depois remove o pedido
         await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
         
         showToast('Pedido removido do histórico!', 'info');
@@ -619,33 +617,42 @@ window.submitReview = async function() {
         const cachedOrder = ordersCache.find(o => o.id === orderId);
         if (cachedOrder) cachedOrder[reviewedField] = true;
 
-        // Envia a avaliação como mensagem no chat (armazena toda a review aqui)
+        // Tenta obter o product_id do pedido (cache ou banco)
         let reviewedProductId = null;
+        try {
+            if (cachedOrder?.product_id) {
+                reviewedProductId = cachedOrder.product_id;
+            } else {
+                const orderRow = await supabaseFetch(`orders?id=eq.${orderId}&select=product_id&limit=1`);
+                if (orderRow?.[0]?.product_id) reviewedProductId = orderRow[0].product_id;
+            }
+        } catch (e) {}
+
+        // Avatar do avaliador
+        const reviewerAvatar = (() => { try { const links = safeParseImages(user.avatar); return links[0] || ''; } catch { return ''; } })();
+
+        // Envia a avaliação como mensagem no chat (old system)
         try {
             const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
             const chat = chatData?.[0];
             if (chat) {
                 const targetName = isSellerRatingBuyer ? (chat.buyer_name || 'Comprador') : (chat.seller_name || 'Vendedor');
-                // Tenta obter o product_id do pedido
-                try {
-                    const orderRow = await supabaseFetch(`orders?id=eq.${orderId}&select=product_id&limit=1`);
-                    if (orderRow?.[0]?.product_id) reviewedProductId = orderRow[0].product_id;
-                } catch (e) {}
                 const stars = '★'.repeat(currentReviewRating) + '☆'.repeat(5 - currentReviewRating);
                 let reviewText = isSellerRatingBuyer ? `Avaliação do comprador` : `Avaliação do vendedor`;
                 reviewText += `\nNota: ${currentReviewRating}/5\n\n`;
                 if (comment) reviewText += `${comment}\n\n`;
                 reviewText += `— ${user.nome || 'Usuário'}`;
                 const newMsg = {
-                    senderId:     user.id,
-                    senderName:   user.nome || 'Usuário',
-                    text:         reviewText,
-                    timestamp:    new Date().toISOString(),
-                    type:         'review',
-                    avaliadoId:   targetId,
-                    avaliadoNome: targetName,
-                    rating:       currentReviewRating,
-                    reviewComment: comment || ''
+                    senderId:        user.id,
+                    senderName:      user.nome || 'Usuário',
+                    text:            reviewText,
+                    timestamp:       new Date().toISOString(),
+                    type:            'review',
+                    avaliadoId:      targetId,
+                    avaliadoNome:    targetName,
+                    rating:          currentReviewRating,
+                    reviewComment:   comment || '',
+                    avaliadorAvatar: reviewerAvatar
                 };
                 if (reviewImages.length > 0) {
                     newMsg.image = reviewImages[0];
@@ -664,23 +671,22 @@ window.submitReview = async function() {
 
         // Persiste a avaliação na tabela avaliacoes (independente do chat)
         try {
-            if (reviewedProductId) {
-                await supabaseFetch('avaliacoes', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        order_id:       orderId,
-                        product_id:     reviewedProductId,
-                        tipo:           mode,
-                        avaliador_id:   user.id,
-                        avaliador_nome: user.nome || 'Usuário',
-                        avaliado_id:    targetId,
-                        rating:         currentReviewRating,
-                        comment:        comment || '',
-                        images:         reviewImages.length > 0 ? JSON.stringify(reviewImages) : '[]',
-                        videos:         '[]'
-                    })
-                });
-            }
+            await supabaseFetch('avaliacoes', {
+                method: 'POST',
+                body: JSON.stringify({
+                    order_id:         orderId,
+                    product_id:       reviewedProductId || null,
+                    tipo:             mode,
+                    avaliador_id:     user.id,
+                    avaliador_nome:   user.nome || 'Usuário',
+                    avaliador_avatar: reviewerAvatar,
+                    avaliado_id:      targetId,
+                    rating:           currentReviewRating,
+                    comment:          comment || '',
+                    images:           reviewImages.length > 0 ? JSON.stringify(reviewImages) : '[]',
+                    videos:           '[]'
+                })
+            });
         } catch (e) {
             console.warn('Erro ao persistir avaliação na tabela:', e);
         }
