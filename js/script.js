@@ -2421,12 +2421,12 @@ window.updateChatBadge = async function() {
     try {
         const user = getSavedUser();
         if (!user) return;
-        const chats = await supabaseFetch('chats?order_id=is.null&select=messages,participants');
+        const allChats = await supabaseFetch('chats?select=messages,participants,order_id');
         let totalUnread = 0;
-        chats.forEach(c => {
-            if (!c.participants || !c.participants.includes(user.id)) return;
+        (allChats || []).forEach(c => {
+            if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
             if (c.messages && c.messages[0]?.type === 'ticket_meta') return;
-            const un = c.messages?.filter(m => m.senderId !== user.id && !m.visto).length || 0;
+            const un = c.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
             totalUnread += un;
         });
         const ids = ['chatBadgeDesktop', 'chatBadgeMobile', 'chatBadgeSellerMobile', 'chatBadgeAdminMobile'];
@@ -2650,15 +2650,24 @@ async function loadChatMessages(orderId, silent = false) {
             () => loadChatMessages(orderId, true)
         );
         let changed = false;
-        const otherSenderIds = chat.participants.filter(id => id !== user.id);
         chat.messages.forEach(msg => {
-            if (msg.senderId && otherSenderIds.includes(msg.senderId) && !msg.visto) {
+            if (msg.senderId && String(msg.senderId) !== String(user.id) && !msg.visto) {
                 msg.visto = true; changed = true;
             }
         });
         if (changed) {
             supabaseFetch(`chats?order_id=eq.${orderId}`, {method: 'PATCH', body: JSON.stringify({messages: chat.messages})}).catch(() => {});
+            window.updateChatBadge();
+            // Atualiza badge da lista lateral de pedidos
+            const contactEl = document.querySelector(`.wa-contact[data-order-id="${orderId}"]`);
+            if (contactEl) {
+                const badge = contactEl.querySelector('.badge.bg-success');
+                if (badge) badge.remove();
+                const textEl = contactEl.querySelector('.wa-contact-text');
+                if (textEl) textEl.style.removeProperty('font-weight');
+            }
         }
+
         const signature = JSON.stringify(chat.messages);
         if (silent && signature === window.lastChatSignature) {
             updateChatLogistics(order, user);
@@ -2730,7 +2739,7 @@ function updateChatLogistics(order, user) {
         } else if (!userAgreed) {
             if (otherAgreed && order.logistics_type) {
                 const typeText = getLogisticsTypeText(order.logistics_type);
-                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex gap-2 mb-2"><button class="ml-attach ml-attach-success flex-grow-1" onclick="window.setLogistics('${order.id}','${order.logistics_type}')"><i class="bi bi-check-lg me-1"></i>Aceitar</button><button class="ml-attach ml-attach-danger flex-grow-1" onclick="window.resetLogistics('${order.id}')"><i class="bi bi-x-lg me-1"></i>Recusar</button></div>`;
+                buttonsHtml += `<p class="text-center small mb-2">A outra parte propôs: <strong>${typeText}</strong></p><div class="d-flex flex-column gap-2 mb-2"><button class="ml-attach ml-attach-success w-100" onclick="window.setLogistics('${order.id}','${order.logistics_type}')"><i class="bi bi-check-lg me-1"></i>Aceitar</button><button class="ml-attach ml-attach-danger w-100" onclick="window.resetLogistics('${order.id}')"><i class="bi bi-x-lg me-1"></i>Recusar</button></div>`;
             } else {
                 buttonsHtml += `<div class="logistics-section"><p class="logistics-section-title">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div></div>`;
             }
@@ -3588,6 +3597,8 @@ function bootstrapApp() {
     window.renderCart();
     window.setupAutoComplete();
     window.updateChatBadge();
+    if (window._chatBadgeInterval) clearInterval(window._chatBadgeInterval);
+    window._chatBadgeInterval = setInterval(() => window.updateChatBadge(), 10000);
 
     const user = getEffectiveUser();
     if (user?.tipo === 'VENDEDOR') {
@@ -4324,6 +4335,9 @@ async function handleGoogleOAuthCallback() {
 
 // ============================================
 // IA — ASSISTENTE DE SUPORTE (Transformers.js — 100% local, sem API key)
+
+const AI_USER_ID = '00000000-0000-0000-0000-00000000a1';
+const AI_USER_DATA = { id: AI_USER_ID, nome: 'DuckDuckGo', avatar: 'https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3', last_seen: new Date().toISOString() };
 // ============================================
 
 /**
@@ -4403,6 +4417,84 @@ window.suggestSupportReply = async function() {
         if (input) { input.value = reply; input.focus(); }
     }
 };
+
+async function _respondIfAiChat(chat) {
+    try {
+        const otherId = chat.participants?.find(p => String(p) !== String(getSavedUser()?.id));
+        if (String(otherId) !== AI_USER_ID) return;
+        const msgs = (chat.messages || []).filter(m => m.type !== 'system' && m.type !== 'direct_chat_meta' && m.type !== 'image');
+        if (!msgs.length) return;
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg && String(lastMsg.senderId) === AI_USER_ID) return;
+        const userMsgs = msgs.filter(m => String(m.senderId) !== AI_USER_ID);
+        let lastUserText = userMsgs.length ? userMsgs[userMsgs.length - 1].text || '' : '';
+        if (!lastUserText) return;
+        lastUserText = lastUserText.replace(/[^\w\sáéíóúãõâêîôûàèìòùçñ]/gi, ' ').replace(/\s+/g, ' ').trim();
+        lastUserText = lastUserText.replace(/\b(oque|o que|oque é|o que é|que|qual|quais|como|quem|quanto|quando|onde|porque|por que|pra que|para que|me diga|explique|saber|queria|gostaria|poderia|pode|me fale|fale|diga|é|são|um|uma|uns|umas|do|da|dos|das|em|no|na|nos|nas|de|para|por|com|sem|sob|sobre|entre|depois|antes|durante|após)\b/gi, '');
+        lastUserText = lastUserText.replace(/\s+/g, ' ').trim();
+        if (!lastUserText) lastUserText = userMsgs.length ? userMsgs[userMsgs.length - 1].text || '' : '';
+        let reply = '';
+        let query = lastUserText;
+        try {
+            const iaUrl = 'https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1';
+            const iaRes = await fetch(iaUrl);
+            const iaData = await iaRes.json();
+            if (iaData.AbstractText) {
+                reply = iaData.AbstractText;
+                if (iaData.AbstractURL) reply += '\n\n' + iaData.AbstractURL;
+            } else if (iaData.RelatedTopics?.length) {
+                const top = iaData.RelatedTopics[0];
+                reply = top.Text || top.Result || '';
+                if (top.FirstURL) reply += '\n\n' + top.FirstURL;
+            } else if (iaData.Answer) {
+                reply = iaData.Answer;
+            }
+        } catch (e) { /* fallback */ }
+        if (!reply) {
+            const proxyList = [
+                (q) => `https://api.allorigins.win/raw?url=${encodeURIComponent('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q))}`,
+                (q) => `https://corsproxy.io/?${encodeURIComponent('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q))}`,
+                (q) => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q))}`,
+            ];
+            for (const buildUrl of proxyList) {
+                try {
+                    const url = buildUrl(query);
+                    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+                    if (!res.ok) continue;
+                    const html = await res.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const results = [];
+                    doc.querySelectorAll('.result__body, .web-result, .results_links').forEach(el => {
+                        const aEl = el.querySelector('.result__title a, .result__a, h2 a');
+                        const snippetEl = el.querySelector('.result__snippet, .snippet, .result__snippet');
+                        if (aEl) {
+                            const title = aEl.textContent.trim();
+                            let link = aEl.getAttribute('href') || '';
+                            if (link.startsWith('//')) link = 'https:' + link;
+                            else if (link.startsWith('/')) link = 'https://duckduckgo.com' + link;
+                            const snippet = snippetEl ? snippetEl.textContent.trim() : '';
+                            if (title && !results.some(r => r.title === title)) {
+                                results.push({ title, link, snippet });
+                            }
+                        }
+                    });
+                    if (results.length > 3) results.length = 3;
+                    if (results.length) {
+                        reply = 'Resultados para "' + query + '":\n\n' + results.map((r, i) => `${i+1}. ${r.title}\n   ${r.link}`).join('\n\n');
+                    }
+                    break;
+                } catch (e) { continue; }
+            }
+        }
+        if (!reply) reply = 'Nao encontrei resultados para "' + query + '" na web.';
+        if (!reply) return;
+        chat.messages.push({ senderId: AI_USER_ID, senderName: 'DuckDuckGo', text: reply, timestamp: new Date().toISOString(), type: 'message' });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        if (window.currentChat === chat.id && window._chatActiveElements?.container) {
+            await loadDirectChatMessages(chat.id, true);
+        }
+    } catch (e) { console.error('AI response error:', e); }
+}
 
 // ============================================
 // VERIFICAÇÃO DE E-MAIL DUPLICADO
@@ -5246,7 +5338,8 @@ window.renderChatContainer = function(opts) {
         showDeleteBtn = false,
         extraHeaderHtml = '',
         extraBeforeMessages = '',
-        extraBeforeInput = ''
+        extraBeforeInput = '',
+        headerSubtitle = ''
     } = opts;
 
     const bothReviewed = order?.buyer_reviewed && order?.seller_reviewed;
@@ -5311,7 +5404,7 @@ window.renderChatContainer = function(opts) {
         <div class="chat-header-info" style="min-width:0;flex:1;">
             <span class="chat-header-name">${partnerName}</span>
             <span class="chat-header-order-id" style="display:block;font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                #${String(chatId).slice(-6).toUpperCase()} · ${msgCount} mensagem${msgCount === 1 ? '' : 's'}${isClosed ? ' · <i class="bi bi-lock-fill"></i> Encerrado' : ''}
+                #${String(chatId).slice(-6).toUpperCase()} · ${msgCount} mensagem${msgCount === 1 ? '' : 's'}${isClosed ? ' · <i class="bi bi-lock-fill"></i> Encerrado' : ''}${headerSubtitle ? ' · ' + headerSubtitle : ''}
             </span>
             ${extraHeaderHtml ? `<div class="mt-1">${extraHeaderHtml}</div>` : ''}
             ${productSummaryHtml}
@@ -5445,17 +5538,23 @@ window.renderDirectChats = async function() {
         const allUsers = await supabaseFetch(`users?select=id,nome,avatar,last_seen&order=nome.asc`);
         const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
         const myChats = directChats.filter(c =>
-            c.participants && c.participants.includes(user.id) &&
+            c.participants && c.participants.some(p => String(p) === String(user.id)) &&
             c.messages && c.messages[0]?.type !== 'ticket_meta'
         );
 
         const contactMap = {};
         myChats.forEach(chat => {
-            const otherId = chat.participants.find(p => p !== user.id);
+            const otherId = chat.participants.find(p => String(p) !== String(user.id));
             if (otherId) contactMap[otherId] = chat;
         });
 
-        const otherUsers = allUsers.filter(u => u.id !== user.id);
+        const otherUsers = allUsers.filter(u => String(u.id) !== String(user.id));
+        if (!allUsers.some(u => String(u.id) === AI_USER_ID)) {
+            allUsers.push(AI_USER_DATA);
+        }
+        if (!otherUsers.some(u => String(u.id) === AI_USER_ID)) {
+            otherUsers.push(AI_USER_DATA);
+        }
         if (!otherUsers.length) {
             waList.innerHTML = `
                 <div class="text-center py-5 px-3" style="color:#999;">
@@ -5504,7 +5603,7 @@ window.renderDirectChats = async function() {
                 const online = isRecentlyOnline(u.last_seen);
                 const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
                 const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
-                const unread = chat.messages?.filter(m => m.senderId !== user.id && !m.visto).length || 0;
+                const unread = chat.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
 
                 return `
                 <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')">
@@ -5623,7 +5722,7 @@ window.startDirectChat = async function(targetUserId) {
         const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
         const existing = directChats.find(c =>
             c.order_id === null &&
-            c.participants && c.participants.includes(user.id) && c.participants.includes(targetUserId) &&
+            c.participants && c.participants.some(p => String(p) === String(user.id)) && c.participants.some(p => String(p) === String(targetUserId)) &&
             c.messages && c.messages[0]?.type !== 'ticket_meta'
         );
 
@@ -5632,7 +5731,9 @@ window.startDirectChat = async function(targetUserId) {
             return;
         }
 
-        const targetData = await supabaseFetch(`users?select=nome,avatar&id=eq.${targetUserId}&limit=1`);
+        const targetData = String(targetUserId) === AI_USER_ID
+            ? [AI_USER_DATA]
+            : await supabaseFetch(`users?select=nome,avatar&id=eq.${targetUserId}&limit=1`);
         const target = targetData?.[0];
         const targetName = target?.nome || 'Usuário';
 
@@ -5640,7 +5741,7 @@ window.startDirectChat = async function(targetUserId) {
             id: crypto.randomUUID(),
             order_id: null,
             buyer_id: user.id,
-            seller_id: targetUserId,
+            seller_id: String(targetUserId) === AI_USER_ID ? user.id : targetUserId,
             buyer_name: user.nome,
             seller_name: targetName,
             participants: [user.id, targetUserId],
@@ -5653,7 +5754,14 @@ window.startDirectChat = async function(targetUserId) {
         await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
 
         await window.renderDirectChats();
-        setTimeout(() => window.openDirectChat(newChat.id), 300);
+        if (String(targetUserId) === AI_USER_ID) {
+            setTimeout(async () => {
+                await window.openDirectChat(newChat.id);
+                _respondIfAiChat(newChat);
+            }, 500);
+        } else {
+            setTimeout(() => window.openDirectChat(newChat.id), 300);
+        }
     } catch (e) {
         console.error('Erro ao criar conversa:', e);
         showToast('Erro ao abrir conversa.', 'error');
@@ -5671,7 +5779,7 @@ window.openDirectChat = async function(chatId) {
         const chat = chatResult?.[0];
         if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
 
-        const otherId = chat.participants.find(p => p !== user.id);
+        const otherId = chat.participants.find(p => String(p) !== String(user.id));
         let otherName = 'Usuário';
         let otherAvatar = `https://ui-avatars.com/api/?name=User&background=random&size=40`;
         let otherLastSeen = null;
@@ -5679,15 +5787,22 @@ window.openDirectChat = async function(chatId) {
         let otherPhone = '';
 
         if (otherId) {
-            const otherData = await supabaseFetch(`users?select=nome,avatar,last_seen,email,telefone&id=eq.${otherId}&limit=1`);
-            const other = otherData?.[0];
-            if (other) {
-                otherName = other.nome || otherName;
-                const realAvatar = normalizeImageUrl(safeParseImages(other.avatar)[0]);
-                if (realAvatar) otherAvatar = realAvatar;
-                otherLastSeen = other.last_seen;
-                otherEmail = other.email || '';
-                otherPhone = other.telefone || '';
+            if (String(otherId) === AI_USER_ID) {
+                otherName = 'DuckDuckGo';
+                otherAvatar = 'https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3';
+                otherEmail = '';
+                otherPhone = '';
+            } else {
+                const otherData = await supabaseFetch(`users?select=nome,avatar,last_seen,email,telefone&id=eq.${otherId}&limit=1`);
+                const other = otherData?.[0];
+                if (other) {
+                    otherName = other.nome || otherName;
+                    const realAvatar = normalizeImageUrl(safeParseImages(other.avatar)[0]);
+                    if (realAvatar) otherAvatar = realAvatar;
+                    otherLastSeen = other.last_seen;
+                    otherEmail = other.email || '';
+                    otherPhone = other.telefone || '';
+                }
             }
         }
 
@@ -5727,7 +5842,9 @@ window.openDirectChat = async function(chatId) {
             onDelete: `window.deleteDirectChat('${chatId}')`,
             showProductSummary: false,
             showAttach: true,
-            statusInfo: { class: 'secondary mb-0 py-1', text: `<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;">${otherEmail ? `<span><i class="bi bi-envelope-fill me-1" style="font-size:0.65rem;"></i>${otherEmail}</span>` : ''}${otherPhone ? `<span><i class="bi bi-telephone-fill me-1" style="font-size:0.65rem;"></i>${otherPhone}</span>` : ''}</div>` }
+            statusInfo: String(otherId) === AI_USER_ID
+                ? { class: 'secondary mb-0 py-1', text: '<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;"><span><i class="bi bi-search me-1"></i>Busca na Web</span><span><i class="bi bi-globe2 me-1"></i>DuckDuckGo</span></div>' }
+                : { class: 'secondary mb-0 py-1', text: `<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;">${otherEmail ? `<span><i class="bi bi-envelope-fill me-1" style="font-size:0.65rem;"></i>${otherEmail}</span>` : ''}${otherPhone ? `<span><i class="bi bi-telephone-fill me-1" style="font-size:0.65rem;"></i>${otherPhone}</span>` : ''}</div>` }
         });
 
         const panel = document.getElementById('waChatActive');
@@ -5817,16 +5934,22 @@ async function loadDirectChatMessages(chatId, silent = false) {
         );
 
         let changed = false;
-        const otherSenderIds = chat.participants.filter(id => id !== user.id);
         chat.messages.forEach(msg => {
-            if (msg.senderId && otherSenderIds.includes(msg.senderId) && !msg.visto) {
+            if (msg.senderId && String(msg.senderId) !== String(user.id) && !msg.visto) {
                 msg.visto = true; changed = true;
             }
         });
         if (changed) {
-            supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {});
+            await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {});
             window.updateChatBadge();
-            window.renderDirectChats();
+            // Atualiza badge da lista lateral sem re-renderizar tudo
+            const contactEl = document.querySelector(`.wa-contact[data-direct-chat-id="${chatId}"]`);
+            if (contactEl) {
+                const badge = contactEl.querySelector('.badge.bg-success');
+                if (badge) badge.remove();
+                const textEl = contactEl.querySelector('.wa-contact-text');
+                if (textEl) textEl.style.removeProperty('font-weight');
+            }
         }
 
         const signature = JSON.stringify(chat.messages);
@@ -5837,13 +5960,17 @@ async function loadDirectChatMessages(chatId, silent = false) {
         const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
         const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'Você')}&background=22c98e&color=fff&size=40`;
 
-        const otherId = chat.participants.find(p => p !== user.id);
+        const otherId = chat.participants.find(p => String(p) !== String(user.id));
         let partnerAvatarSrc = `https://ui-avatars.com/api/?name=User&background=random&size=40`;
         try {
             if (otherId) {
-                const pd = await supabaseFetch(`users?select=avatar&id=eq.${otherId}&limit=1`);
-                const ra = normalizeImageUrl(safeParseImages(pd?.[0]?.avatar)[0]);
-                if (ra) partnerAvatarSrc = ra;
+                if (String(otherId) === AI_USER_ID) {
+                    partnerAvatarSrc = 'https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3';
+                } else {
+                    const pd = await supabaseFetch(`users?select=avatar&id=eq.${otherId}&limit=1`);
+                    const ra = normalizeImageUrl(safeParseImages(pd?.[0]?.avatar)[0]);
+                    if (ra) partnerAvatarSrc = ra;
+                }
             }
         } catch (e) {}
 
@@ -5896,6 +6023,9 @@ window.sendDirectChatMessage = async function(event) {
         input.value = '';
         window.cancelReplyOrEdit();
         await loadDirectChatMessages(window.currentChat);
+        if (chat.participants?.some(p => String(p) === AI_USER_ID)) {
+            _respondIfAiChat(chat);
+        }
     } catch (e) { showToast('Erro ao enviar mensagem.', 'error'); }
 };
 
@@ -5940,6 +6070,7 @@ window.sendDirectChatImage = async function(urlParam) {
         chat.messages.push(msg);
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         await loadDirectChatMessages(window.currentChat);
+        if (chat.participants?.some(p => String(p) === AI_USER_ID)) _respondIfAiChat(chat);
     } catch (e) { showToast('Erro ao processar o link.', 'error'); }
 };
 
@@ -5955,6 +6086,7 @@ window.sendDirectChatFile = async function(urlParam) {
         chat.messages.push({ senderId: user.id, senderName: user.nome, text: `Arquivo: ${url.split('/').pop()}`, file: { name: 'Arquivo Externo', url, size: 0 }, timestamp: new Date().toISOString(), type: 'file' });
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         await loadDirectChatMessages(window.currentChat);
+        if (chat.participants?.some(p => String(p) === AI_USER_ID)) _respondIfAiChat(chat);
     } catch { showToast('Erro ao enviar arquivo.', 'error'); }
 };
 
@@ -6008,12 +6140,38 @@ async function sendDirectLocationMessage(mapsUrl, text) {
         chat.messages.push({ senderId: user.id, senderName: user.nome, text, location: mapsUrl, timestamp: new Date().toISOString(), type: 'location' });
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         await loadDirectChatMessages(window.currentChat);
-        window._chatActiveElements?.attachPanel?.classList.add('d-none');
+        if (chat.participants?.some(p => String(p) === AI_USER_ID)) _respondIfAiChat(chat);
     } catch { showToast('Erro ao enviar localização.', 'error'); }
 }
 
 window.viewDirectChatPartnerProfile = async function(partnerId) {
     if (!partnerId) return;
+    if (String(partnerId) === AI_USER_ID) {
+        const modalHtml = `
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-body text-center p-4">
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                    <img src="https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid #e9ecef;" referrerpolicy="no-referrer">
+                    <h5 class="mt-3 mb-1">DuckDuckGo</h5>
+                    <p class="text-muted small mb-2"><i class="bi bi-search me-1"></i>Busca na Web</p>
+                    <p class="small text-muted mb-0">Pesquisa via DuckDuckGo Instant Answer<br>Digite sua pergunta e eu busco a resposta</p>
+                </div>
+            </div>
+        </div>`;
+        let modalEl = document.getElementById('partnerProfileModal');
+        if (!modalEl) {
+            modalEl = document.createElement('div');
+            modalEl.id = 'partnerProfileModal';
+            modalEl.className = 'modal fade';
+            modalEl.tabIndex = -1;
+            document.body.appendChild(modalEl);
+        }
+        modalEl.innerHTML = modalHtml;
+        const bsModal = new bootstrap.Modal(modalEl);
+        bsModal.show();
+        return;
+    }
     let partner = null;
     try {
         const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at,last_seen&id=eq.${partnerId}&limit=1`);
@@ -6093,7 +6251,7 @@ window.blockDirectChatUser = async function(targetId) {
         const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
         const chat = directChats.find(c =>
             c.order_id === null &&
-            c.participants && c.participants.includes(user.id) && c.participants.includes(targetId) &&
+            c.participants && c.participants.some(p => String(p) === String(user.id)) && c.participants.some(p => String(p) === String(targetId)) &&
             c.messages && c.messages[0]?.type !== 'ticket_meta'
         );
         if (chat) {

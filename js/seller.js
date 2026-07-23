@@ -46,11 +46,22 @@ async function renderOrdersListSilently(type) {
 
         if (!orders.length) return; // mantém a mensagem de "nenhum pedido" já mostrada
 
+        // Busca chats para calcular não lidas
+        const _orderIds = orders.map(o => o.id);
+        const _chats = await supabaseFetch('chats?select=order_id,messages,participants&order_id=in.(' + _orderIds.map(id => '"' + id + '"').join(',') + ')');
+        const _unreadMap = {};
+        (_chats || []).forEach(c => {
+            if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
+            const u = c.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
+            if (u > 0) _unreadMap[c.order_id] = u;
+        });
+
         waList.innerHTML = orders.map(order => {
             const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
             const isPending = order.status === 'pending' || order.status === 'offer_pending';
             const isBuyer   = user.id === order.buyer_id;
             const partnerName = isBuyer ? order.seller_name : order.buyer_name;
+            const _unread  = _unreadMap[order.id] || 0;
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
@@ -64,10 +75,13 @@ async function renderOrdersListSilently(type) {
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
-                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
+                    <div class="wa-contact-text" style="${_unread ? 'font-weight:600;color:#111;' : ''}">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
                     ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
-                <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                    ${_unread ? `<span class="badge bg-success wa-contact-badge" style="position:static;">${_unread}</span>` : ''}
+                    <span class="badge ${st.class} wa-contact-badge" style="position:static;">${st.text}</span>
+                </div>
             </div>`;
         }).join('');
         window.filterWaContacts(document.getElementById('waContactSearch')?.value || '');
@@ -133,11 +147,22 @@ window.renderOrderManagement = async function(type = 'buyer') {
             return;
         }
 
+        // Busca chats para calcular não lidas
+        const orderIds = orders.map(o => o.id);
+        const chats = await supabaseFetch('chats?select=order_id,messages,participants&order_id=in.(' + orderIds.map(id => '"' + id + '"').join(',') + ')');
+        const unreadMap = {};
+        (chats || []).forEach(c => {
+            if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
+            const u = c.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
+            if (u > 0) unreadMap[c.order_id] = u;
+        });
+
         waList.innerHTML = orders.map(order => {
             const st        = ORDER_STATUS_MAP[order.status] || { text: order.status, class: 'bg-secondary' };
             const isPending = order.status === 'pending' || order.status === 'offer_pending';
             const isBuyer   = user.id === order.buyer_id;
             const partnerName = isBuyer ? order.seller_name : order.buyer_name;
+            const unread    = unreadMap[order.id] || 0;
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
@@ -151,10 +176,13 @@ window.renderOrderManagement = async function(type = 'buyer') {
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
-                    <div class="wa-contact-text">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
+                    <div class="wa-contact-text" style="${unread ? 'font-weight:600;color:#111;' : ''}">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
                     ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
-                <span class="badge ${st.class} wa-contact-badge">${st.text}</span>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                    ${unread ? `<span class="badge bg-success wa-contact-badge" style="position:static;">${unread}</span>` : ''}
+                    <span class="badge ${st.class} wa-contact-badge" style="position:static;">${st.text}</span>
+                </div>
             </div>`;
         }).join('');
 
