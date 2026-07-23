@@ -52,7 +52,7 @@ async function renderOrdersListSilently(type) {
         const _unreadMap = {};
         (_chats || []).forEach(c => {
             if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
-            const u = c.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
+            const u = c.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0;
             if (u > 0) _unreadMap[c.order_id] = u;
         });
 
@@ -153,7 +153,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
         const unreadMap = {};
         (chats || []).forEach(c => {
             if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
-            const u = c.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
+            const u = c.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0;
             if (u > 0) unreadMap[c.order_id] = u;
         });
 

@@ -2426,7 +2426,7 @@ window.updateChatBadge = async function() {
         (allChats || []).forEach(c => {
             if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
             if (c.messages && c.messages[0]?.type === 'ticket_meta') return;
-            const un = c.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
+            const un = c.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0;
             totalUnread += un;
         });
         const ids = ['chatBadgeDesktop', 'chatBadgeMobile', 'chatBadgeSellerMobile', 'chatBadgeAdminMobile'];
@@ -4435,6 +4435,7 @@ async function _respondIfAiChat(chat) {
         if (!lastUserText) lastUserText = userMsgs.length ? userMsgs[userMsgs.length - 1].text || '' : '';
         let reply = '';
         let query = lastUserText;
+        let results = [];
         try {
             const iaUrl = 'https://api.duckduckgo.com/?q=' + encodeURIComponent(query) + '&format=json&no_html=1&skip_disambig=1';
             const iaRes = await fetch(iaUrl);
@@ -4463,7 +4464,6 @@ async function _respondIfAiChat(chat) {
                     if (!res.ok) continue;
                     const html = await res.text();
                     const doc = new DOMParser().parseFromString(html, 'text/html');
-                    const results = [];
                     doc.querySelectorAll('.result__body, .web-result, .results_links').forEach(el => {
                         const aEl = el.querySelector('.result__title a, .result__a, h2 a');
                         const snippetEl = el.querySelector('.result__snippet, .snippet, .result__snippet');
@@ -4480,7 +4480,7 @@ async function _respondIfAiChat(chat) {
                     });
                     if (results.length > 3) results.length = 3;
                     if (results.length) {
-                        reply = 'Resultados para "' + query + '":\n\n' + results.map((r, i) => `${i+1}. ${r.title}\n   ${r.link}`).join('\n\n');
+                        reply = results.map((r, i) => `${i+1}. ${r.title}: ${r.link}`).join('\n\n');
                     }
                     break;
                 } catch (e) { continue; }
@@ -4488,7 +4488,9 @@ async function _respondIfAiChat(chat) {
         }
         if (!reply) reply = 'Nao encontrei resultados para "' + query + '" na web.';
         if (!reply) return;
-        chat.messages.push({ senderId: AI_USER_ID, senderName: 'DuckDuckGo', text: reply, timestamp: new Date().toISOString(), type: 'message' });
+        const msgPayload = { senderId: AI_USER_ID, senderName: 'DuckDuckGo', text: reply, timestamp: new Date().toISOString(), type: 'message' };
+        if (results.length) msgPayload.searchResults = results;
+        chat.messages.push(msgPayload);
         await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         if (window.currentChat === chat.id && window._chatActiveElements?.container) {
             await loadDirectChatMessages(chat.id, true);
@@ -4955,7 +4957,17 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             <span>${window.escapeHtml?.(cleanText || 'Localização compartilhada') ?? (cleanText || 'Localização compartilhada')}</span>
         </a>` : '';
 
-    const showTextCaption = cleanText && !(msg.type === 'image' && (cleanText === 'Imagem' || cleanText === 'GIF')) && !(msg.type === 'file' && msg.file) && !(msg.type === 'video');
+    const searchResultsHtml = (msg.searchResults?.length) ? `
+        <div class="d-flex flex-column gap-2 mt-2">
+            ${msg.searchResults.map(r => `
+                <a href="${r.link}" target="_blank" rel="noopener" class="chat-location-chip" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;background:rgba(13,110,253,0.08);color:#0d6efd;padding:8px 12px;border-radius:8px;font-weight:500;font-size:0.85rem;">
+                    <i class="bi bi-link-45deg" style="font-size:1.1rem;"></i>
+                    <span>${window.escapeHtml?.(r.title) || r.title}</span>
+                </a>
+            `).join('')}
+        </div>` : '';
+
+    const showTextCaption = cleanText && !(msg.type === 'image' && (cleanText === 'Imagem' || cleanText === 'GIF')) && !(msg.type === 'file' && msg.file) && !(msg.type === 'video') && !msg.searchResults;
 
     // Reação
     const reaction = msg.reaction || null;
@@ -5008,6 +5020,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
                        onerror="this.outerHTML='<a href=\\'${msg.video.replace(/'/g, "\\'")}\\' target=\\'_blank\\' class=\\'small text-break\\'>${msg.video}</a>'"></video>` : ''}
             ${fileChipHtml}
             ${locationChipHtml}
+            ${searchResultsHtml}
             ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${window.formatLinks?.(cleanText) ?? cleanText}</div>` : ''}
             <div class="msg-time">
                 ${isMe ? `<span class="msg-status me-1">${msg.visto ? '<span class="text-info"><i class="bi bi-check-all"></i> Visto</span>' : '<span class="text-muted"><i class="bi bi-check"></i> Entregue</span>'}</span>` : ''}
@@ -5427,17 +5440,17 @@ window.renderChatContainer = function(opts) {
 
     const attachHtml = showAttach ? `
     <div id="${previewId}" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-    <div id="${attachPanelId}" class="p-3 bg-light border-top d-none">
+    <div id="${attachPanelId}" class="p-3 bg-light border-top d-none chat-attach-panel">
         <div class="d-flex gap-2 mb-3">
             <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image','${attachPanelId}')"><i class="bi bi-play-circle me-1"></i>Mídia</button>
             <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file','${attachPanelId}')"><i class="bi bi-file-earmark me-1"></i>Documentos</button>
             <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="location" onclick="window.setChatAttachType('location','${attachPanelId}')"><i class="bi bi-geo-alt-fill me-1"></i>Endereço</button>
         </div>
         <div id="${attachPanelId}ImageBox">
-            <div class="input-group input-group-sm mb-2 shadow-sm">
-                <span class="input-group-text bg-white border-end-0"><i class="bi bi-link-45deg text-muted"></i></span>
-                <input type="url" id="${attachLinkId}" class="form-control border-start-0" placeholder="Cole o link da imagem, vídeo ou GIF...">
-                <button type="button" class="ml-attach rounded-start-0" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
+                <input type="url" id="${attachLinkId}" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF...">
+                <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
             </div>
             <div class="d-flex gap-2">
                 <label class="ml-attach flex-grow-1" style="cursor:pointer;">
@@ -5448,10 +5461,10 @@ window.renderChatContainer = function(opts) {
             </div>
         </div>
         <div id="${attachPanelId}FileBox" class="d-none">
-            <div class="input-group input-group-sm mb-2 shadow-sm">
-                <span class="input-group-text bg-white border-end-0"><i class="bi bi-link-45deg text-muted"></i></span>
-                <input type="url" id="${attachLinkId}File" class="form-control border-start-0" placeholder="Cole o link do documento...">
-                <button type="button" class="ml-attach rounded-start-0" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
+                <input type="url" id="${attachLinkId}File" class="form-control" placeholder="Cole o link do documento...">
+                <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn1}')"><i class="bi bi-google"></i>${docHostBtn1}</button>
@@ -5459,10 +5472,10 @@ window.renderChatContainer = function(opts) {
             </div>
         </div>
         <div id="${attachPanelId}LocationBox" class="d-none">
-            <div class="input-group input-group-sm mb-2 shadow-sm">
-                <span class="input-group-text bg-white border-end-0"><i class="bi bi-geo-alt-fill text-muted"></i></span>
-                <input type="url" id="${attachLinkId}Loc" class="form-control border-start-0" placeholder="Cole o link do endereço (Google Maps)...">
-                <button type="button" class="ml-attach rounded-start-0" onclick="${onSendLocation}('other')"><i class="bi bi-send"></i></button>
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-geo-alt-fill text-muted"></i></span>
+                <input type="url" id="${attachLinkId}Loc" class="form-control" placeholder="Cole o link do endereço (Google Maps)...">
+                <button type="button" class="ml-attach" onclick="${onSendLocation}('other')"><i class="bi bi-send"></i></button>
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('current')"><i class="bi bi-geo-alt-fill"></i>Endereço atual</button>
@@ -5603,7 +5616,7 @@ window.renderDirectChats = async function() {
                 const online = isRecentlyOnline(u.last_seen);
                 const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
                 const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
-                const unread = chat.messages?.filter(m => String(m.senderId) !== String(user.id) && !m.visto).length || 0;
+                const unread = (window.currentChat === chat.id) ? 0 : (chat.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0);
 
                 return `
                 <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')">

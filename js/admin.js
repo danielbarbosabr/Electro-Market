@@ -519,7 +519,7 @@ window.renderAdminAllChats = async function() {
                         const order = orders.find(o => o.id === c.order_id) || {};
                         const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
                         const lastMsg = (c.messages || [])[c.messages.length - 1];
-                        const unread = (c.messages || []).filter(m => String(m.senderId) !== String(user.id) && !m.visto).length;
+                        const unread = (c.order_id === window._adminActiveChatOrderId) ? 0 : (c.messages || []).filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length;
                         return `
                         <div class="admin-row admin-row-wrap admin-row-clickable" onclick="window.adminOpenChatsModal('${c.order_id}')">
                             <div class="admin-row-icon"><i class="bi bi-chat-dots-fill"></i></div>
@@ -1240,7 +1240,7 @@ window.adminOpenChatsModal = async function(orderId) {
                     const order = orders.find(o => o.id === c.order_id) || {};
                     const msgCount = (c.messages || []).filter(m => m.type !== 'system').length;
                     const lastMsg = (c.messages || [])[c.messages.length - 1];
-                    const unread = (c.messages || []).filter(m => String(m.senderId) !== String(user.id) && !m.visto).length;
+                    const unread = (c.order_id === window._adminActiveChatOrderId) ? 0 : (c.messages || []).filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length;
                     return `
                     <div class="wa-contact ${c.order_id === window._adminActiveChatOrderId ? 'active-chat' : ''}" data-order-id="${c.order_id}" onclick="window.adminChatsModalSelect('${c.order_id}')">
                         <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
@@ -1298,7 +1298,7 @@ window.adminChatsModalSelect = async function(orderId) {
         const adminChatPartnerAvatar = normalizeImageUrl(safeParseImages(partnerFromCache?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent((order?.buyer_name || '?').slice(0,2))}&background=22c98e&color=fff&size=40`;
         window.__setupReactionHooks(chat, c => supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }), () => adminChatsModalSelect(orderId));
         // Marca como visto mensagens dos participantes
-        { const adminUser = getSavedUser(); let changed = false; (chat.messages || []).forEach(m => { if (m.senderId && m.senderId !== adminUser?.id && !m.visto) { m.visto = true; changed = true; } }); if (changed) { supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {}); window.updateChatBadge(); } }
+        { const adminUser = getSavedUser(); let changed = false; (chat.messages || []).forEach(m => { if (m.senderId && m.senderId !== adminUser?.id && !m.visto) { m.visto = true; changed = true; } }); if (changed) { supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {}); window.updateChatBadge(); const _el = document.querySelector(`.wa-contact[data-order-id="${orderId}"]`); if (_el) { const _b = _el.querySelector('.badge.bg-success'); if (_b) _b.remove(); const _t = _el.querySelector('.wa-contact-text'); if (_t) _t.style.removeProperty('font-weight'); } } }
         const msgsHtml = (chat.messages || []).map((m, i) => adminMsgBubbleHtml(m, i, resolveSenderName, adminChatMyAvatar, adminChatPartnerAvatar)).join('')
             || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
         const msgCount = (chat.messages || []).filter(m => m.type !== 'system').length;
@@ -1597,7 +1597,7 @@ window.renderAdminSupportTab = function(chats, orders, users) {
         const badgeClass = isDispute ? 'badge-ticket' : (c.closed ? 'badge-muted' : 'badge-open');
         const icon = isDispute ? 'bi-exclamation-triangle-fill' : (c.closed ? 'bi-lock-fill' : 'bi-bag-fill');
         const adminUser = getSavedUser();
-        const _unread = (c.messages || []).filter(m => String(m.senderId) !== String(adminUser?.id) && !m.visto).length;
+        const _unread = (c.id === window.currentChat) ? 0 : (c.messages || []).filter(m => m.senderId && String(m.senderId) !== String(adminUser?.id) && !m.visto).length;
         return `
             <div class="wa-contact ${isActive ? 'active-chat' : ''}" onclick="window.adminSupportSelect('${c.id}', 'order')" data-contact-id="${c.id}">
                 <img src="${safeParseImages(c.avatar)[0] || c.avatar}" class="wa-contact-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45/e9ecef/6c757d?text=%3F'">
@@ -1719,7 +1719,7 @@ window.adminSupportSelect = async function(id, type) {
                 () => window.adminSupportSelect(id, type)
             );
             // Mark as seen
-            { let changed = false; (chat.messages || []).forEach(m => { if (m.senderId && m.senderId !== adminUser?.id && !m.visto) { m.visto = true; changed = true; } }); if (changed) { supabaseFetch(`chats?order_id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {}); window.updateChatBadge(); } }
+            { let changed = false; (chat.messages || []).forEach(m => { if (m.senderId && m.senderId !== adminUser?.id && !m.visto) { m.visto = true; changed = true; } }); if (changed) { supabaseFetch(`chats?order_id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {}); window.updateChatBadge(); const _el = document.querySelector(`.wa-contact[data-contact-id="${id}"]`); if (_el) { const _b = _el.querySelector('.badge.bg-success'); if (_b) _b.remove(); const _t = _el.querySelector('.wa-contact-text'); if (_t) _t.style.removeProperty('font-weight'); } } }
 
             const msgsHtml = (chat.messages || []).map((m, i) => adminSupportMsgBubbleHtml(m, i, resolveSenderName, resolveSenderAvatar)).join('')
                 || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
@@ -1975,7 +1975,7 @@ window.adminSupportCloseFullscreen = function() {
  */
 function supportAttachPanelHtml(prefix) {
     return `
-    <div id="${prefix}AttachPanel" class="p-3 bg-light border-top d-none">
+    <div id="${prefix}AttachPanel" class="p-3 bg-light border-top d-none chat-attach-panel">
         <div class="d-flex gap-2 mb-2">
             <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="media" onclick="window.setAdminSupportAttachType('media')">
                 <i class="bi bi-play-circle me-1"></i>Mídia

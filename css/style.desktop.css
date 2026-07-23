@@ -1083,6 +1083,60 @@ body.dark-theme .ml-shipping-card {
     background: color-mix(in srgb, #fd7e14 10%, transparent);
 }
 
+/* Link input + send button como um único componente */
+.wa-side .input-group-sm,
+.chat-attach-panel .input-group-sm,
+#supportAttachPanel .input-group-sm {
+    border: 1.5px solid var(--border-light);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.wa-side .input-group-sm:focus-within,
+.chat-attach-panel .input-group-sm:focus-within,
+#supportAttachPanel .input-group-sm:focus-within {
+    border-color: var(--primary-action);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-action) 20%, transparent);
+}
+.wa-side .input-group-sm .input-group-text,
+.wa-side .input-group-sm .form-control,
+.chat-attach-panel .input-group-sm .input-group-text,
+.chat-attach-panel .input-group-sm .form-control,
+#supportAttachPanel .input-group-sm .input-group-text,
+#supportAttachPanel .input-group-sm .form-control {
+    border: none;
+    background: transparent;
+}
+.wa-side .input-group-sm .form-control:focus,
+.chat-attach-panel .input-group-sm .form-control:focus,
+#supportAttachPanel .input-group-sm .form-control:focus {
+    box-shadow: none;
+}
+.wa-side .input-group-sm .ml-attach,
+.chat-attach-panel .input-group-sm .ml-attach,
+#supportAttachPanel .input-group-sm .ml-attach {
+    height: auto;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--primary-action) !important;
+    padding: 0 14px;
+    margin: 0;
+    transition: background .15s ease;
+}
+.wa-side .input-group-sm .ml-attach:hover,
+.chat-attach-panel .input-group-sm .ml-attach:hover,
+#supportAttachPanel .input-group-sm .ml-attach:hover {
+    background: color-mix(in srgb, var(--primary-action) 10%, transparent);
+    box-shadow: none;
+}
+.wa-side .input-group-sm .ml-attach:active,
+.chat-attach-panel .input-group-sm .ml-attach:active,
+#supportAttachPanel .input-group-sm .ml-attach:active {
+    transform: scale(0.93);
+}
+
 .ml-btn-danger {
     background: #dc3545;
     color: #fff;
