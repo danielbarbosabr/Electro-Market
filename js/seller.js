@@ -229,11 +229,11 @@ window.renderSellerRequests = async function() {
                     <p class="small mb-1"><i class="bi bi-person-fill me-2 text-muted"></i><strong>${buyer.nome || order.buyer_name || 'Cliente'}</strong></p>
                     ${buyer.telefone ? `<p class="small mb-1"><i class="bi bi-telephone-fill me-2 text-muted"></i>${buyer.telefone}</p>` : ''}
                     ${buyer.endereco ? `<p class="small mb-2"><i class="bi bi-geo-alt-fill me-2 text-muted"></i>${buyer.endereco}${buyer.cep ? `, CEP ${buyer.cep}` : ''} — ${buyer.cidade || ''}/${buyer.estado || ''}</p>` : `<p class="small mb-2 text-muted"><i class="bi bi-geo-alt-fill me-2"></i>Endereço não informado</p>`}
-                    <div class="d-flex gap-2 mt-2">
-                        <button class="ml-attach ml-attach-success flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                    <div class="d-flex flex-column gap-2 mt-2">
+                        <button class="ml-attach ml-attach-success w-100" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
                             <i class="bi bi-check-lg me-1"></i>${isOffer ? 'Aceitar Oferta' : 'Aceitar'}
                         </button>
-                        <button class="ml-attach ml-attach-danger flex-grow-1" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                        <button class="ml-attach ml-attach-danger w-100" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
                             <i class="bi bi-x-lg me-1"></i>${isOffer ? 'Recusar Oferta' : 'Recusar'}
                         </button>
                     </div>
@@ -316,18 +316,6 @@ window.removeOrderFromHistory = async function(orderId, type) {
         console.error("Erro ao remover:", err);
         showToast('Erro ao remover registro. Verifique a conexão.', 'error'); 
     }
-};
-
-window.cancelOrderBuyer = async function(orderId) {
-    if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
-    try {
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'cancelled', updated_at: new Date().toISOString() })
-        });
-        showToast('Pedido cancelado!', 'info');
-        window.renderOrderManagement('buyer');
-    } catch { showToast('Erro ao cancelar pedido.', 'error'); }
 };
 
 window.deleteProduct = async function(pid) {
@@ -429,66 +417,86 @@ window.advanceLogisticsStatus = async function(orderId, nextStatus) {
     } catch { showToast('Erro ao atualizar status.', 'error'); }
 };
 
-window.confirmReceipt = async function(orderId) {
-    if (!confirm('Confirmar que recebeu o produto? Esta ação finalizará o pedido.')) return;
-    try {
-        // Busca os dados do pedido (produto e quantidade) antes de finalizar, para dar baixa no estoque
-        const orderData = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
-        const order = orderData?.[0];
-
-        await supabaseFetch(`orders?id=eq.${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'finished', updated_at: new Date().toISOString() })
-        });
-
-        // Baixa automática de estoque (igual Mercado Livre): assim que a compra é
-        // finalizada, a quantidade comprada é descontada do anúncio automaticamente.
-        if (order?.product_id) {
-            await baixarEstoqueProduto(order.product_id, order.quantity || 1);
-        }
-
-        const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-        const chat = chatData[0];
-        if (chat) {
-            chat.messages.push({ senderId: 'system', text: 'O comprador confirmou o recebimento. Compra finalizada!', timestamp: new Date().toISOString(), type: 'system' });
-            await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-        }
-        showToast('Pedido finalizado!', 'success');
-        loadChatMessages(orderId);
-        window.openReviewModal(orderId, 'buyer_rates_seller');
-    } catch { showToast('Erro ao confirmar recebimento.', 'error'); }
-};
-
-/** Abre um chamado de suporte direto para o pedido, sem modal — marca como disputa
- *  e cria o ticket vinculado. O chat continua o mesmo, mas aparece no suporte do admin. */
+/** Abre uma disputa no pedido — envia e-mail para o suporte e registra no chat. */
 window.requestOrderSupport = async function(orderId, category) {
-    if (!confirm('Abrir um chamado de suporte para este pedido?')) return;
+    if (!confirm('Enviar solicitação de suporte para este pedido?')) return;
     try {
+        const user = getSavedUser();
+        const nome = user?.nome || 'Usuário';
+        const userEmail = user?.email || '';
+        const labels = { produto_nao_recebido: 'Não recebi o produto', entrega_sem_confirmacao: 'Entreguei, mas o comprador não confirmou' };
+        const assunto = labels[category] || 'Problema com o pedido';
+
+        // Busca dados do pedido para incluir no e-mail
+        let produtoInfo = '';
+        let orderData;
+        try {
+            orderData = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
+            const order = orderData?.[0];
+            if (order) {
+                produtoInfo = `Produto: ${order.product_title || 'N/A'}
+Valor: R$ ${parseFloat(order.total || order.price || 0).toFixed(2)}
+Status: ${order.status || 'N/A'}`;
+            }
+        } catch (e) {}
+
+        // Marca o pedido como disputa
         await supabaseFetch(`orders?id=eq.${orderId}`, {
             method: 'PATCH',
             body: JSON.stringify({ status: 'dispute', updated_at: new Date().toISOString() })
         });
 
-        const labels = { produto_nao_recebido: 'Não recebi o produto', entrega_sem_confirmacao: 'Entreguei, mas o comprador não confirmou' };
-        const ticketId = await window.createSupportTicket({
-            category,
-            subject: labels[category] || 'Problema com o pedido',
-            orderId
-        });
-
-        if (ticketId) {
+        // Adiciona registro de disputa no chat do pedido
+        try {
             const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
             const chat = chatData[0];
             if (chat) {
-                chat.messages.push({ senderId: 'system', text: `Chamado de suporte aberto (#${ticketId.slice(-6).toUpperCase()}). A equipe de suporte foi notificada.`, timestamp: new Date().toISOString(), type: 'system' });
+                chat.messages.push({
+                    type: 'dispute_report',
+                    category,
+                    subject: assunto,
+                    reportedBy: nome,
+                    reportedByEmail: userEmail || '',
+                    reportedByRole: user?.tipo || 'Visitante',
+                    timestamp: new Date().toISOString()
+                });
+                chat.messages.push({
+                    senderId: 'system',
+                    text: `Disputa aberta: ${assunto}. A equipe de suporte foi notificada por e-mail.`,
+                    timestamp: new Date().toISOString(),
+                    type: 'system'
+                });
                 await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
             }
-            showToast('Chamado de suporte aberto!', 'success');
-            loadChatMessages(orderId);
-        }
+        } catch (e) {}
+
+        // Envia e-mail
+        const body = `
+Nova solicitação de suporte:
+
+━━━━ DADOS DO SOLICITANTE ━━━━
+Nome: ${nome}
+E-mail: ${userEmail || 'não informado'}
+Tipo: ${user?.tipo || 'Visitante'}
+
+━━━━ PEDIDO ━━━━
+ID: ${orderId}
+${produtoInfo}
+
+━━━━ SOLICITAÇÃO ━━━━
+Assunto: ${assunto}
+
+━━━━━━━━━━━━━━━━━━━━━━
+ElectroMarket - Plataforma de E-commerce
+        `.trim();
+
+        const mailto = `mailto:dannybarbosadelimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] ' + assunto)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailto;
+        showToast('E-mail de suporte aberto e disputa registrada!', 'success');
+        loadChatMessages(orderId);
     } catch (e) {
         console.error(e);
-        showToast('Erro ao abrir chamado de suporte.', 'error');
+        showToast('Erro ao enviar solicitação de suporte.', 'error');
     }
 };
 

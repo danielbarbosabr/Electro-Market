@@ -9,7 +9,7 @@ function buildAdminTabButtons(counts, variant) {
     const tabs = [
         { tab: 'admin-overview', icon: 'bi-grid-1x2-fill',        label: 'Início' },
         { tab: 'admin-content',  icon: 'bi-collection-fill',      label: 'Conteúdo',    count: counts.users + counts.products },
-        { tab: 'admin-support',  icon: 'bi-headset',              label: 'Suporte',     count: (counts.chatsAbertos || 0) + (counts.ticketsAbertos || 0) },
+        { tab: 'admin-support',  icon: 'bi-headset',              label: 'Suporte',     count: (counts.chatsAbertos || 0) },
         { tab: 'admin-cats',     icon: 'bi-tags-fill',            label: 'Categorias',  count: counts.categorias }
     ];
     return tabs.map((t, i) => `
@@ -130,20 +130,15 @@ window.renderAdminPanel = async function() {
         window._adminProductsCache = products;
         window._adminUsersCache = users;
 
-        // Chamados de suporte (linhas de `chats` com order_id NULL) — busca — parte.
-        const tickets = await fetchSupportTicketsSafe();
-
         const categorias = [...new Set(products.map(p => p.categoria || 'Geral'))];
         const chatsAbertos = chats.filter(c => !c.closed).length;
-        const ticketsAbertos = tickets.filter(t => t.status !== 'closed').length;
-        const tabCounts = { users: users.length, products: products.length, categorias: categorias.length, chatsAbertos, ticketsAbertos };
+        const tabCounts = { users: users.length, products: products.length, categorias: categorias.length, chatsAbertos };
 
-        // Badge de aviso no dock mobile (aba Suporte unificada: conversas + chamados)
+        // Badge de aviso no dock mobile
         const supportDockBadge = document.getElementById('adminSupportBadgeDock');
         if (supportDockBadge) {
-            const totalAbertos = chatsAbertos + ticketsAbertos;
-            supportDockBadge.textContent = totalAbertos;
-            supportDockBadge.classList.toggle('d-none', totalAbertos === 0);
+            supportDockBadge.textContent = chatsAbertos;
+            supportDockBadge.classList.toggle('d-none', chatsAbertos === 0);
         }
 
         grid.innerHTML = `
@@ -169,7 +164,7 @@ window.renderAdminPanel = async function() {
                         <div class="admin-stat-card stat-blue"><i class="bi bi-people-fill"></i><div><h3>${users.length}</h3><span>Usuários</span></div></div>
                         <div class="admin-stat-card stat-green"><i class="bi bi-box-seam-fill"></i><div><h3>${products.length}</h3><span>Publicações</span></div></div>
                         <div class="admin-stat-card stat-orange"><i class="bi bi-bag-check-fill"></i><div><h3>${orders.length}</h3><span>Pedidos</span></div></div>
-                        <div class="admin-stat-card stat-red"><i class="bi bi-headset"></i><div><h3>${ticketsAbertos}</h3><span>Chamados Abertos</span></div></div>
+                        <div class="admin-stat-card stat-red"><i class="bi bi-headset"></i><div><h3>${chatsAbertos}</h3><span>Chats Abertos</span></div></div>
                     </div>
 
                     <div class="admin-tab-panel active" id="admin-overview">
@@ -205,18 +200,6 @@ window.renderAdminPanel = async function() {
                                     <span class="admin-row-badge ${c.closed ? 'badge-muted' : 'badge-open'}">${c.closed ? 'Encerrado' : (ORDER_STATUS_MAP[order.status]?.text || 'Aberto')}</span>
                                 </div>`;
                             }).join('') || '<p class="text-muted small mb-0">Nenhuma conversa ainda.</p>'}
-                        </div>
-                        <div class="admin-card">
-                            <h6 class="admin-card-title"><i class="bi bi-headset me-2"></i>últimos Chamados de Suporte</h6>
-                            ${tickets.slice(0, 5).map(t => `
-                                <div class="admin-row">
-                                    <img src="${safeParseImages(t.requester_avatar)[0] || ('https://ui-avatars.com/api/?name=' + encodeURIComponent((t.requester_name || '?').slice(0,2)) + '&background=e50914&color=fff&size=40')}" class="admin-row-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
-                                    <div class="admin-row-info">
-                                        <strong>${getTicketLabel(t)}</strong>
-                                        <small>${t.requester_name || 'Visitante'}</small>
-                                    </div>
-                                    <span class="admin-row-badge ${t.status === 'closed' ? 'badge-muted' : 'badge-open'}"><i class="bi ${t.status === 'closed' ? 'bi-lock-fill' : 'bi-headset'} me-1"></i>${t.status === 'closed' ? 'Solicitação Encerrada' : 'Solicitação Aberta'}</span>
-                                </div>`).join('') || '<p class="text-muted small mb-0">Nenhum chamado ainda.</p>'}
                         </div>
 
                         <header class="admin-topbar" style="margin-top:0.5rem">
@@ -322,7 +305,7 @@ window.renderAdminPanel = async function() {
         // Guarda os dados carregados pra alimentar os gráficos (usados aqui
         // mesmo, dentro da aba "Início" — só constrói quando o canvas estiver
         // realmente visível, senão o Chart.js mede a largura errada).
-        window._adminReportsData = { users, products, orders, chats, tickets, categorias };
+        window._adminReportsData = { users, products, orders, chats, categorias };
         window._adminChartsReady = false;
 
         // Se o admin já estava numa aba específica (ex: voltou de uma conversa
@@ -1549,130 +1532,128 @@ window.adminChatsModalDelete = async function(orderId) {
 // messages/chat-input-bar), só que sem lista lateral do lado, e com as
 // ações de administrador (encerrar/apagar) integradas ao próprio chat.
 
-/** Preenche a lista da aba "Chats" com as conversas já carregadas pelo renderAdminPanel */
-window.renderAdminSupportTab = function(chats, tickets, orders, users) {
+/** Preenche a lista da aba "Suporte" com Conversas e Disputas separadas */
+window.renderAdminSupportTab = function(chats, orders, users) {
     const list = document.getElementById('adminSupportContactList');
+    const tabsEl = document.getElementById('adminSupportTabs');
     if (!list) return;
 
-    window._adminSupportData = { chats, tickets, orders, users };
+    window._adminSupportData = { chats, orders, users };
 
-    const buildContactList = (term = '') => {
-        const q = term.trim().toLowerCase();
+    const chatContacts = [];
+    const disputeContacts = [];
 
-        // Build unified contacts
-        const contacts = [];
+    chats.forEach(c => {
+        const order = orders.find(o => o.id === c.order_id) || {};
+        const msgs = c.messages || [];
+        const disputeMsg = msgs.slice().reverse().find(m => m.type === 'dispute_report');
+        const hasDispute = !!(disputeMsg || order.status === 'dispute');
+        const lastMsg = msgs.slice().reverse().find(m => m.type !== 'ticket_meta' && m.type !== 'dispute_report');
+        const name = order.product_title || 'Pedido #' + c.order_id?.slice(-6);
+        const buyer = order.buyer_name || '?';
+        const seller = order.seller_name || '?';
 
-        // Order chats
-        chats.forEach(c => {
-            const order = orders.find(o => o.id === c.order_id) || {};
-            const lastMsg = (c.messages || []).slice().reverse().find(m => m.type !== 'ticket_meta');
-            const name = order.product_title || 'Pedido #' + c.order_id?.slice(-6);
-            const buyer = order.buyer_name || '?';
-            const seller = order.seller_name || '?';
+        const contact = {
+            id: c.order_id,
+            type: hasDispute ? 'dispute' : 'order',
+            name,
+            subname: `${buyer} ? ${seller}`,
+            avatar: order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=Ped',
+            lastMsg: lastMsg?.text || (lastMsg?.image ? '[Imagem]' : ''),
+            lastTime: lastMsg?.timestamp || c.created_at || '',
+            closed: getChatClosed(c),
+            messages: msgs,
+            chat: c,
+            order,
+            dispute: disputeMsg || null
+        };
 
-            contacts.push({
-                id: c.order_id,
-                type: 'order',
-                name,
-                subname: `${buyer} ? ${seller}`,
-                avatar: order.product_img || 'https://placehold.co/45/e9ecef/6c757d?text=Ped',
-                lastMsg: lastMsg?.text || (lastMsg?.image ? '[Imagem]' : ''),
-                lastTime: lastMsg?.timestamp || c.created_at || '',
-                closed: getChatClosed(c),
-                messages: c.messages || [],
-                chat: c,
-                order
-            });
-        });
+            if (hasDispute) {
+            disputeContacts.push(contact);
+        } else {
+            chatContacts.push(contact);
+        }
+    });
 
-        // Support tickets
-        tickets.forEach(t => {
-            const msgs = t.messages || [];
-            const lastMsg = msgs.slice().reverse().find(m => m.type !== 'ticket_meta');
-            const roleLabel = t.requester_role === 'ADMIN' ? 'Admin' : (t.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
+    const sortFn = (a, b) => {
+        const ta = a.lastTime ? new Date(a.lastTime).getTime() : 0;
+        const tb = b.lastTime ? new Date(b.lastTime).getTime() : 0;
+        return tb - ta;
+    };
+    chatContacts.sort(sortFn);
+    disputeContacts.sort(sortFn);
 
-            contacts.push({
-                id: t.id,
-                type: 'ticket',
-                name: t.requester_name || 'Visitante',
-                subname: `${getTicketLabel(t)} • ${roleLabel}`,
-                avatar: t.requester_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent((t.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=45`,
-                lastMsg: lastMsg?.text || (lastMsg?.image ? '[Imagem]' : ''),
-                lastTime: lastMsg?.timestamp || '',
-                closed: t.status === 'closed',
-                messages: msgs,
-                ticket: t
-            });
-        });
+    const renderContact = (c) => {
+        const isActive = window._adminActiveSupportId === c.id;
+        const timeStr = c.lastTime ? new Date(c.lastTime).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+        const isDispute = c.type === 'dispute';
+        const badgeText = isDispute ? (c.dispute?.subject || 'Disputa') : (c.closed ? 'Enc.' : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'));
+        const badgeClass = isDispute ? 'badge-ticket' : (c.closed ? 'badge-muted' : 'badge-open');
+        const icon = isDispute ? 'bi-exclamation-triangle-fill' : (c.closed ? 'bi-lock-fill' : 'bi-bag-fill');
+        return `
+            <div class="wa-contact ${isActive ? 'active-chat' : ''}" onclick="window.adminSupportSelect('${c.id}', 'order')" data-contact-id="${c.id}">
+                <img src="${safeParseImages(c.avatar)[0] || c.avatar}" class="wa-contact-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45/e9ecef/6c757d?text=%3F'">
+                <div class="wa-contact-textbox">
+                    <div class="wa-contact-name">${c.name}</div>
+                    <div class="wa-contact-text">${c.lastMsg ? window.stripLegacyEmoji?.(c.lastMsg.slice(0, 60)) || c.lastMsg.slice(0, 60) : 'Nenhuma mensagem'}</div>
+                    <small class="text-muted" style="font-size:0.68rem;">${c.subname}</small>
+                </div>
+                <div class="wa-contact-badge text-end" style="flex-shrink:0;">
+                    <small class="text-muted" style="font-size:0.65rem;">${timeStr}</small>
+                    <div><span class="admin-row-badge ${badgeClass}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${icon} me-1"></i>${badgeText.slice(0,24)}</span></div>
+                </div>
+            </div>`;
+    };
 
-        // Sort by last message time (most recent first)
-        contacts.sort((a, b) => {
-            const ta = a.lastTime ? new Date(a.lastTime).getTime() : 0;
-            const tb = b.lastTime ? new Date(b.lastTime).getTime() : 0;
-            return tb - ta;
-        });
+    const showTab = (tab) => {
+        window._adminSupportActiveTab = tab;
+        const data = tab === 'solicitacoes' ? disputeContacts : chatContacts;
 
         const countEl = document.getElementById('adminSupportSidebarCount');
         if (countEl) {
-            const open = contacts.filter(c => !c.closed).length;
-            countEl.textContent = `${open} aberto${open !== 1 ? 's' : ''} • ${contacts.length} total`;
-        }
-
-        // Filter
-        const filtered = !q ? contacts : contacts.filter(c =>
-            `${c.name} ${c.subname}`.toLowerCase().includes(q)
-        );
-
-        if (filtered.length === 0) {
-            list.innerHTML = '<div class="text-center text-muted small py-5 px-3">Nenhuma conversa encontrada.</div>';
-            return;
-        }
-
-        // Separate into sections when not searching
-        const renderContact = (c) => {
-            const isActive = window._adminActiveSupportId === c.id;
-            const timeStr = c.lastTime ? new Date(c.lastTime).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
-            return `
-                <div class="wa-contact ${isActive ? 'active-chat' : ''}" onclick="window.adminSupportSelect('${c.id}', '${c.type}')" data-contact-id="${c.id}">
-                    <img src="${safeParseImages(c.avatar)[0] || c.avatar}" class="wa-contact-avatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45/e9ecef/6c757d?text=%3F'">
-                    <div class="wa-contact-textbox">
-                        <div class="wa-contact-name">${c.name}</div>
-                        <div class="wa-contact-text">${c.lastMsg ? window.stripLegacyEmoji?.(c.lastMsg.slice(0, 60)) || c.lastMsg.slice(0, 60) : 'Nenhuma mensagem'}</div>
-                        <small class="text-muted" style="font-size:0.68rem;">${c.subname}</small>
-                    </div>
-                    <div class="wa-contact-badge text-end" style="flex-shrink:0;">
-                        <small class="text-muted" style="font-size:0.65rem;">${timeStr}</small>
-                        <div><span class="admin-row-badge ${c.closed ? 'badge-muted' : (c.type === 'ticket' ? 'badge-ticket' : 'badge-open')}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${c.closed ? 'bi-lock-fill' : (c.type === 'ticket' ? 'bi-headset' : 'bi-bag-fill')} me-1"></i>${c.closed ? 'Enc.' : (c.type === 'ticket' ? getTicketLabel(c.ticket).slice(0,24) : (ORDER_STATUS_MAP[c.order?.status]?.text || 'Aberto'))}</span></div>
-                    </div>
-                </div>`;
-        };
-
-        if (q) {
-            // Search mode: mixed
-            list.innerHTML = filtered.map(renderContact).join('');
-        } else {
-            // Separated sections
-            const chatsSection = contacts.filter(c => c.type === 'order');
-            const ticketsSection = contacts.filter(c => c.type === 'ticket');
-            let html = '';
-            if (chatsSection.length) {
-                html += `<div class="wa-contact-section-header"><span>Conversas de Pedido</span><span class="small text-muted">${chatsSection.length}</span></div>`;
-                html += chatsSection.map(renderContact).join('');
+            if (tab === 'solicitacoes') {
+                countEl.textContent = `${data.length} ${data.length !== 1 ? 'solicitações' : 'solicitação'}`;
+            } else {
+                const openTotal = chatContacts.filter(c => !c.closed).length;
+                countEl.textContent = `${data.length} conversa${data.length !== 1 ? 's' : ''} (${openTotal} abert${openTotal !== 1 ? 'as' : 'a'})`;
             }
-            if (ticketsSection.length) {
-                html += `<div class="wa-contact-section-header"><span>Chamados de Suporte</span><span class="small text-muted">${ticketsSection.length}</span></div>`;
-                html += ticketsSection.map(renderContact).join('');
-            }
-            list.innerHTML = html;
         }
+
+        document.querySelectorAll('#adminSupportTabs .admin-support-tab').forEach(el => {
+            el.classList.toggle('active', el.dataset.tab === tab);
+        });
+
+        const q = document.getElementById('adminSupportSearch')?.value.trim().toLowerCase() || '';
+        const filtered = !q ? data : data.filter(c => `${c.name} ${c.subname}`.toLowerCase().includes(q));
+
+        list.innerHTML = filtered.length
+            ? filtered.map(renderContact).join('')
+            : '<div class="text-center text-muted small py-5 px-3">' +
+              (q ? 'Nenhuma conversa encontrada.' : (tab === 'solicitacoes' ? 'Nenhuma solicitação pendente.' : 'Nenhuma conversa.')) +
+              '</div>';
     };
 
-    window._adminSupportBuildList = buildContactList;
-    buildContactList();
+    // Render tab bar
+    if (tabsEl) {
+        tabsEl.innerHTML = `
+            <button class="admin-support-tab active" data-tab="conversas" onclick="window._adminSupportShowTab('conversas')">
+                <i class="bi bi-chat-dots me-1"></i>Conversas (${chatContacts.length})
+            </button>
+            <button class="admin-support-tab ${disputeContacts.length ? 'has-items' : ''}" data-tab="solicitacoes" onclick="window._adminSupportShowTab('solicitacoes')">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>Solicitações${disputeContacts.length ? ` (${disputeContacts.length})` : ''}
+            </button>`;
+    }
+
+    window._adminSupportShowTab = showTab;
+    window._adminSupportBuildList = (term) => {
+        document.getElementById('adminSupportSearch').value = term || '';
+        showTab(window._adminSupportActiveTab || 'conversas');
+    };
+    showTab('conversas');
 };
 
 window.filterAdminSupportContacts = function(query) {
-    if (window._adminSupportBuildList) window._adminSupportBuildList(query);
+    window._adminSupportBuildList?.(query);
 };
 
 window.adminSupportSelect = async function(id, type) {
@@ -1753,7 +1734,7 @@ window.adminSupportSelect = async function(id, type) {
                 showCloseBtn: false,
                 showAttach: true,
                 showDeleteBtn: true,
-                statusInfo: { text: st.text, class: closed ? 'secondary' : statusToAlertClass(order?.status) },
+                statusInfo: { text: STATUS_BAR_MAP[order?.status] || st.text, class: closed ? 'secondary' : statusToAlertClass(order?.status) },
                 statusText: '',
                 extraHeaderHtml: ''
             });
@@ -1779,86 +1760,6 @@ window.adminSupportSelect = async function(id, type) {
                     </div>`;
             }
 
-        } else {
-            // Support ticket
-            const result = await supabaseFetch(`chats?id=eq.${id}&limit=1`);
-            const ticket = normalizeTicket(result?.[0]);
-            if (!ticket) { showToast('Chamado não encontrado.', 'error'); window.adminSupportBack(); return; }
-
-            const resolveSenderName = () => ticket.requester_name;
-            const resolveSenderAvatar = (m) => {
-                if (m.senderId === adminUser?.id) return '';
-                return ticket.requester_avatar || '';
-            };
-            const myAvatar = normalizeImageUrl(safeParseImages(adminUser?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(adminUser?.nome || 'Suporte')}&background=ffc107&color=1c1c1c&size=40`;
-            const requesterAvatar = safeParseImages(ticket.requester_avatar)[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
-            let deleteOtherCallback = '';
-            if (ticket.order_id) {
-                const orderResult = await supabaseFetch(`orders?id=eq.${ticket.order_id}&select=seller_id,buyer_id&limit=1`);
-                const orderData = orderResult?.[0];
-                const otherId = orderData?.seller_id && orderData.seller_id !== ticket.requester_id ? orderData.seller_id
-                    : (orderData?.buyer_id && orderData.buyer_id !== ticket.requester_id ? orderData.buyer_id : null);
-                if (otherId) {
-                    deleteOtherCallback = `window.adminDeleteUserAccount('${otherId}', 'Participante')`;
-                }
-            }
-            window.__setupReactionHooks(ticket,
-                c => supabaseFetch(`chats?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }),
-                () => window.adminSupportSelect(id, type)
-            );
-            { let changed = false; (ticket.messages || []).forEach(m => { if (m.senderId && m.senderId !== adminUser?.id && !m.visto) { m.visto = true; changed = true; } }); if (changed) { supabaseFetch(`chats?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ messages: ticket.messages }) }).catch(() => {}); } }
-            const msgsHtml = (ticket.messages || []).map((m, i) => adminSupportMsgBubbleHtml(m, i, resolveSenderName, resolveSenderAvatar)).join('')
-                || '<div class="text-center text-muted py-4">Sem mensagens.</div>';
-            const msgCount = (ticket.messages || []).filter(m => m.type !== 'system').length;
-            const roleLabel = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
-            const reasonLabel = getTicketLabel(ticket);
-
-            activeChatEl.innerHTML = window.renderChatContainer({
-                chatId: id,
-                chat: ticket,
-                partner: { name: ticket.requester_name || 'Visitante', avatar: requesterAvatar },
-                msgsId: 'adminSupportMsgsBody',
-                inputId: 'adminSupportChatInput',
-                previewId: 'adminSupportInputPreview',
-                attachPanelId: 'adminSupportAttachPanel',
-                attachLinkId: 'adminSupportAttachLinkInput',
-                participantsId: 'adminSupportTicketParticipants',
-                statusBarId: 'adminSupportTicketStatusBar',
-                onSend: `window.adminSupportSendMessage('${id}', 'ticket')`,
-                onBack: 'window.adminSupportBack()',
-                onClose: ticket.status !== 'closed' ? `window.adminSupportCloseTicket('${id}')` : '',
-                onDelete: `window.adminSupportDelete('${id}', 'ticket')`,
-                onToggleParticipants: `window.adminToggleParticipants('adminSupportTicketParticipants')`,
-                onToggleAttachPanel: 'window.toggleAdminSupportAttachPanel()',
-                onConfirmAttach: `window.confirmAdminSupportAttach('${id}')`,
-                onSendLocation: `window.sendAdminSupportLocation('${id}')`,
-                onSendFile: 'window.sendAdminSupportFile',
-                onCloseTicket: ticket.status !== 'closed' ? `window.adminSupportCloseTicket('${id}')` : '',
-                onChangeStatus: `window.adminChangeTicketStatus('${id}')`,
-                onDeleteRequester: `window.adminDeleteUserAccount('${ticket.requester_id}', '${(ticket.requester_name || 'Solicitante').replace(/'/g, "\\'")}')`,
-                onDeleteOtherAccount: deleteOtherCallback,
-                showBackBtn: true,
-                showCloseBtn: false,
-                showAttach: ticket.status !== 'closed',
-                showDeleteBtn: true,
-                statusInfo: { text: ticket.status === 'closed' ? '<i class="bi bi-lock-fill me-1"></i>Encerrado' : `<i class="bi bi-headset me-1"></i>${getTicketLabel(ticket).slice(0,30)}`, class: ticket.status === 'closed' ? 'secondary' : 'info' },
-                statusText: '',
-                extraHeaderHtml: ''
-            });
-
-            const msgsBody = document.getElementById('adminSupportMsgsBody');
-            if (msgsBody) { msgsBody.innerHTML = msgsHtml; msgsBody.scrollTop = msgsBody.scrollHeight; }
-            const participantsPanel = document.getElementById('adminSupportTicketParticipants');
-            if (participantsPanel) {
-                participantsPanel.innerHTML = `
-                    <div class="chat-participant-row">
-                        <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=3483fa&color=fff&size=40'">
-                        <div class="chat-participant-info">
-                            <strong>${ticket.requester_name || 'Visitante'}</strong>
-                            <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel}</small>
-                        </div>
-                    </div>`;
-            }
         }
     } catch (e) {
         console.error(e);
@@ -1976,10 +1877,9 @@ window.openAdminSupportFullscreen = async function() {
     grid.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger"></div><p class="mt-2">Carregando conversas...</p></div>';
 
     try {
-        const [chats, orders, tickets] = await Promise.all([
+        const [chats, orders] = await Promise.all([
             supabaseFetch('chats?select=*&order_id=not.is.null'),
-            Promise.resolve(adminOrdersCache || []),
-            fetchSupportTicketsSafe()
+            Promise.resolve(adminOrdersCache || [])
         ]);
 
         grid.innerHTML = `
@@ -1993,8 +1893,9 @@ window.openAdminSupportFullscreen = async function() {
                         </div>
                         <div class="wa-side__search">
                             <i class="bi bi-search"></i>
-                            <input type="text" id="adminSupportSearch" placeholder="Buscar conversa..." autocomplete="off" oninput="window.filterAdminSupportContacts(this.value)">
+                            <input type="text" id="adminSupportSearch" placeholder="Buscar conversa..." autocomplete="off" oninput="window._adminSupportBuildList?.(this.value)">
                         </div>
+                        <div id="adminSupportTabs" class="admin-support-tabs"></div>
                         <div id="adminSupportContactList" class="wa-side__list"></div>
                     </section>
 
@@ -2008,7 +1909,7 @@ window.openAdminSupportFullscreen = async function() {
                 </div>
             </div>`;
 
-        window.renderAdminSupportTab(chats, tickets, orders, window._adminUsersCache || []);
+        window.renderAdminSupportTab(chats, orders, window._adminUsersCache || []);
     } catch (e) {
         console.error(e);
         grid.innerHTML = '<div class="alert alert-danger">Erro ao carregar conversas de suporte.</div>';
@@ -2768,95 +2669,7 @@ const SUPPORT_CATEGORY_LABELS = {
     outro:                     'Outro assunto'
 };
 
-/** Retorna o label legível de um chamado de suporte: categoria ? assunto ? primeira mensagem ? fallback */
-function getTicketLabel(t) {
-    return SUPPORT_CATEGORY_LABELS[t?.category] || t?.subject || t?.messages?.[0]?.text || 'Chamado';
-}
 
-/** Converte a linha crua de `chats` (com a mensagem de metadados embutida) num objeto de chamado "achatado" e fácil de usar na UI */
-function normalizeTicket(raw) {
-    if (!raw) return null;
-    const msgs = raw.messages || [];
-    const meta = msgs.find(m => m && m.type === 'ticket_meta') || {};
-    // Tenta achar o avatar do requerente: primeiro no próprio metadata do
-    // chamado, depois no cache de usuários do admin (buscando pelo buyer_id).
-    const cachedUser = (window._adminUsersCache || []).find(u => u.id === raw.buyer_id);
-    const requesterAvatar = meta.requester_avatar || safeParseImages(cachedUser?.avatar)[0] || null;
-    return {
-        id:              raw.id,
-        category:        meta.category,
-        subject:         meta.subject,
-        status:          getChatClosed(raw) ? 'closed' : 'open',
-        requester_id:    raw.buyer_id,
-        requester_name:  raw.buyer_name,
-        requester_email: meta.requester_email,
-        requester_role:  meta.requester_role,
-        requester_avatar: normalizeImageUrl(requesterAvatar),
-        order_id:        meta.related_order_id || null,
-        messages:        msgs.filter(m => m && m.type !== 'ticket_meta')
-    };
-}
-
-/** Busca os chamados de suporte (linhas de `chats` com order_id NULL) sem derrubar o painel em caso de erro */
-async function fetchSupportTicketsSafe() {
-    try {
-        const rows = await supabaseFetch('chats?order_id=is.null&select=*&order=id.desc');
-        return rows.filter(r => {
-            const msgs = r.messages;
-            if (typeof msgs === 'string') { try { return JSON.parse(msgs).some(m => m && m.type === 'ticket_meta'); } catch(e) { return false; } }
-            return Array.isArray(msgs) && msgs.some(m => m && m.type === 'ticket_meta');
-        }).map(normalizeTicket);
-    } catch (e) {
-        console.warn('Erro ao buscar chamados de suporte:', e);
-        return [];
-    }
-}
-
-/**
- * Cria um chamado de suporte. Chamado automaticamente sempre que: o usuário
- * pede recuperação de senha, o comprador reporta que não recebeu o produto,
- * o vendedor reporta que entregou mas não teve confirmação, ou o usuário
- * pede ajuda geral pelo formulário "Falar com o Suporte".
- */
-window.createSupportTicket = async function({ category, subject, message = null, orderId = null, overrideEmail = null }) {
-    const user = getSavedUser();
-    const firstMsgText = message || subject;
-    const ticket = {
-        id: crypto.randomUUID(),
-        // order_id fica NULL de propósito: — o que marca esta linha como um
-        // chamado de suporte (todo chat de pedido de verdade tem order_id).
-        order_id:   null,
-        buyer_id:   user?.id || null,
-        buyer_name: user?.nome || 'Visitante',
-        messages: [
-            {
-                // "Mensagem" de metadados: não — exibida na conversa, só carrega
-                // os dados extras do chamado dentro do próprio JSON de messages.
-                type:              'ticket_meta',
-                category,
-                subject,
-                closed:            false,
-                requester_email:   overrideEmail || user?.email || null,
-                requester_role:    user?.tipo || null,
-                requester_avatar:  user?.avatar || null,
-                related_order_id:  orderId
-            },
-            {
-                senderId:   user?.id || 'anon',
-                senderName: user?.nome || 'Visitante',
-                text:       firstMsgText,
-                timestamp:  new Date().toISOString()
-            }
-        ]
-    };
-    try {
-        await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(ticket) });
-        return ticket.id;
-    } catch (e) {
-        console.error('Erro ao abrir chamado de suporte:', e);
-        return null;
-    }
-}
 
 /** A tabela `chats` não possui coluna `closed` (apenas as colunas existentes:
  *  id, order_id, seller_id, seller_name, buyer_id, buyer_name, participants,
@@ -2915,35 +2728,39 @@ window.submitSupportRequest = async function(event) {
     event.preventDefault();
     const category = document.getElementById('supportReqCategory')?.value || 'outro';
     const email    = document.getElementById('supportReqEmail')?.value.trim();
-    const subject  = SUPPORT_CATEGORY_LABELS[category] || 'Solicitação de suporte';
     const desc     = document.getElementById('supportReqDescription')?.value.trim();
-    const message  = desc || subject;
     const user     = getSavedUser();
+    const nome     = user?.nome || 'Visitante';
+    const assunto  = SUPPORT_CATEGORY_LABELS[category] || 'Solicitação de suporte';
+    const message  = desc || assunto;
+    const userEmail = user?.email || email || '';
 
     if (!user && !email) { showToast('Informe seu e-mail para podermos retornar.', 'warning'); return false; }
 
-    const btn = document.querySelector('#supportRequestForm button[type="submit"]');
-    if (btn) { btn.disabled = true; btn.dataset.origText = btn.dataset.origText || btn.textContent; btn.textContent = 'Abrindo chamado...'; }
+    const body = `
+Nova solicitação de suporte:
 
-    const ticketId = await createSupportTicket({
-        category,
-        subject,
-        message,
-        orderId:      window._supportReqOrderId || null,
-        overrideEmail: email
-    });
+━━━━ DADOS DO SOLICITANTE ━━━━
+Nome: ${nome}
+E-mail: ${userEmail}
+Tipo: ${user?.tipo || 'Visitante'}
 
-    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText; }
+━━━━ SOLICITAÇÃO ━━━━
+Assunto: ${assunto}
+Mensagem: ${message}
 
-    if (ticketId) {
-        if (!user) { try { localStorage.setItem('electroGuestTicketId', ticketId); } catch (e) {} }
-        document.getElementById('supportRequestForm')?.reset();
-        window._supportReqOrderId = null;
-        showToast('Chamado aberto! Continue a conversa por aqui.', 'success');
-        window.enterSupportChatMode(ticketId, subject);
-    } else {
-        showToast('Erro ao abrir chamado. Tente novamente em instantes.', 'error');
-    }
+━━━━━━━━━━━━━━━━━━━━━━
+ElectroMarket - Plataforma de E-commerce
+    `.trim();
+
+    const mailtoLink = `mailto:dannybarbosadelimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] ' + assunto)}&body=${encodeURIComponent(body)}`;
+
+    document.getElementById('supportRequestForm')?.reset();
+    window._supportReqOrderId = null;
+    const modal = bootstrap.Modal.getInstance(document.getElementById('supportRequestModal'));
+    if (modal) modal.hide();
+    window.location.href = mailtoLink;
+    showToast('E-mail aberto no seu programa de e-mail. É só enviar!', 'success');
     return false;
 };
 
@@ -2955,30 +2772,6 @@ let supportReplyIndex        = null;
 let supportEditIndex         = null;
 let supportAttachType        = 'image'; // 'image' | 'file'
 window._activeSupportTicketId = null;
-
-/** Procura um chamado ainda aberto pertencente ao usuário atual (logado, pelo
- *  id da conta; visitante, pelo id salvo no localStorage quando abriu o
- *  chamado) — usado pra retomar a conversa em vez de repetir o formulário. */
-async function findMyOpenSupportTicket() {
-    const user = getSavedUser();
-    try {
-        if (user) {
-            const rows = await supabaseFetch(`chats?order_id=is.null&buyer_id=eq.${user.id}&select=*&order=id.desc&limit=20`);
-            const open = (rows || []).find(r => !getChatClosed(r));
-            return open || null;
-        }
-        let guestId = null;
-        try { guestId = localStorage.getItem('electroGuestTicketId'); } catch (e) {}
-        if (!guestId) return null;
-        const rows = await supabaseFetch(`chats?id=eq.${guestId}&select=*&limit=1`);
-        const t = rows?.[0];
-        if (!t || getChatClosed(t)) { try { localStorage.removeItem('electroGuestTicketId'); } catch (e) {} return null; }
-        return t;
-    } catch (e) {
-        console.warn('Erro ao buscar chamado em andamento:', e);
-        return null;
-    }
-}
 
 /** Volta a etapa 1 (formulário) do modal de suporte */
 window.showSupportRequestForm = function() {
@@ -3062,6 +2855,22 @@ window.enterSupportChatMode = function(ticketId, subjectLabel) {
         });
         chatView.classList.remove('d-none');
     }
+
+    // Adiciona botão IA no input do suporte
+    setTimeout(() => {
+        const sendBtn = chatView?.querySelector('.chat-send-btn');
+        if (sendBtn && !document.getElementById('supportAiBtn')) {
+            const aiBtn = document.createElement('button');
+            aiBtn.id = 'supportAiBtn';
+            aiBtn.type = 'button';
+            aiBtn.className = 'chat-send-btn';
+            aiBtn.title = 'Responder com IA';
+            aiBtn.style.cssText = 'background:#6f42c1;margin-right:4px;';
+            aiBtn.innerHTML = '<i class="bi bi-stars"></i>';
+            aiBtn.onclick = window.suggestSupportReply;
+            sendBtn.parentNode.insertBefore(aiBtn, sendBtn);
+        }
+    }, 300);
 
     window._chatActiveElements = {
         input:       document.getElementById(inputId),

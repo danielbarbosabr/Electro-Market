@@ -4,10 +4,9 @@
 
 const SUPABASE_URL = 'https://pjisiqvaulgoikaitmaj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqaXNpcXZhdWxnb2lrYWl0bWFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNjI5ODAsImV4cCI6MjA5MjYzODk4MH0.vq69kmmYdr2aBePlxwVcO3QhUtbp5dtx-pZxRXgEkV8';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
 module.exports = (req, res) => {
-    // Nunca deixa isso em cache (nem no navegador, nem em CDN) — é só pra
-    // esse fetch interno do próprio site.
     res.setHeader('Cache-Control', 'no-store');
 
     if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -17,5 +16,5 @@ module.exports = (req, res) => {
         return;
     }
 
-    res.status(200).json({ SUPABASE_URL, SUPABASE_KEY });
+    res.status(200).json({ SUPABASE_URL, SUPABASE_KEY, GOOGLE_CLIENT_ID });
 };

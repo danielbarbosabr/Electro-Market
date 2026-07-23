@@ -143,6 +143,39 @@ body.dark-theme { /* Tema Netflix: Preto e Vermelho */
   40%, 60% { transform: translateX(8px); }
 }
 
+/* ── Validação inline dos campos ──────────────────────────────── */
+.ml-field-msg {
+  display: block;
+  font-size: 0.7rem;
+  margin-top: 2px;
+  min-height: 1rem;
+  transition: color 0.2s;
+}
+.ml-field-msg.is-valid { color: #28a745; }
+.ml-field-msg.is-invalid { color: #dc3545; }
+.ml-field input.is-valid { border-color: #28a745 !important; }
+.ml-field input.is-invalid { border-color: #dc3545 !important; }
+
+/* ── Botão Google ─────────────────────────────────────────────── */
+.ml-btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  background: #fff;
+  color: #3c4043;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.ml-btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.ml-btn-google:active { background: #eee; }
+
 /* ── Layout auth-screen ─────────────────────────────────────── */
 .auth-overlay {
   position: fixed;
@@ -3537,6 +3570,42 @@ body.admin-chat-fullscreen .admin-standalone-page .admin-chat-main {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.admin-support-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.admin-support-tab {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.admin-support-tab:hover {
+    background: rgba(0,0,0,0.04);
+}
+
+.admin-support-tab.active {
+    background: #dc3545;
+    color: #fff;
+    font-weight: 600;
+}
+
+.admin-support-tab.has-items:not(.active) {
+    color: #dc3545;
 }
 
 /* -------- Painel de chat -------- */

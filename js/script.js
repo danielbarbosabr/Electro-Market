@@ -1896,34 +1896,34 @@ window.prepareEditProduct = function(pid) {
 };
 
 const TERMS_SECTIONS = [
-    { icon: 'file-text',     title: '01. Termos Gerais', id: 'ts1', html: '<p>Ao acessar ou utilizar a plataforma <strong>Electro Marketing</strong> (doravante "plataforma"), você concorda com estes Termos de Uso. Caso não concorde, não utilize o serviço.</p><p>Estes Termos aplicam-se a todos os usuários da plataforma, sejam eles compradores, vendedores ou visitantes. O uso implica na aceitação integral e irretratável destes Termos.</p><p>A Electro Marketing reserva-se o direito de alterar estes Termos a qualquer momento, sendo responsabilidade do usuário verificar periodicamente as atualizações.</p>' },
-    { icon: 'shop',          title: '02. Sobre a Electro Marketing', id: 'ts2', html: '<p>A Electro Marketing é uma plataforma digital de classificados que funciona como um <strong>marketplace de anúncios</strong>, semelhante ao Facebook Marketplace e a OLX.</p><div class="hl"><strong>Importante:</strong> A Electro Marketing não processa pagamentos, não vende produtos e não intermedia transações financeiras. A plataforma apenas facilita o contato entre compradores e vendedores.</div><p>Funcionamento básico:</p><ul><li>Vendedores anunciam seus produtos ou serviços na plataforma;</li><li>Compradores encontram os anúncios por meio de busca e filtros;</li><li>A negociação acontece diretamente entre comprador e vendedor por meio do chat da plataforma;</li><li>Pagamento, entrega, garantia, troca e demais condições são definidos exclusivamente entre as partes;</li><li>A plataforma apenas facilita o contato entre os usuários.</li></ul>' },
+    { icon: 'file-text',     title: '01. Termos Gerais', id: 'ts1', html: '<p>Ao acessar ou utilizar a plataforma <strong>ElectroMarket</strong> (doravante "plataforma"), você concorda com estes Termos de Uso. Caso não concorde, não utilize o serviço.</p><p>Estes Termos aplicam-se a todos os usuários da plataforma, sejam eles compradores, vendedores ou visitantes. O uso implica na aceitação integral e irretratável destes Termos.</p><p>A ElectroMarket reserva-se o direito de alterar estes Termos a qualquer momento, sendo responsabilidade do usuário verificar periodicamente as atualizações.</p>' },
+    { icon: 'shop',          title: '02. Sobre a ElectroMarket', id: 'ts2', html: '<p>A ElectroMarket é uma plataforma digital de classificados que funciona como um <strong>marketplace de anúncios</strong>, semelhante ao Facebook Marketplace e a OLX.</p><div class="hl"><strong>Importante:</strong> A ElectroMarket não processa pagamentos, não vende produtos e não intermedia transações financeiras. A plataforma apenas facilita o contato entre compradores e vendedores.</div><p>Funcionamento básico:</p><ul><li>Vendedores anunciam seus produtos ou serviços na plataforma;</li><li>Compradores encontram os anúncios por meio de busca e filtros;</li><li>A negociação acontece diretamente entre comprador e vendedor por meio do chat da plataforma;</li><li>Pagamento, entrega, garantia, troca e demais condições são definidos exclusivamente entre as partes;</li><li>A plataforma apenas facilita o contato entre os usuários.</li></ul>' },
     { icon: 'person-plus',   title: '03. Cadastro de Usuários', id: 'ts3', html: '<p>Para utilizar determinadas funcionalidades da plataforma, é necessário realizar cadastro. Ao se cadastrar, você declara que:</p><ul><li>É maior de 18 anos ou está devidamente autorizado por responsável legal;</li><li>As informações fornecidas são verdadeiras, completas e atualizadas;</li><li>É responsável pela guarda e sigilo de sua senha de acesso;</li><li>Notificará imediatamente a plataforma em caso de uso não autorizado de sua conta.</li></ul><p>É vedada a criação de múltiplas contas por mesma pessoa, bem como a transferência de contas entre usuários.</p>' },
-    { icon: 'megaphone',     title: '04. Publicação de Anúncios', id: 'ts4', html: '<p>Ao publicar um anúncio, o vendedor declara e garante que:</p><ul><li>É titular ou possui autorização legal para comercializar o produto ou serviço anunciado;</li><li>As informações do anúncio (título, descrição, preço, fotos) são fieis e não enganosas;</li><li>O produto ou serviço atende à legislação vigente;</li><li>As fotos são reais e representam fielmente o item anunciado.</li></ul><p>A Electro Marketing não se responsabiliza pela veracidade dos anúncios, cabendo aos usuários avaliar as condições de cada oferta antes de fechar negócio.</p><p>É proibido publicar anúncios duplicados, com preços manipulados ou com intenção de spam.</p>' },
+    { icon: 'megaphone',     title: '04. Publicação de Anúncios', id: 'ts4', html: '<p>Ao publicar um anúncio, o vendedor declara e garante que:</p><ul><li>É titular ou possui autorização legal para comercializar o produto ou serviço anunciado;</li><li>As informações do anúncio (título, descrição, preço, fotos) são fieis e não enganosas;</li><li>O produto ou serviço atende à legislação vigente;</li><li>As fotos são reais e representam fielmente o item anunciado.</li></ul><p>A ElectroMarket não se responsabiliza pela veracidade dos anúncios, cabendo aos usuários avaliar as condições de cada oferta antes de fechar negócio.</p><p>É proibido publicar anúncios duplicados, com preços manipulados ou com intenção de spam.</p>' },
     { icon: 'chat-dots',     title: '05. Chat entre Comprador e Vendedor', id: 'ts5', html: '<p>O chat da plataforma é o canal oficial de comunicação entre compradores e vendedores. Ao utilizar o chat, os usuários concordam em:</p><ul><li>Manter comunicação respeitosa e profissional;</li><li>Não utilizar o chat para envio de spam, correntes ou mensagens em massa;</li><li>Não compartilhar dados pessoais sensíveis por meio do chat;</li><li>Compreender que a plataforma não se responsabiliza por acordos feitos entre as partes via chat.</li></ul><div class="hl"><strong>Lembre-se:</strong> Toda negociação, combinando preço, forma de pagamento, prazo de entrega e condições de garantia, é de responsabilidade exclusiva do comprador e do vendedor.</div>' },
-    { icon: 'shield-check',  title: '06. Responsabilidades do Anunciante', id: 'ts6', html: '<p>O anunciante (vendedor) é responsável por:</p><ul><li>Garantir que o produto ou serviço esteja disponível conforme descrito no anúncio;</li><li>Responder às mensagens dos potenciais compradores em prazo razoável;</li><li>Informar condições de pagamento, entrega e garantia de forma clara;</li><li>Cumprir os termos acordados diretamente com o comprador;</li><li>Manter seu anúncio atualizado, removendo-o caso o produto não esteja mais disponível.</li></ul><p>A Electro Marketing não é responsável por descumprimentos de acordos entre comprador e vendedor.</p>' },
+    { icon: 'shield-check',  title: '06. Responsabilidades do Anunciante', id: 'ts6', html: '<p>O anunciante (vendedor) é responsável por:</p><ul><li>Garantir que o produto ou serviço esteja disponível conforme descrito no anúncio;</li><li>Responder às mensagens dos potenciais compradores em prazo razoável;</li><li>Informar condições de pagamento, entrega e garantia de forma clara;</li><li>Cumprir os termos acordados diretamente com o comprador;</li><li>Manter seu anúncio atualizado, removendo-o caso o produto não esteja mais disponível.</li></ul><p>A ElectroMarket não é responsável por descumprimentos de acordos entre comprador e vendedor.</p>' },
     { icon: 'person',        title: '07. Responsabilidades do Comprador', id: 'ts7', html: '<p>O comprador é responsável por:</p><ul><li>Avaliar cuidadosamente as condições do anúncio antes de efetuar qualquer negócio;</li><li>Entrar em contato com o vendedor para esclarecer dúvidas sobre o produto;</li><li>Verificar a reputação e histórico do vendedor quando disponível;</li><li>Compreender que a plataforma não garante a qualidade, segurança ou legalidade dos produtos anunciados;</li><li>Realizar pagamentos e combinar entregas diretamente com o vendedor.</li></ul>' },
     { icon: 'exclamation-triangle', title: '08. Conteúdos Proibidos', id: 'ts8', html: '<p>É terminantemente proibido na plataforma a publicação de:</p><ul><li>Produtos ilegais, roubados ou contrabandeados;</li><li>Armas, drogas, substâncias controladas ou materiais que violem a legislação;</li><li>Produtos falsificados ou que infrinjam propriedade intelectual;</li><li>Conteúdo discriminatório, ofensivo, pornográfico ou que incite à violência;</li><li>Spam, correntes, golpes ou qualquer forma de fraude;</li><li>Dados pessoais de terceiros sem autorização;</li><li>Anúncios com preços simbólicos para fins de manipulação ou engano.</li></ul><p>A violação desta cláusula poderá resultar em remoção imediata do conteúdo, suspensão ou banimento da conta.</p>' },
-    { icon: 'lock',          title: '09. Segurança da Conta', id: 'ts9', html: '<p>Cada usuário é responsável por manter a segurança de sua conta. Recomendamos:</p><ul><li>Utilizar senhas fortes e únicas para a plataforma;</li><li>Não compartilhar credenciais de acesso com terceiros;</li><li>Verificar regularmente a atividade da conta;</li><li>Sair da sessão em dispositivos públicos ou compartilhados.</li></ul><p>A Electro Marketing não se responsabiliza por acessos não autorizados decorrentes de negligência do titular da conta.</p>' },
-    { icon: 'flag',          title: '10. Denúncias e Moderação', id: 'ts10', html: '<p>A Electro Marketing disponibiliza mecanismos para que os usuários reportem conteúdos ou comportamentos que violem estes Termos.</p><p>A equipe de moderação analisará as denúncias em prazo razoável e tomará as providências cabíveis, que podem incluir:</p><ul><li>Remoção do conteúdo denunciado;</li><li>Aviso ao usuário infrator;</li><li>Suspensão temporária da conta;</li><li>Banimento permanente da plataforma.</li></ul><p>A decisão de moderação será comunicada ao usuário denunciante quando pertinente.</p>' },
-    { icon: 'x-octagon',     title: '11. Suspensão ou Banimento de Contas', id: 'ts11', html: '<p>A Electro Marketing reserva-se o direito de suspender ou banir contas que:</p><ul><li>Violem qualquer cláusula destes Termos de Uso;</li><li>Apresentem comportamento fraudulento, enganoso ou prejudicial a outros usuários;</li><li>Recebam múltiplas denúncias fundamentadas;</li><li>Utilizem a plataforma para atividades ilegais.</li></ul><p>Em caso de banimento, o usuário não poderá criar nova conta na plataforma. A Electro Marketing não é obrigada a fornecer justificativa detalhada em cada caso.</p>' },
+    { icon: 'lock',          title: '09. Segurança da Conta', id: 'ts9', html: '<p>Cada usuário é responsável por manter a segurança de sua conta. Recomendamos:</p><ul><li>Utilizar senhas fortes e únicas para a plataforma;</li><li>Não compartilhar credenciais de acesso com terceiros;</li><li>Verificar regularmente a atividade da conta;</li><li>Sair da sessão em dispositivos públicos ou compartilhados.</li></ul><p>A ElectroMarket não se responsabiliza por acessos não autorizados decorrentes de negligência do titular da conta.</p>' },
+    { icon: 'flag',          title: '10. Denúncias e Moderação', id: 'ts10', html: '<p>A ElectroMarket disponibiliza mecanismos para que os usuários reportem conteúdos ou comportamentos que violem estes Termos.</p><p>A equipe de moderação analisará as denúncias em prazo razoável e tomará as providências cabíveis, que podem incluir:</p><ul><li>Remoção do conteúdo denunciado;</li><li>Aviso ao usuário infrator;</li><li>Suspensão temporária da conta;</li><li>Banimento permanente da plataforma.</li></ul><p>A decisão de moderação será comunicada ao usuário denunciante quando pertinente.</p>' },
+    { icon: 'x-octagon',     title: '11. Suspensão ou Banimento de Contas', id: 'ts11', html: '<p>A ElectroMarket reserva-se o direito de suspender ou banir contas que:</p><ul><li>Violem qualquer cláusula destes Termos de Uso;</li><li>Apresentem comportamento fraudulento, enganoso ou prejudicial a outros usuários;</li><li>Recebam múltiplas denúncias fundamentadas;</li><li>Utilizem a plataforma para atividades ilegais.</li></ul><p>Em caso de banimento, o usuário não poderá criar nova conta na plataforma. A ElectroMarket não é obrigada a fornecer justificativa detalhada em cada caso.</p>' },
     { icon: 'shield-lock',   title: '12. Privacidade e LGPD', id: 'ts12', html: '<p>A coleta e o tratamento de dados pessoais seguem a <strong>Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong>.</p><p>Os dados coletados são utilizados exclusivamente para:</p><ul><li>Funcionamento da plataforma (cadastro, anúncios, chat);</li><li>Comunicação entre a plataforma e os usuários;</li><li>Melhoria da experiência de uso;</li><li>Cumprimento de obrigações legais.</li></ul><p>Para mais detalhes, consulte nossa <a href="#" onclick="event.preventDefault();window.showPrivacyPage()" style="color:var(--market-color);text-decoration:underline;">Política de Privacidade</a>.</p>' },
-    { icon: 'shield-exclamation', title: '13. Limitação de Responsabilidade', id: 'ts13', html: '<div class="hl"><strong>Atenção:</strong> A Electro Marketing atua exclusivamente como intermediária tecnológica. A plataforma <strong>não participa</strong> das negociações, pagamentos, entregas ou quaisquer transações entre compradores e vendedores.</div><p>Portanto, a Electro Marketing <strong>não se responsabiliza</strong> por:</p><ul><li>Qualidade, segurança ou legalidade dos produtos anunciados;</li><li>Cumprimento dos acordos entre comprador e vendedor;</li><li>Pagamentos, reembolsos ou estornos;</li><li>Entregas, atrasos ou danos durante o transporte;</li><li>Garantias, trocas ou devoluções de produtos;</li><li>Veracidade das informações prestadas pelos usuários;</li><li>Perdas ou danos diretos ou indiretos decorrentes do uso da plataforma.</li></ul><p>O uso da plataforma é por conta e risco do usuário.</p>' },
-    { icon: 'arrow-repeat',  title: '14. Alterações dos Termos', id: 'ts14', html: '<p>A Electro Marketing poderá alterar estes Termos de Uso a qualquer momento, sem aviso prévio obrigatório.</p><p>As alterações entram em vigor a partir da data de publicação na plataforma. O uso continuado da plataforma após as alterações implica na aceitação das novas condições.</p><p>Recomendamos que os usuários revisem periodicamente esta página.</p>' },
-    { icon: 'headset',       title: '15. Contato e Suporte', id: 'ts15', html: '<p>Em caso de dúvidas, sugestões ou solicitações relacionadas a estes Termos de Uso, entre em contato conosco:</p><ul><li><strong>E-mail:</strong> suporte@electromarketing.com.br</li><li><strong>Suporte na plataforma:</strong> utilize a seção "Falar com o Suporte" disponível no menu</li></ul><p>Nosso time responderá em até 48 horas úteis.</p>' }
+    { icon: 'shield-exclamation', title: '13. Limitação de Responsabilidade', id: 'ts13', html: '<div class="hl"><strong>Atenção:</strong> A ElectroMarket atua exclusivamente como intermediária tecnológica. A plataforma <strong>não participa</strong> das negociações, pagamentos, entregas ou quaisquer transações entre compradores e vendedores.</div><p>Portanto, a ElectroMarket <strong>não se responsabiliza</strong> por:</p><ul><li>Qualidade, segurança ou legalidade dos produtos anunciados;</li><li>Cumprimento dos acordos entre comprador e vendedor;</li><li>Pagamentos, reembolsos ou estornos;</li><li>Entregas, atrasos ou danos durante o transporte;</li><li>Garantias, trocas ou devoluções de produtos;</li><li>Veracidade das informações prestadas pelos usuários;</li><li>Perdas ou danos diretos ou indiretos decorrentes do uso da plataforma.</li></ul><p>O uso da plataforma é por conta e risco do usuário.</p>' },
+    { icon: 'arrow-repeat',  title: '14. Alterações dos Termos', id: 'ts14', html: '<p>A ElectroMarket poderá alterar estes Termos de Uso a qualquer momento, sem aviso prévio obrigatório.</p><p>As alterações entram em vigor a partir da data de publicação na plataforma. O uso continuado da plataforma após as alterações implica na aceitação das novas condições.</p><p>Recomendamos que os usuários revisem periodicamente esta página.</p>' },
+    { icon: 'headset',       title: '15. Contato e Suporte', id: 'ts15', html: '<p>Em caso de dúvidas, sugestões ou solicitações relacionadas a estes Termos de Uso, entre em contato conosco:</p><ul><li><strong>E-mail:</strong> dannybarbosadelimabr@gmail.com</li><li><strong>Suporte na plataforma:</strong> utilize a seção "Falar com o Suporte" disponível no menu</li></ul><p>Nosso time responderá em até 48 horas úteis.</p>' }
 ];
 
 const PRIVACY_SECTIONS = [
-    { icon: 'database',     title: '01. Dados Coletados', id: 'ps1', html: '<p>A Electro Marketing coleta os seguintes dados pessoais durante o uso da plataforma:</p><ul><li><strong>Dados de cadastro:</strong> nome completo, CPF, e-mail, telefone, endereço (rua, número, bairro, cidade, UF, CEP);</li><li><strong>Dados de perfil:</strong> foto de perfil, banner, tipo de conta (comprador/vendedor);</li><li><strong>Dados de uso:</strong> histórico de buscas, anúncios visualizados, mensagens enviadas no chat;</li><li><strong>Dados técnicos:</strong> endereço IP, tipo de navegador, sistema operacional, dispositivo.</li></ul>' },
+    { icon: 'database',     title: '01. Dados Coletados', id: 'ps1', html: '<p>A ElectroMarket coleta os seguintes dados pessoais durante o uso da plataforma:</p><ul><li><strong>Dados de cadastro:</strong> nome completo, CPF, e-mail, telefone, endereço (rua, número, bairro, cidade, UF, CEP);</li><li><strong>Dados de perfil:</strong> foto de perfil, banner, tipo de conta (comprador/vendedor);</li><li><strong>Dados de uso:</strong> histórico de buscas, anúncios visualizados, mensagens enviadas no chat;</li><li><strong>Dados técnicos:</strong> endereço IP, tipo de navegador, sistema operacional, dispositivo.</li></ul>' },
     { icon: 'bullseye',     title: '02. Finalidade da Coleta', id: 'ps2', html: '<p>Os dados são coletados para:</p><ul><li>Viabilizar o cadastro e o funcionamento da plataforma;</li><li>Exibir anúncios e facilitar o contato entre compradores e vendedores;</li><li>Processar mensagens enviadas pelo chat interno;</li><li>Melhorar a experiência de navegação e personalizar conteúdos;</li><li>Enviar notificações relevantes ao usuário;</li><li>Cumprir obrigações legais e regulatórias.</li></ul><div class="hl" style="background:#e8f4fd;border-left-color:var(--market-color);color:#1a4a7a;">Não utilizamos seus dados para fins de marketing externo sem o seu consentimento explícito.</div>' },
-    { icon: 'share',        title: '03. Compartilhamento de Dados', id: 'ps3', html: '<p>A Electro Marketing <strong>não vende</strong> dados pessoais de usuários a terceiros.</p><p>Os dados podem ser compartilhados apenas nas seguintes situações:</p><ul><li>Quando exigido por lei ou ordem judicial;</li><li>Para fins de segurança e prevenção de fraudes;</li><li>Com prestadores de serviços essenciais (hospedagem, infraestrutura) sob acordos de confidencialidade.</li></ul>' },
+    { icon: 'share',        title: '03. Compartilhamento de Dados', id: 'ps3', html: '<p>A ElectroMarket <strong>não vende</strong> dados pessoais de usuários a terceiros.</p><p>Os dados podem ser compartilhados apenas nas seguintes situações:</p><ul><li>Quando exigido por lei ou ordem judicial;</li><li>Para fins de segurança e prevenção de fraudes;</li><li>Com prestadores de serviços essenciais (hospedagem, infraestrutura) sob acordos de confidencialidade.</li></ul>' },
     { icon: 'lock',         title: '04. Armazenamento e Segurança', id: 'ps4', html: '<p>Seus dados são armazenados em servidores seguros com criptografia e proteção contra acessos não autorizados. Adotamos medidas técnicas e administrativas para proteger suas informações, incluindo:</p><ul><li>Criptografia em trânsito (HTTPS/SSL);</li><li>Controle de acesso restrito aos dados;</li><li>Monitoramento regular de segurança;</li><li>Backups periódicos.</li></ul>' },
-    { icon: 'file-earmark-text', title: '05. Seus Direitos (LGPD)', id: 'ps5', html: '<p>Conforme a Lei Geral de Proteção de Dados, você tem direito a:</p><ul><li><strong>Confirmação</strong> da existência de tratamento de dados;</li><li><strong>Acesso</strong> aos seus dados pessoais;</li><li><strong>Correção</strong> de dados incompletos ou desatualizados;</li><li><strong>Anonimização, bloqueio ou eliminação</strong> de dados desnecessários;</li><li><strong>Portabilidade</strong> dos dados;</li><li><strong>Eliminação</strong> dos dados tratados com consentimento;</li><li><strong>Informação</strong> sobre compartilhamento de dados;</li><li><strong>Revogação</strong> do consentimento.</li></ul><p>Para exercer esses direitos, entre em contato pelo e-mail: <strong>privacidade@electromarketing.com.br</strong></p>' },
+    { icon: 'file-earmark-text', title: '05. Seus Direitos (LGPD)', id: 'ps5', html: '<p>Conforme a Lei Geral de Proteção de Dados, você tem direito a:</p><ul><li><strong>Confirmação</strong> da existência de tratamento de dados;</li><li><strong>Acesso</strong> aos seus dados pessoais;</li><li><strong>Correção</strong> de dados incompletos ou desatualizados;</li><li><strong>Anonimização, bloqueio ou eliminação</strong> de dados desnecessários;</li><li><strong>Portabilidade</strong> dos dados;</li><li><strong>Eliminação</strong> dos dados tratados com consentimento;</li><li><strong>Informação</strong> sobre compartilhamento de dados;</li><li><strong>Revogação</strong> do consentimento.</li></ul><p>Para exercer esses direitos, entre em contato pelo e-mail: <strong>dannybarbosadelimabr@gmail.com</strong></p>' },
     { icon: 'cookie',       title: '06. Cookies', id: 'ps6', html: '<p>A plataforma utiliza cookies para:</p><ul><li>Manter a sessão do usuário ativa;</li><li>Lembrar preferências de navegação e tema;</li><li>Coletar estatísticas de uso para melhoria do serviço.</li></ul><p>Você pode gerenciar as preferências de cookies diretamente nas configurações do seu navegador.</p>' },
     { icon: 'clock-history', title: '07. Retenção de Dados', id: 'ps7', html: '<p>Os dados pessoais são mantidos enquanto a conta do usuário estiver ativa. Após a exclusão da conta, os dados serão removidos ou anonimizados em até 90 dias, exceto quando exigido por obrigação legal.</p>' },
     { icon: 'person-x',     title: '08. Menores de Idade', id: 'ps8', html: '<p>A plataforma não é direcionada a menores de 18 anos. Caso um menor seja identificado, sua conta será suspensa e os dados removidos imediatamente.</p>' },
     { icon: 'arrow-repeat', title: '09. Alterações nesta Política', id: 'ps9', html: '<p>Esta Política de Privacidade pode ser atualizada periodicamente. As alterações serão publicadas nesta página com a data de última atualização.</p>' },
-    { icon: 'envelope',     title: '10. Contato', id: 'ps10', html: '<p>Em caso de dúvidas sobre esta Política de Privacidade ou sobre o tratamento dos seus dados:</p><ul><li><strong>E-mail:</strong> privacidade@electromarketing.com.br</li><li><strong>Suporte:</strong> utilize a seção "Falar com o Suporte" na plataforma</li></ul>' }
+    { icon: 'envelope',     title: '10. Contato', id: 'ps10', html: '<p>Em caso de dúvidas sobre esta Política de Privacidade ou sobre o tratamento dos seus dados:</p><ul><li><strong>E-mail:</strong> dannybarbosadelimabr@gmail.com</li><li><strong>Suporte:</strong> utilize a seção "Falar com o Suporte" na plataforma</li></ul>' }
 ];
 
 function renderTermsPrivacy(sections, title, subtitle) {
@@ -2175,7 +2175,7 @@ function updateUI() {
         }
     });
 
-    updateCartBadge();
+    window.updateCartBadge();
 }
 
 async function loadNotifications() {
@@ -2437,13 +2437,6 @@ window.updateChatBadge = async function() {
     } catch (e) {}
 };
 
-function updateCartBadge() {
-    const count = cart.reduce((a, i) => a + (i.qtd || 1), 0);
-    document.querySelectorAll('#cartBadgeDesktop, #cartBadgeMobile').forEach(el => {
-        if (el) { el.textContent = count; el.classList.toggle('d-none', count === 0); }
-    });
-}
-
 window.openAddressMap = function(location) {
     if (!location) {
         showToast('Endereço não disponível para este anúncio.', 'info');
@@ -2472,249 +2465,6 @@ window.sendSupportChatLocation = async function() {
         if (typeof loadMySupportTicket === 'function') loadMySupportTicket(ticketId);
         showToast('Localização enviada!', 'success');
     } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
-};
-
-// ============================================
-// CARRINHO
-// ============================================
-
-function renderCart() {
-    const list    = document.getElementById('cartItemsList');
-    const totalEl = document.getElementById('cartTotalValue');
-    if (!list) return;
-
-    if (!cart.length) {
-        list.innerHTML = `
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-cart-x fs-1 d-block mb-3"></i>
-                Seu carrinho está vazio
-            </div>`;
-        if (totalEl) totalEl.textContent = 'R$ 0,00';
-        updateCartBadge();
-        return;
-    }
-
-    let total = 0;
-    list.innerHTML = cart.map((item, i) => {
-        total += (item.preco || 0) * (item.qtd || 1);
-        const thumb = safeParseImages(item.img)[0];
-        return `
-        <div class="cart-item">
-            <div class="d-flex gap-2 align-items-start">
-                <img src="${thumb || 'https://placehold.co/60'}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/60/e9ecef/6c757d?text=%20'">
-                <div class="flex-grow-1" style="min-width:0">
-                    <div class="cart-item-title text-truncate">${item.titulo}</div>
-                    <div class="cart-item-price">${(item.preco || 0) === 0 ? 'GRÁTIS' : `R$ ${(item.preco || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}`}</div>
-                    <div class="d-flex align-items-center gap-2 mt-2">
-                        <button class="btn btn-outline-secondary" onclick="window.updateCartQty(${i}, -1)">−</button>
-                        <span class="small fw-bold">${item.qtd || 1}</span>
-                        <button class="btn btn-outline-secondary" onclick="window.updateCartQty(${i}, +1)">+</button>
-                    </div>
-                </div>
-            </div>
-            <div class="d-flex gap-1 mt-2">
-                <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="removeFromCart(${i})">
-                    <i class="bi bi-trash"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-primary flex-grow-1" onclick="buyItem(${i})">
-                    Solicitar Compra
-                </button>
-            </div>
-        </div>`;
-    }).join('');
-
-    if (totalEl) totalEl.textContent = formatPreco(total, {htmlGratis:false});
-    updateCartBadge();
-    localStorage.setItem('electroCart', JSON.stringify(cart));
-}
-
-/** Esvazia o carrinho por completo, com confirmação pra evitar clique acidental */
-window.esvaziarCarrinho = function() {
-    if (cart.length === 0) { showToast('Seu carrinho já está vazio.', 'info'); return; }
-    if (!confirm('Tem certeza que deseja remover todos os itens do carrinho?')) return;
-    cart.length = 0;
-    localStorage.setItem('electroCart', JSON.stringify(cart));
-    renderCart();
-    showToast('Carrinho esvaziado.', 'info');
-};
-
-/** Seletor de quantidade estilo Mercado Livre: botão abre uma lista com todas
- *  as quantidades disponíveis (1 até o estoque do produto) */
-window.toggleQtyDropdown = function(evt) {
-    if (evt) evt.stopPropagation();
-    const list = document.getElementById('qtyDropdownList');
-    if (!list) return;
-    const isOpen = list.classList.contains('show');
-    list.classList.toggle('show', !isOpen);
-    document.getElementById('mlQtyPicker')?.classList.toggle('open', !isOpen);
-};
-
-window.selectDetailQty = function(n) {
-    window._detailQty = n;
-    const valueEl = document.getElementById('detailQtyValue');
-    if (valueEl) valueEl.textContent = n;
-    document.getElementById('qtyDropdownList')?.classList.remove('show');
-    document.getElementById('mlQtyPicker')?.classList.remove('open');
-};
-
-// Fecha o dropdown de quantidade ao clicar fora dele
-document.addEventListener('click', (evt) => {
-    const picker = document.getElementById('mlQtyPicker');
-    if (picker && !picker.contains(evt.target)) {
-        document.getElementById('qtyDropdownList')?.classList.remove('show');
-        picker.classList.remove('open');
-    }
-});
-
-document.getElementById('cartOffcanvas')?.addEventListener('show.bs.offcanvas', function(e) {
-    if (!getSavedUser()) {
-        e.preventDefault();
-        window.showAuthScreen?.();
-        showToast('Faça login para acessar o carrinho!', 'warning');
-    }
-});
-
-window.addToCart = function(productId, options = {}) {
-    if (!getSavedUser()) {
-        window.showAuthScreen?.();
-        return showToast('Faça login para adicionar ao carrinho!', 'warning');
-    }
-    const { openCart = true, silent = false, qty = 1 } = options;
-    const p = allProductsCache.find(x => x.id === productId);
-    if (!p) return;
-    const stock  = Math.max(1, parseInt(p.quantidade) || 1);
-    const addQty = Math.max(1, qty);
-    const exist = cart.find(i => i.id === productId);
-    if (exist) {
-        if (exist.qtd + addQty > stock) return showToast(`Limite de ${stock} unidade${stock === 1 ? '' : 's'} em estoque!`, 'warning');
-        exist.qtd += addQty;
-    } else {
-        if (addQty > stock) return showToast(`Limite de ${stock} unidade${stock === 1 ? '' : 's'} em estoque!`, 'warning');
-        cart.push({ ...p, qtd: addQty });
-    }
-    renderCart();
-    if (!silent) showToast(`"${p.titulo.substring(0,30)}..." adicionado ao carrinho!`, 'success');
-
-    if (openCart) bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
-};
-
-window.removeFromCart = function(i) {
-    cart.splice(i, 1);
-    renderCart();
-};
-
-window.updateCartQty = function(i, delta) {
-    const item = cart[i];
-    if (!item) return;
-    const stock  = Math.max(1, parseInt(item.quantidade) || 1);
-    const newQty = (item.qtd || 1) + delta;
-    if (newQty > stock) {
-        showToast(`Máximo de ${stock} unidade${stock === 1 ? '' : 's'} em estoque!`, 'warning');
-        return;
-    }
-    newQty < 1 ? window.removeFromCart(i) : (item.qtd = newQty, renderCart());
-};
-
-window.toggleLike = async function(pid) {
-    const idx     = likedProducts.indexOf(pid);
-    const product = allProductsCache.find(p => p.id == pid);
-    if (!product) return;
-
-    if (idx > -1) {
-        likedProducts.splice(idx, 1);
-        product.likes = Math.max(0, (product.likes || 0) - 1);
-        showToast('Removido dos curtidos', 'info', 2000);
-    } else {
-        likedProducts.push(pid);
-        product.likes = (product.likes || 0) + 1;
-        showToast('Adicionado aos seus curtidos!', 'success', 2000);
-    }
-
-    localStorage.setItem('electroLiked', JSON.stringify(likedProducts));
-    try {
-        await supabaseFetch(`products?id=eq.${pid}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ likes: product.likes })
-        });
-    } catch (e) {}
-
-    // Se a página de detalhes em tela cheia estiver aberta, não sobrescreve ela com o
-    // grid de novo — só atualiza o botão/contador de curtidas ali mesmo.
-    const grid = document.getElementById('productsGrid');
-    if (grid?.classList.contains('product-detail-active')) {
-        window.refreshDetailLikeBtn(pid);
-    } else {
-        renderGrid(allProductsCache);
-    }
-};
-
-window.buyItem = async function(i) {
-    const item = cart[i];
-    const user = getSavedUser();
-    if (!user) { showToast('Faça login para comprar!', 'warning'); return; }
-
-    const btn          = document.querySelector(`button[onclick="buyItem(${i})"]`);
-    const originalText = btn?.textContent || 'Solicitar Compra';
-    if (btn) { btn.disabled = true; btn.textContent = 'Processando...'; }
-
-    try {
-        const orderId = `ord_${Date.now()}`;
-        const imgs = safeParseImages(item.img);
-        const order   = {
-            id:             orderId,
-            seller_id:      item.vendedor_id || 'system',
-            seller_name:    item.loja || 'Vendedor',
-            buyer_id:       user.id,
-            buyer_name:     user.nome,
-            product_id:     item.id,
-            product_title:  item.titulo,
-            product_img:    (imgs.length > 0 ? imgs[0] : ''),
-            total:          (item.preco || 0) * (item.qtd || 1),
-            quantity:       item.qtd || 1,
-            status:         'pending',
-            // Tabela orders usa realiza_entrega (snake_case) no SQL fornecido
-            realiza_entrega: !!(item.realizaEntrega ?? item.realiza_entrega ?? true),
-            agree_buyer:    false,
-            agree_seller:   false,
-            created_at:     new Date().toISOString(),
-            updated_at:     new Date().toISOString()
-        };
-
-        await supabaseFetch('orders', { method: 'POST', body: JSON.stringify(order) });
-
-        await supabaseFetch('chats', {
-            method: 'POST',
-            body: JSON.stringify({
-                id:           crypto.randomUUID(),
-                order_id:     orderId,
-                seller_id:    order.seller_id,
-                seller_name:  order.seller_name,
-                buyer_id:     order.buyer_id,
-                buyer_name:   order.buyer_name,
-                participants: [order.seller_id, order.buyer_id],
-                logistics_agreed: false,
-                messages: [{
-                    senderId:  'system',
-                    text:      `Pedido #${orderId.slice(-8).toUpperCase()} criado!\n${item.titulo}\n${formatPreco(order.total, {htmlGratis:false})}\nAguardando aprovação do vendedor...`,
-                    timestamp: new Date().toISOString()
-                }]
-            })
-        });
-
-        cart.splice(i, 1);
-        renderCart();
-        ordersCache.push(order);
-        bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas'))?.hide();
-
-        createPersistentNotification(`Pedido #${orderId.slice(-6).toUpperCase()} realizado com sucesso!`, 'success');
-        window.renderOrderManagement('buyer');
-
-    } catch (err) {
-        console.error(err);
-        showToast('Erro ao processar pedido: ' + (err.message || 'Tente novamente.'), 'error');
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = originalText; }
-    }
 };
 
 // ============================================
@@ -3464,203 +3214,7 @@ window.chatCancelOrder = async function(orderId) {
     } catch { showToast('Erro ao cancelar.', 'error'); }
 };
 
-// ============================================
-// FAZER OFERTA (estilo eBay: comprador propõe um
-// valor ao vendedor, que aparece em "Solicitações
-// Pendentes" pra ser aceito ou recusado)
-// ============================================
 
-/** Abre a página fullscreen de fazer oferta (mesmo estilo do Criar Anúncio) */
-window.showOfferPage = function(pid) {
-    const grid = document.getElementById('productsGrid');
-    if (!grid) return;
-
-    const hero = document.getElementById('heroSection');
-    if (hero) hero.classList.add('d-none');
-    const gridTitleEl = document.getElementById('gridTitle');
-    if (gridTitleEl) gridTitleEl.textContent = '';
-    document.getElementById('storefrontBanner')?.replaceChildren();
-
-    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active') && !grid.classList.contains('create-ad-active') && !grid.classList.contains('offer-page-active')) {
-        window._preDetailState = {
-            html: grid.innerHTML,
-            gridClass: grid.className,
-            gridDisplay: grid.style.display,
-            title: document.getElementById('gridTitle')?.textContent || '',
-            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
-        };
-    }
-
-    grid.className = 'offer-page-active';
-    grid.style.display = 'block';
-
-    const user = getSavedUser();
-    if (!user) { showToast('Faça login para enviar uma oferta!', 'warning'); window.closeProductDetail(); return; }
-
-    const item = allProductsCache.find(x => x.id == pid || x.id === pid);
-    if (!item) { showToast('Produto não encontrado.', 'error'); window.closeProductDetail(); return; }
-    if (user.id === item.vendedor_id) { showToast('Você não pode fazer uma oferta no seu próprio anúncio.', 'warning'); window.closeProductDetail(); return; }
-
-    const preco = parseFloat(item.preco) || 0;
-
-    grid.innerHTML = `
-    <div class="detail-page">
-        <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
-            <i class="bi bi-arrow-left"></i> Voltar
-        </button>
-
-        <div class="create-ad-wrap">
-            <div class="create-ad-header">
-                <div>
-                    <h4>Fazer Oferta</h4>
-                    <p class="text-muted small mb-0">Proponha um valor para este produto</p>
-                </div>
-            </div>
-
-            <form id="offerForm" class="create-ad-form" onsubmit="window.submitOffer(event)">
-                <div class="create-ad-section">
-                    <div class="create-ad-section-title">
-                        <i class="bi bi-box-seam-fill"></i>
-                        <span>Produto</span>
-                    </div>
-                    <div class="create-ad-section-body">
-                        <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
-                            <img id="offerProductImg" src="${safeParseImages(item.img)[0] || 'https://placehold.co/60'}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/60'"
-                                 style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">
-                            <div class="flex-grow-1">
-                                <h6 class="fw-bold mb-1">${item.titulo}</h6>
-                                <small class="text-muted">Preço anunciado: <strong>${formatPreco(preco)}</strong></small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="create-ad-section">
-                    <div class="create-ad-section-title">
-                        <i class="bi bi-tag-fill"></i>
-                        <span>Sua Oferta</span>
-                    </div>
-                    <div class="create-ad-section-body">
-                        <div class="mb-3">
-                            <div class="ml-field">
-                                <input type="number" id="offerAmount" step="0.01" min="0.01"${preco > 0 ? ` max="${preco - 0.01}"` : ''} placeholder=" " required>
-                                <label for="offerAmount">Seu valor (R$) *</label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="ml-field">
-                                <input type="number" id="offerQty" min="1" value="1" max="${Math.max(1, item.quantidade ?? 9999)}" placeholder=" " required>
-                                <label for="offerQty">Quantidade *</label>
-                            </div>
-                        </div>
-                        <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i>O vendedor pode aceitar ou recusar sua oferta em até alguns dias. Você será avisado assim que ele responder.</p>
-                    </div>
-                </div>
-
-                <div class="create-ad-footer">
-                    <button type="button" class="ml-btn ml-btn-outline" onclick="window.closeProductDetail()">
-                        <i class="bi bi-x-lg me-2"></i>Cancelar
-                    </button>
-                    <button type="submit" class="ml-btn ml-btn-primary">
-                        <i class="bi bi-send me-2"></i>Enviar Oferta
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>`;
-
-    document.getElementById('offerForm').dataset.pid = pid;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
-window.openOfferModal = function(pid) { window.showOfferPage(pid); };
-
-/** Envia a oferta como um pedido com status especial (offer_pending), reaproveitando
- *  toda a estrutura de pedidos/chat já existente — o vendedor decide em "Solicitações
- *  Pendentes", igual ao fluxo de aceitar/recusar uma compra normal. */
-window.submitOffer = async function(event) {
-    event.preventDefault();
-    const user = getSavedUser();
-    if (!user) { showToast('Faça login para enviar uma oferta!', 'warning'); return; }
-
-    const form = document.getElementById('offerForm');
-    const pid  = form.dataset.pid;
-    const item = allProductsCache.find(x => x.id == pid || x.id === pid);
-    if (!item) { showToast('Produto não encontrado.', 'error'); return; }
-
-    const preco      = parseFloat(item.preco) || 0;
-    const offerValue = parseFloat(document.getElementById('offerAmount').value);
-    const qty        = parseInt(document.getElementById('offerQty').value) || 1;
-
-    if (!offerValue || offerValue <= 0) { showToast('Informe um valor de oferta válido.', 'warning'); return; }
-    if (preco > 0 && offerValue >= preco) {
-        showToast('A oferta deve ser menor que o preço anunciado. Pra pagar o valor cheio, use "Solicitar Compra".', 'warning');
-        return;
-    }
-
-    const btn          = form.querySelector('button[type="submit"]');
-    const originalText = btn?.textContent || 'Enviar Oferta';
-    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
-
-    try {
-        const orderId = `ord_${Date.now()}`;
-        const imgs = safeParseImages(item.img);
-        const order = {
-            id:                   orderId,
-            seller_id:            item.vendedor_id || 'system',
-            seller_name:          item.loja || 'Vendedor',
-            buyer_id:             user.id,
-            buyer_name:           user.nome,
-            product_id:           item.id,
-            product_title:        item.titulo,
-            product_img:          (imgs.length > 0 ? imgs[0] : ''),
-            total:                offerValue * qty,
-            quantity:             qty,
-            status:               'offer_pending',
-            offer_amount:         offerValue,
-            offer_original_price: preco,
-            realiza_entrega:      !!(item.realiza_entrega ?? item.realizaEntrega ?? true),
-            agree_buyer:          false,
-            agree_seller:         false,
-            created_at:           new Date().toISOString(),
-            updated_at:           new Date().toISOString()
-        };
-
-        await supabaseFetch('orders', { method: 'POST', body: JSON.stringify(order) });
-
-        await supabaseFetch('chats', {
-            method: 'POST',
-            body: JSON.stringify({
-                id:           crypto.randomUUID(),
-                order_id:     orderId,
-                seller_id:    order.seller_id,
-                seller_name:  order.seller_name,
-                buyer_id:     order.buyer_id,
-                buyer_name:   order.buyer_name,
-                participants: [order.seller_id, order.buyer_id],
-                logistics_agreed: false,
-                messages: [{
-                    senderId:  'system',
-                    text:      `Oferta enviada para "${item.titulo}"!\nValor oferecido: ${formatPreco(offerValue, {htmlGratis:false})} (preço anunciado: ${formatPreco(preco, {htmlGratis:false})})\nAguardando resposta do vendedor...`,
-                    timestamp: new Date().toISOString()
-                }]
-            })
-        });
-
-        ordersCache.push(order);
-        window.closeProductDetail();
-
-        createPersistentNotification(`Oferta enviada para "${item.titulo}"!`, 'success');
-        showToast('Oferta enviada ao vendedor!', 'success');
-        window.renderOrderManagement('buyer');
-
-    } catch (err) {
-        console.error(err);
-        showToast('Erro ao enviar oferta: ' + (err.message || 'Tente novamente.'), 'error');
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = originalText; }
-    }
-};
 
 // ============================================
 // TEMA (função global para o switch mobile)
@@ -3700,6 +3254,12 @@ function syncHeaderHeightVar() {
 }
 
 function bootstrapApp() {
+    // OAuth callback: se a URL contiver access_token, processa login Google
+    if (window.location.hash && window.location.hash.includes('access_token')) {
+        handleGoogleOAuthCallback();
+        return;
+    }
+
     // Aplicar tema salvo
     if (localStorage.getItem('modoEscuro') === 'true') {
         document.body.classList.add('dark-theme');
@@ -4025,7 +3585,7 @@ function bootstrapApp() {
 
     // Init
     updateUI();
-    renderCart();
+    window.renderCart();
     window.setupAutoComplete();
     window.updateChatBadge();
 
@@ -4422,7 +3982,6 @@ function preencherCamposEndereco(data, sourceId) {
 window.loadPage          = loadPage;
 window.applyFilters      = applyFilters;
 window.clearFilters      = clearFilters;
-window.renderCart        = renderCart;
 window.showToast         = showToast;
 window.logout            = () => {
     localStorage.removeItem('electroUser');
@@ -4649,20 +4208,31 @@ window.mlCadGoToStep = function(step) {
     });
 };
 
-window.mlCadNextStep = function() {
+window.mlCadNextStep = async function() {
     // Valida os campos obrigatórios do passo 1 antes de avançar
     const requiredIds = ['v2CadNome', 'v2CadCPF', 'v2CadTelefone', 'v2CadEmail', 'v2CadPass'];
     for (const id of requiredIds) {
         const el = document.getElementById(id);
         if (el && !el.reportValidity()) return;
     }
-    // Valida CPF antes de avançar
+    // Valida CPF
     const cpfInput = document.getElementById('v2CadCPF');
     if (cpfInput) {
         const cpf = cpfInput.value.replace(/\D/g, '');
         if (!validarCPF(cpf)) {
             showToast('CPF inválido! Verifique os números.', 'error');
             cpfInput.focus();
+            return;
+        }
+    }
+    // Verifica se o e-mail já está cadastrado
+    const emailInput = document.getElementById('v2CadEmail');
+    if (emailInput) {
+        const r = await window.checkEmailExists(emailInput.value);
+        if (r.exists) {
+            showToast('Este e-mail já está cadastrado. Use outro e-mail ou faça login.', 'error');
+            emailInput.classList.add('is-invalid');
+            emailInput.focus();
             return;
         }
     }
@@ -4676,9 +4246,174 @@ window.mlCadPrevStep = function() {
 
 window.forgotPassword = function(event) {
   event?.preventDefault();
-  // Abre um chamado de suporte de recuperação de senha — cai direto na aba
-  // "Suporte" do administrador, que passa a acompanhar e resolver o caso.
-  window.openSupportRequestModal('esqueci_senha');
+  const user = getSavedUser();
+  const nome = user?.nome || 'Usuário';
+  const userEmail = user?.email || '';
+  const body = `
+Nova solicitação de suporte:
+
+━━━━ DADOS DO SOLICITANTE ━━━━
+Nome: ${nome}
+E-mail: ${userEmail || 'não informado'}
+Tipo: ${user?.tipo || 'Visitante'}
+
+━━━━ SOLICITAÇÃO ━━━━
+Assunto: Esqueci minha senha
+Mensagem: Olá, esqueci minha senha e preciso de ajuda para recuperar o acesso à minha conta.
+
+━━━━━━━━━━━━━━━━━━━━━━
+ElectroMarket - Plataforma de E-commerce
+  `.trim();
+  const mailto = `mailto:dannybarbosadelimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] Esqueci minha senha')}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+  showToast('E-mail aberto no seu programa de e-mail para solicitar recuperação de senha.', 'success');
+};
+
+// ============================================
+// GOOGLE LOGIN (via Supabase OAuth)
+// ============================================
+
+window.loginWithGoogle = function() {
+    const redirectTo = window.location.origin + window.location.pathname;
+    window.location.href =
+        `${CONFIG.SUPABASE_URL}/auth/v1/authorize` +
+        `?provider=google` +
+        `&redirect_to=${encodeURIComponent(redirectTo)}`;
+};
+
+/** Processa o retorno do OAuth do Google (access_token na hash da URL) */
+async function handleGoogleOAuthCallback() {
+    const params = new URLSearchParams(window.location.hash.replace('#', '?'));
+    const accessToken = params.get('access_token');
+    if (!accessToken) return;
+
+    try {
+        const res = await fetch(`${CONFIG.SUPABASE_URL}/auth/v1/user`, {
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': CONFIG.SUPABASE_KEY }
+        });
+        const authUser = await res.json();
+        if (!authUser?.email) return;
+
+        const existing = await supabaseFetch(`users?email=eq.${encodeURIComponent(authUser.email)}&limit=1`);
+        if (existing?.length) {
+            localStorage.setItem('electroUser', JSON.stringify(existing[0]));
+        } else {
+            const newUser = {
+                id: crypto.randomUUID(),
+                tipo: 'CLIENTE',
+                nome: authUser.user_metadata?.full_name || authUser.email,
+                email: authUser.email,
+                avatar: JSON.stringify([authUser.user_metadata?.avatar_url || '', '']),
+                telefone: '',
+                senha_hash: '',
+                created_at: new Date().toISOString()
+            };
+            await supabaseFetch('users', { method: 'POST', body: JSON.stringify(newUser) });
+            localStorage.setItem('electroUser', JSON.stringify(newUser));
+        }
+
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        updateUI();
+        showToast('Login com Google realizado!', 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch {
+        showToast('Erro ao autenticar com Google.', 'error');
+        setTimeout(() => location.reload(), 1500);
+    }
+}
+
+// ============================================
+// IA — ASSISTENTE DE SUPORTE (Transformers.js — 100% local, sem API key)
+// ============================================
+
+/**
+ * Carrega o Transformers.js dinamicamente via esm.sh e cria o pipeline.
+ * O modelo (LaMini-Flan-T5-77M) é baixado uma vez do Hugging Face Hub
+ * e cacheado no IndexedDB do navegador.
+ */
+let _aiPipeline = null;
+let _aiStatus = 'idle';
+
+async function _getAiPipeline() {
+    if (_aiPipeline) return _aiPipeline;
+    if (_aiStatus === 'loading') return null;
+    if (_aiStatus === 'error') return null;
+
+    _aiStatus = 'loading';
+    showToast('Carregando IA local... (primeira vez baixa o modelo, pode demorar)', 'info', 5000);
+
+    try {
+        const { pipeline } = await import('https://esm.sh/@xenova/transformers@2.17.1');
+        _aiPipeline = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-77M', {
+            progress_callback: (p) => {
+                if (p.status === 'progress' && p.progress != null) {
+                    const pct = Math.round(p.progress * 100);
+                    if (pct % 20 === 0 || pct === 100) {
+                        showToast(`Baixando modelo IA: ${pct}%`, 'info', 3000);
+                    }
+                }
+            }
+        });
+        _aiStatus = 'ready';
+        showToast('IA local carregada!', 'success', 2000);
+        return _aiPipeline;
+    } catch (e) {
+        _aiStatus = 'error';
+        showToast('Erro ao carregar IA: ' + (e.message || e), 'error', 5000);
+        return null;
+    }
+}
+
+window.callAI = async function(messages, options = {}) {
+    const pipe = await _getAiPipeline();
+    if (!pipe) { showToast('IA indisponível no momento.', 'warning'); return null; }
+
+    const lastMsgs = messages.slice(-4);
+    const context = lastMsgs.map(m => `${m.role === 'user' ? 'Cliente' : 'Atendente'}: ${m.content}`).join('\n');
+
+    const prompt = `Gere uma resposta de suporte educada e útil em português para esta conversa:\n${context}\n\nResposta:`;
+
+    try {
+        const result = await pipe(prompt, { max_new_tokens: 150, temperature: 0.7, do_sample: true });
+        const text = result?.[0]?.generated_text || '';
+        return text.replace(prompt, '').trim() || null;
+    } catch (e) {
+        showToast('Erro ao gerar resposta: ' + (e.message || e), 'error');
+        return null;
+    }
+};
+
+window.suggestSupportReply = async function() {
+    const ticketId = window._activeSupportTicketId;
+    if (!ticketId) { showToast('Nenhum chamado ativo.', 'warning'); return; }
+
+    const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
+    const ticket = result?.[0];
+    if (!ticket) return;
+
+    const msgs = (ticket.messages || []).filter(m => m.type !== 'system' && !m.deleted);
+    const lastMsgs = msgs.slice(-8).map(m => ({
+        role: m.isStaff ? 'assistant' : 'user',
+        content: `${m.senderName || 'Usuário'}: ${m.text || ''}`
+    }));
+
+    const reply = await window.callAI(lastMsgs, { temperature: 0.5, max_tokens: 200 });
+    if (reply) {
+        const input = window._chatActiveElements?.input;
+        if (input) { input.value = reply; input.focus(); }
+    }
+};
+
+// ============================================
+// VERIFICAÇÃO DE E-MAIL DUPLICADO
+// ============================================
+
+window.checkEmailExists = async function(email) {
+    if (!email) return { exists: false };
+    try {
+        const data = await supabaseFetch(`users?select=id&email=eq.${encodeURIComponent(email)}&limit=1`);
+        return { exists: data && data.length > 0 };
+    } catch { return { exists: false }; }
 };
 
 window.hideAuthScreen = function() {
@@ -4862,6 +4597,15 @@ document.addEventListener('submit', async (e) => {
             return;
         }
 
+        // Verifica se o e-mail já está cadastrado
+        const emailExiste = await window.checkEmailExists(payload.email);
+        if (emailExiste.exists) {
+            showToast('Este e-mail já está cadastrado. Faça login ou use outro e-mail.', 'error');
+            document.getElementById('v2CadEmail')?.classList.add('is-invalid');
+            if (btn) { btn.disabled = false; btn.textContent = orig; }
+            return;
+        }
+
         try {
             await supabaseFetch('users', { method: 'POST', body: JSON.stringify(payload) });
             
@@ -4934,28 +4678,18 @@ document.addEventListener('submit', async (e) => {
 document.getElementById('v2LogEmail')?.addEventListener('input', (e) => e.target.classList.remove('input-error'));
 document.getElementById('v2LogPass')?.addEventListener('input', (e) => e.target.classList.remove('input-error'));
 
-// ============================================
-// FAVORITOS E HISTÓRICO
-// ============================================
-
-window.renderLikedProducts = () => {
-    window.exitWaOrdersView();
-    const hero = document.getElementById('heroSection');
-    if (hero) hero.classList.add('d-none');
-    document.getElementById('gridTitle').textContent = 'Seus Curtidos';
-    renderGrid(allProductsCache.filter(p => likedProducts.includes(p.id)));
-    window.closeMobileMenu();
-};
-
-window.renderAccessHistory = () => {
-    window.exitWaOrdersView();
-    const hero = document.getElementById('heroSection');
-    if (hero) hero.classList.add('d-none');
-    document.getElementById('gridTitle').textContent = 'Vistos Recentemente';
-    const historyProducts = accessHistory.map(id => allProductsCache.find(p => p.id == id)).filter(Boolean);
-    renderGrid(historyProducts);
-    window.closeMobileMenu();
-};
+// Verificação de e-mail duplicado ao sair do campo
+document.getElementById('v2CadEmail')?.addEventListener('blur', async function() {
+    const msgEl = document.getElementById('v2CadEmailMsg');
+    if (!this.value) { this.classList.remove('is-valid', 'is-invalid'); if (msgEl) msgEl.textContent = ''; return; }
+    const r = await window.checkEmailExists(this.value);
+    this.classList.toggle('is-invalid', r.exists);
+    this.classList.toggle('is-valid', !r.exists);
+    if (msgEl) {
+        msgEl.textContent = r.exists ? 'Este e-mail já está cadastrado.' : '';
+        msgEl.className = 'ml-field-msg' + (r.exists ? ' is-invalid' : ' is-valid');
+    }
+});
 
 window.closeMobileMenu = () =>
     bootstrap.Offcanvas.getInstance(document.getElementById('mobileMenu'))?.hide();
@@ -6092,6 +5826,7 @@ async function loadDirectChatMessages(chatId, silent = false) {
         if (changed) {
             supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {});
             window.updateChatBadge();
+            window.renderDirectChats();
         }
 
         const signature = JSON.stringify(chat.messages);
