@@ -21,6 +21,12 @@ alter table public.orders
 alter table public.chats
   add column if not exists closed               boolean     default false;
 
+-- ---------- CHATS: colunas para conversas em grupo ----------
+alter table public.chats
+  add column if not exists is_group             boolean     default false,
+  add column if not exists group_name           text,
+  add column if not exists group_avatar         text;
+
 -- ---------- USERS: tabela usada no cadastro/login ----------
 create table if not exists public.users (
   id              uuid primary key default gen_random_uuid(),

@@ -1606,7 +1606,7 @@ window.renderAdminSupportTab = function(chats, orders, users) {
                     <div class="wa-contact-text" style="${_unread ? 'font-weight:600;color:#111;' : ''}">${c.lastMsg ? window.stripLegacyEmoji?.(c.lastMsg.slice(0, 60)) || c.lastMsg.slice(0, 60) : 'Nenhuma mensagem'}</div>
                     <small class="text-muted" style="font-size:0.68rem;">${c.subname}</small>
                 </div>
-                <div class="wa-contact-badge text-end" style="flex-shrink:0;">
+                <div class="text-end" style="flex-shrink:0;background:transparent;">
                     ${_unread ? `<span class="badge bg-success d-block mx-auto mb-1" style="font-size:0.6rem;">${_unread}</span>` : ''}
                     <small class="text-muted" style="font-size:0.65rem;">${timeStr}</small>
                     <div><span class="admin-row-badge ${badgeClass}" style="font-size:0.6rem;padding:1px 6px;"><i class="bi ${icon} me-1"></i>${badgeText.slice(0,24)}</span></div>
@@ -1624,7 +1624,7 @@ window.renderAdminSupportTab = function(chats, orders, users) {
                 countEl.textContent = `${data.length} ${data.length !== 1 ? 'solicitações' : 'solicitação'}`;
             } else {
                 const openTotal = chatContacts.filter(c => !c.closed).length;
-                countEl.textContent = `${data.length} conversa${data.length !== 1 ? 's' : ''} (${openTotal} abert${openTotal !== 1 ? 'as' : 'a'})`;
+                countEl.textContent = `${data.length} · ${openTotal} abert${openTotal !== 1 ? 'as' : 'a'}`;
             }
         }
 
@@ -1957,10 +1957,19 @@ window.adminSupportBack = function() {
 
 window.adminSupportCloseFullscreen = function() {
     window._adminSupportViewOpen = false;
-    document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
+    document.body.classList.remove('wa-locked', 'admin-chat-fullscreen', 'wa-fullscreen');
     window._adminActiveSupportId = null;
     window.goToAdminTab('admin-overview');
     adminRefreshCurrentView();
+};
+
+window.adminToggleSupportFullscreen = function() {
+    const isFull = document.body.classList.toggle('wa-fullscreen');
+    const btn = document.getElementById('adminSupportFullscreenBtn');
+    if (btn) {
+        btn.innerHTML = isFull ? '<i class="bi bi-fullscreen-exit"></i>' : '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = isFull ? 'Sair da tela cheia' : 'Tela cheia';
+    }
 };
 
 /**
@@ -2066,7 +2075,8 @@ window.openAdminSupportFullscreen = async function() {
                     <section class="wa-side">
                         <div class="wa-side__header">
                             <h6 class="mb-0">Suporte</h6>
-                            <span class="small text-muted ms-auto me-2" id="adminSupportSidebarCount"></span>
+                            <span class="small text-muted ms-auto me-2" id="adminSupportSidebarCount" style="white-space:nowrap;"></span>
+                            <button type="button" id="adminSupportFullscreenBtn" class="chat-header-close" onclick="window.adminToggleSupportFullscreen()" title="Tela cheia" style="margin-right:4px;font-size:0.85rem;"><i class="bi bi-arrows-fullscreen"></i></button>
                             <button type="button" class="ml-auth-close" aria-label="Fechar" onclick="window.adminSupportCloseFullscreen()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
                         </div>
                         <div class="wa-side__search">
@@ -2079,8 +2089,8 @@ window.openAdminSupportFullscreen = async function() {
 
                     <section class="wa-chat">
                         <div id="adminSupportEmpty" class="wa-empty-state">
-                            <i class="bi bi-chat-square-text"></i>
-                            <p>Selecione uma conversa ao lado</p>
+                            <i class="bi bi-headset"></i>
+                            <p class="wa-empty-sub">Nenhum atendimento selecionado.<br>Escolha uma conversa ao lado para responder.</p>
                         </div>
                         <div id="adminSupportChatActive" class="d-none h-100 flex-column chat-container" style="margin:0;border-radius:0;"></div>
                     </section>
@@ -2944,7 +2954,6 @@ ElectroMarket - Plataforma de E-commerce
 
 // -------- Chat do chamado de suporte (visão do usuário que abriu) --------
 
-let supportChatPollInterval  = null;
 let supportChatLastSignature = null;
 let supportReplyIndex        = null;
 let supportEditIndex         = null;
@@ -3064,19 +3073,16 @@ window.enterSupportChatMode = function(ticketId, subjectLabel) {
     startSupportChatPolling(ticketId);
 };
 
-function startSupportChatPolling(ticketId) {
-    stopSupportChatPolling();
-    supportChatPollInterval = setInterval(() => {
+const _supportChatPoller = window.ChatCore.createPoller(
+    (id, silent) => loadMySupportTicket(id, silent),
+    (id) => {
         const modalEl = document.getElementById('supportRequestModal');
-        const isOpen  = modalEl?.classList.contains('show');
-        if (!isOpen || window._activeSupportTicketId !== ticketId) { stopSupportChatPolling(); return; }
-        loadMySupportTicket(ticketId, true);
-    }, 1500);
-}
-
-function stopSupportChatPolling() {
-    if (supportChatPollInterval) { clearInterval(supportChatPollInterval); supportChatPollInterval = null; }
-}
+        return !!modalEl?.classList.contains('show') && window._activeSupportTicketId === id;
+    },
+    1500
+);
+function startSupportChatPolling(ticketId) { _supportChatPoller.start(ticketId); }
+function stopSupportChatPolling() { _supportChatPoller.stop(); }
 
 /** Abre um modal listando as pessoas da conversa de suporte (igual ao
  *  botão de participantes dos outros chats): o usuário que abriu o

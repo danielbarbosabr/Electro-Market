@@ -5,6 +5,91 @@
 //            toggle tema global, melhor gestão de estado
 // ============================================
 
+// ============================================
+// CHAT CORE — lógica compartilhada entre os 3 tipos de chat do sistema:
+//   - Chat de pedido      (startChatPolling/loadChatMessages, abaixo)
+//   - Chat direto         (startDirectChatPolling/loadDirectChatMessages, abaixo)
+//   - Chat de suporte     (admin.js -> startSupportChatPolling)
+// Antes vivia em js/chat-core.js separado; unificado aqui.
+// ============================================
+(function () {
+    window.ChatCore = window.ChatCore || {};
+
+    /**
+     * Cria um poller (start/stop) genérico.
+     * Substitui os pares startChatPolling/stopChatPolling,
+     * startDirectChatPolling/stopDirectChatPolling e
+     * startSupportChatPolling/stopSupportChatPolling.
+     *
+     * @param {function(id, silent)} loadFn     função que recarrega as mensagens
+     * @param {function(id): boolean} isActiveFn retorna true se o chat/modal ainda está aberto
+     * @param {number} intervalMs somente diferença real entre os 3 usos (4000 ou 1500)
+     */
+    window.ChatCore.createPoller = function (loadFn, isActiveFn, intervalMs) {
+        let handle = null;
+        return {
+            start(id) {
+                this.stop();
+                handle = setInterval(() => {
+                    if (!isActiveFn(id)) { this.stop(); return; }
+                    loadFn(id, true);
+                }, intervalMs || 4000);
+            },
+            stop() {
+                if (handle) { clearInterval(handle); handle = null; }
+            }
+        };
+    };
+
+    /**
+     * Marca como "visto" (visto: true) as mensagens recebidas de outra pessoa
+     * e, se algo mudou, salva via patchFn e limpa o badge/negrito do contato
+     * na lista lateral. Usado por loadChatMessages e loadDirectChatMessages.
+     *
+     * @param {object} chat objeto do chat (precisa de .messages)
+     * @param {object} user usuário logado (getSavedUser())
+     * @param {function(messages): Promise} patchFn salva as mensagens atualizadas
+     * @param {string} contactSelector seletor CSS do item na lista lateral (ex: '.wa-contact[data-order-id="..."]')
+     * @returns {boolean} true se alguma mensagem foi marcada como vista
+     */
+    window.ChatCore.markSeenAndClearBadge = function (chat, user, patchFn, contactSelector) {
+        let changed = false;
+        chat.messages.forEach(msg => {
+            if (msg.senderId && String(msg.senderId) !== String(user.id) && !msg.visto) {
+                msg.visto = true;
+                changed = true;
+            }
+        });
+        if (changed) {
+            Promise.resolve(patchFn(chat.messages)).catch(() => {});
+            window.updateChatBadge?.();
+            const contactEl = contactSelector ? document.querySelector(contactSelector) : null;
+            if (contactEl) {
+                contactEl.querySelector('.badge.bg-success')?.remove();
+                const textEl = contactEl.querySelector('.wa-contact-text');
+                if (textEl) textEl.style.removeProperty('font-weight');
+            }
+        }
+        return changed;
+    };
+
+    /**
+     * Compara a "assinatura" (JSON) das mensagens atuais com a última renderizada,
+     * para não re-renderizar a lista inteira a cada polling silencioso sem necessidade.
+     * Usado por loadChatMessages e loadDirectChatMessages.
+     *
+     * @returns {{skip: boolean, isNewIncoming: boolean}}
+     */
+    window.ChatCore.diffSignature = function (chat, silent) {
+        const signature = JSON.stringify(chat.messages);
+        const skip = !!(silent && signature === window.lastChatSignature);
+        const isNewIncoming = !!(silent && window.lastChatSignature !== null &&
+            chat.messages.length > (JSON.parse(window.lastChatSignature || '[]').length || 0));
+        window.lastChatSignature = signature;
+        return { skip, isNewIncoming };
+    };
+})();
+
 window.allProductsCache = [];
 window.cart              = JSON.parse(localStorage.getItem('electroCart'))    || [];
 window.likedProducts     = JSON.parse(localStorage.getItem('electroLiked'))   || [];
@@ -195,8 +280,13 @@ window.exitWaOrdersView = function() {
     stopDirectChatPolling();
     document.getElementById('whatsappOrdersView')?.classList.add('d-none');
     document.getElementById('productGridMain')?.classList.remove('d-none');
-    document.body.classList.remove('wa-locked', 'admin-chat-fullscreen');
+    document.body.classList.remove('wa-locked', 'admin-chat-fullscreen', 'wa-fullscreen');
     document.body.style.overflow = '';
+    document.getElementById('waSideMe')?.classList.remove('d-none');
+    document.getElementById('waSideMyName')?.classList.remove('d-none');
+    document.getElementById('waSideFullscreenBtn')?.classList.add('d-none');
+    document.getElementById('waSideCloseBtn')?.classList.add('d-none');
+    document.body.classList.remove('wa-fullscreen');
     if (typeof window.closeWaChat === 'function') window.closeWaChat();
     if (typeof window.closeDirectChat === 'function') window.closeDirectChat();
 };
@@ -2537,7 +2627,7 @@ window.showChat = async function(orderId) {
         onSendFile: 'window.sendChatImageFile',
         onChatActions: 'window.toggleChatActions()',
         showBackBtn: true,
-        showCloseBtn: true,
+        showCloseBtn: false,
         showProductSummary: true,
         showAttach: true,
         extraBeforeInput: logisticsAreaHtml
@@ -2586,24 +2676,16 @@ window.closeWaChat = function() {
     document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
 };
 
-function startChatPolling(orderId) {
-    stopChatPolling();
-    window.chatPollInterval = setInterval(() => {
+const _orderChatPoller = window.ChatCore.createPoller(
+    (id, silent) => loadChatMessages(id, silent),
+    (id) => {
         const panel = document.getElementById('waChatActive');
-        if (!panel || panel.classList.contains('d-none') || window.currentChat !== orderId) {
-            stopChatPolling();
-            return;
-        }
-        loadChatMessages(orderId, true);
-    }, 4000);
-}
-
-function stopChatPolling() {
-    if (window.chatPollInterval) {
-        clearInterval(window.chatPollInterval);
-        window.chatPollInterval = null;
-    }
-}
+        return !!panel && !panel.classList.contains('d-none') && window.currentChat === id;
+    },
+    4000
+);
+function startChatPolling(orderId) { _orderChatPoller.start(orderId); }
+function stopChatPolling() { _orderChatPoller.stop(); }
 
 async function loadChatMessages(orderId, silent = false) {
     const container = window._chatActiveElements?.container || document.getElementById('chatMessagesContainer');
@@ -2649,32 +2731,17 @@ async function loadChatMessages(orderId, silent = false) {
             (c) => supabaseFetch(`chats?order_id=eq.${orderId}`, {method: 'PATCH', body: JSON.stringify({messages: c.messages})}),
             () => loadChatMessages(orderId, true)
         );
-        let changed = false;
-        chat.messages.forEach(msg => {
-            if (msg.senderId && String(msg.senderId) !== String(user.id) && !msg.visto) {
-                msg.visto = true; changed = true;
-            }
-        });
-        if (changed) {
-            supabaseFetch(`chats?order_id=eq.${orderId}`, {method: 'PATCH', body: JSON.stringify({messages: chat.messages})}).catch(() => {});
-            window.updateChatBadge();
-            // Atualiza badge da lista lateral de pedidos
-            const contactEl = document.querySelector(`.wa-contact[data-order-id="${orderId}"]`);
-            if (contactEl) {
-                const badge = contactEl.querySelector('.badge.bg-success');
-                if (badge) badge.remove();
-                const textEl = contactEl.querySelector('.wa-contact-text');
-                if (textEl) textEl.style.removeProperty('font-weight');
-            }
-        }
+        window.ChatCore.markSeenAndClearBadge(
+            chat, user,
+            (messages) => supabaseFetch(`chats?order_id=eq.${orderId}`, {method: 'PATCH', body: JSON.stringify({messages})}),
+            `.wa-contact[data-order-id="${orderId}"]`
+        );
 
-        const signature = JSON.stringify(chat.messages);
-        if (silent && signature === window.lastChatSignature) {
+        const { skip, isNewIncoming } = window.ChatCore.diffSignature(chat, silent);
+        if (skip) {
             updateChatLogistics(order, user);
             return;
         }
-        const isNewIncoming = silent && window.lastChatSignature !== null && chat.messages.length > (JSON.parse(window.lastChatSignature || '[]').length || 0);
-        window.lastChatSignature = signature;
         const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
         const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome||'Você')}&background=22c98e&color=fff&size=40`;
         const partnerAvatarSrc = document.getElementById(`msgs_${orderId}Avatar`)?.src || window._chatActiveElements?.container?.closest('.chat-container')?.querySelector('.chat-header-avatar-wrap img')?.src || '';
@@ -2683,8 +2750,8 @@ async function loadChatMessages(orderId, silent = false) {
             return window.renderMsgBubble(msg, index, {
                 userId: user.id, myAvatar, partnerAvatar: partnerAvatarSrc, supportAvatar,
                 resolveSenderName: () => msg.senderName || '',
-                actions: {reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage'},
-                useDropdown: true, enableGrouping: true, allMessages: chat.messages
+                actions: {reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage', star: 'toggleStarMessage'},
+                useDropdown: true, enableGrouping: false
             });
         }).join('');
         if (wasNearBottom) {
@@ -3032,9 +3099,8 @@ window.sendTrackingCode = async function(orderId) {
 // AÇÕES COMPARTILHADAS DE CHAT (reply, edit, delete, copy)
 // ============================================
 
-window.startReply = async function(index) {
-    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-    const msg = chatResult?.[0]?.messages[index];
+window.startReply = function(index) {
+    const msg = window.__getActiveChatData?.()?.chat?.messages?.[index];
     if (!msg) return;
 
     currentReplyIndex = index;
@@ -3053,9 +3119,8 @@ window.startReply = async function(index) {
     (window._chatActiveElements?.input || document.getElementById('chatMessageInput'))?.focus();
 };
 
-window.startEdit = async function(index) {
-    const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-    const msg = chatResult?.[0]?.messages[index];
+window.startEdit = function(index) {
+    const msg = window.__getActiveChatData?.()?.chat?.messages?.[index];
     if (!msg) return;
 
     editingMessageIndex = index;
@@ -3088,8 +3153,7 @@ window.cancelReplyOrEdit = function() {
 
 window.copyMessageText = async function(index) {
     try {
-        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-        const msg = chatResult?.[0]?.messages[index];
+        const msg = window.__getActiveChatData?.()?.chat?.messages?.[index];
         if (!msg?.text) return;
         await navigator.clipboard.writeText(msg.text);
         showToast('Mensagem copiada!', 'success', 1500);
@@ -3101,18 +3165,140 @@ window.copyMessageText = async function(index) {
 window.deleteMessage = async function(index) {
     if (!confirm('Apagar esta mensagem para todos?')) return;
     try {
-        const chatResult = await supabaseFetch(`chats?order_id=eq.${currentChat}&limit=1`);
-        const chat = chatResult?.[0];
-        if (!chat?.messages[index]) return;
+        const data = window.__getActiveChatData?.();
+        const chat = data?.chat;
+        if (!chat?.messages?.[index]) return;
         chat.messages[index].text = '';
         chat.messages[index].image = null;
         chat.messages[index].file = null;
         chat.messages[index].deleted = true;
-        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
-        loadChatMessages(currentChat);
+        await data.save(chat);
+        data.render();
     } catch (e) {
         showToast('Erro ao apagar mensagem.', 'error');
     }
+};
+
+/** Mostra/esconde a barra de pesquisa dentro da conversa aberta */
+window.toggleChatSearch = function(msgsId) {
+    const bar = document.getElementById(`${msgsId}SearchBar`);
+    if (!bar) return;
+    const willShow = bar.classList.contains('d-none');
+    bar.classList.toggle('d-none');
+    const input = bar.querySelector('input');
+    if (willShow) {
+        input.focus();
+    } else {
+        input.value = '';
+        window.searchInChat(msgsId, '');
+    }
+};
+
+/** Filtra as mensagens visíveis da conversa aberta pelo texto pesquisado.
+ *  Igual ao WhatsApp: não esconde as mensagens, apenas destaca as que combinam
+ *  com a busca e guarda a lista de resultados para navegação (ver searchInChatNav). */
+window.__chatSearchState = window.__chatSearchState || {};
+
+window.searchInChat = function(msgsId, query) {
+    const container = document.getElementById(msgsId);
+    if (!container) return;
+    const q = (query || '').trim().toLowerCase();
+    const countEl = document.getElementById(`${msgsId}SearchCount`);
+
+    container.querySelectorAll('.msg-row').forEach(row => {
+        row.style.display = '';
+        row.classList.remove('chat-search-match', 'chat-search-match-active');
+    });
+
+    if (!q) {
+        window.__chatSearchState[msgsId] = null;
+        if (countEl) countEl.classList.add('d-none');
+        return;
+    }
+
+    const rows = Array.from(container.querySelectorAll('.msg-row'));
+    const matches = rows.filter(row => row.textContent.toLowerCase().includes(q));
+    matches.forEach(row => row.classList.add('chat-search-match'));
+
+    if (countEl) {
+        countEl.classList.toggle('d-none', matches.length === 0);
+        countEl.textContent = matches.length ? `0/${matches.length}` : 'Sem resultados';
+    }
+
+    // Começa pela combinação mais recente (mais próxima do fim da conversa), como no WhatsApp.
+    window.__chatSearchState[msgsId] = { matches, index: matches.length - 1 };
+    if (matches.length) window.__applyChatSearchActive(msgsId);
+};
+
+/** Navega entre os resultados da busca atual (setas cima/baixo ou Enter/Shift+Enter). */
+window.searchInChatNav = function(msgsId, direction) {
+    const state = window.__chatSearchState[msgsId];
+    if (!state || !state.matches.length) return;
+    state.index = (state.index + direction + state.matches.length) % state.matches.length;
+    window.__applyChatSearchActive(msgsId);
+};
+
+window.__applyChatSearchActive = function(msgsId) {
+    const state = window.__chatSearchState[msgsId];
+    if (!state || !state.matches.length) return;
+    state.matches.forEach(row => row.classList.remove('chat-search-match-active'));
+    const active = state.matches[state.index];
+    active.classList.add('chat-search-match-active');
+    active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const countEl = document.getElementById(`${msgsId}SearchCount`);
+    if (countEl) countEl.textContent = `${state.index + 1}/${state.matches.length}`;
+};
+
+window.toggleStarMessage = async function(index) {
+    try {
+        const data = window.__getActiveChatData?.();
+        const chat = data?.chat;
+        const msg = chat?.messages?.[index];
+        if (!msg) return;
+        msg.starred = !msg.starred;
+        await data.save(chat);
+        data.render();
+        showToast(msg.starred ? 'Mensagem favoritada.' : 'Removida dos favoritos.', 'info', 1200);
+    } catch (e) {
+        showToast('Erro ao favoritar mensagem.', 'error');
+    }
+};
+
+/** Abre um modal listando todas as mensagens favoritadas da conversa atualmente aberta */
+window.showStarredMessages = function() {
+    const data = window.__getActiveChatData?.();
+    const chat = data?.chat;
+    const messages = (chat?.messages || []).filter(m => m.starred);
+
+    let modalEl = document.getElementById('starredMessagesModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'starredMessagesModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        document.body.appendChild(modalEl);
+    }
+
+    const itemsHtml = messages.length ? messages.map(m => `
+        <div class="p-2 mb-2 rounded border small">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong>${m.senderName || 'Usuário'}</strong>
+                <span class="text-muted" style="font-size:0.7rem;">${new Date(m.timestamp).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            <div style="white-space:pre-wrap;">${window.escapeHtml?.(m.text || '') ?? (m.text || '')}</div>
+        </div>`).join('') : `<div class="text-center text-muted py-4"><i class="bi bi-star fs-1 d-block mb-2"></i>Nenhuma mensagem favoritada nesta conversa.</div>`;
+
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-header">
+                    <h6 class="modal-title"><i class="bi bi-star me-2"></i>Mensagens favoritas</h6>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="modal-body" style="max-height:60vh;overflow-y:auto;">${itemsHtml}</div>
+            </div>
+        </div>`;
+    new bootstrap.Modal(modalEl).show();
 };
 
 // ============================================
@@ -4879,6 +5065,10 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
         useDropdown = true, enableGrouping = false, allMessages = []
     } = opts;
 
+    if (msg.type === 'direct_chat_meta') {
+        return '';
+    }
+
     if (msg.type === 'system' || msg.senderId === 'system') {
         return `<div class="text-center my-3"><span class="system-chip"><i class="bi bi-info-circle-fill"></i>${window.stripLegacyEmoji?.(msg.text) ?? msg.text}</span></div>`;
     }
@@ -4891,7 +5081,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
         const commentText = lines.filter(l => !l.startsWith('Nota:') && !l.startsWith('Avaliação') && !l.startsWith('—')).join('\n').trim();
         const isMe = msg.senderId === userId;
         return `
-        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}">
+        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" data-msg-index="${index}">
             ${!isMe ? `<img class="msg-avatar" src="${partnerAvatar || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
             <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}" style="background:${isMe ? '#d9fdd3' : '#fff5f5'};border:1px solid #ffd1d1;">
                 <div class="d-flex align-items-center gap-1 mb-1">
@@ -4927,7 +5117,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
 
     if (msg.deleted) {
         return `
-        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}">
+        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}" data-msg-index="${index}">
             ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
             ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
             <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted ${bubblePosition}">
@@ -4960,7 +5150,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
     const searchResultsHtml = (msg.searchResults?.length) ? `
         <div class="d-flex flex-column gap-2 mt-2">
             ${msg.searchResults.map(r => `
-                <a href="${r.link}" target="_blank" rel="noopener" class="chat-location-chip" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;background:rgba(13,110,253,0.08);color:#0d6efd;padding:8px 12px;border-radius:8px;font-weight:500;font-size:0.85rem;">
+                <a href="${r.link}" target="_blank" rel="noopener" class="chat-location-chip mb-2" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:rgba(13,110,253,0.08);color:#0d6efd;padding:8px 12px;border-radius:8px;font-weight:500;font-size:0.85rem;">
                     <i class="bi bi-link-45deg" style="font-size:1.1rem;"></i>
                     <span>${window.escapeHtml?.(r.title) || r.title}</span>
                 </a>
@@ -4985,6 +5175,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
                         <li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="event.stopPropagation();window.reactToMessage(${index}, ${isMe})"><i class="bi bi-emoji-smile me-2"></i>Reagir</a></li>
                         ${a.reply ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.reply}(${index})"><i class="bi bi-reply me-2"></i>Responder</a></li>` : ''}
                         ${a.copy ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.copy}(${index})"><i class="bi bi-clipboard me-2"></i>Copiar</a></li>` : ''}
+                        ${a.star ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.star}(${index})"><i class="bi ${msg.starred ? 'bi-star-fill' : 'bi-star'} me-2"></i>${msg.starred ? 'Remover dos favoritos' : 'Favoritar'}</a></li>` : ''}
                         ${a.edit && isMe ? `<li><a class="dropdown-item py-1 small" href="javascript:void(0)" onclick="window.${a.edit}(${index})"><i class="bi bi-pencil me-2"></i>Editar</a></li>` : ''}
                         ${a.delete && isMe ? `<li><a class="dropdown-item py-1 small text-danger" href="javascript:void(0)" onclick="window.${a.delete}(${index})"><i class="bi bi-trash me-2"></i>Apagar</a></li>` : ''}
                     </ul>
@@ -4995,13 +5186,14 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
                 <i class="bi bi-emoji-smile" onclick="event.stopPropagation();window.showReactionPicker(event, ${index}, ${isMe})" title="Reagir"></i>
                 ${a.reply ? `<i class="bi bi-reply" onclick="window.${a.reply}(${index})" title="Responder"></i>` : ''}
                 ${a.copy ? `<i class="bi bi-clipboard" onclick="window.${a.copy}(${index})" title="Copiar"></i>` : ''}
+                ${a.star ? `<i class="bi ${msg.starred ? 'bi-star-fill text-warning' : 'bi-star'}" onclick="window.${a.star}(${index})" title="${msg.starred ? 'Remover dos favoritos' : 'Favoritar'}"></i>` : ''}
                 ${a.edit && (isMe || isStaff) ? `<i class="bi bi-pencil" onclick="window.${a.edit}(${index})" title="Editar"></i>` : ''}
                 ${a.delete && (isMe || isStaff) ? `<i class="bi bi-trash text-danger" onclick="window.${a.delete}(${index})" title="Apagar"></i>` : ''}
             </div>`;
     };
 
     return `
-    <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}">
+    <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}" data-msg-index="${index}">
         ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
         ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
         <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''} ${bubblePosition}" style="margin-bottom:${reaction ? '10px' : '0'}">
@@ -5020,9 +5212,10 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
                        onerror="this.outerHTML='<a href=\\'${msg.video.replace(/'/g, "\\'")}\\' target=\\'_blank\\' class=\\'small text-break\\'>${msg.video}</a>'"></video>` : ''}
             ${fileChipHtml}
             ${locationChipHtml}
-            ${searchResultsHtml}
             ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${window.formatLinks?.(cleanText) ?? cleanText}</div>` : ''}
+            ${searchResultsHtml}
             <div class="msg-time">
+                ${msg.starred ? '<i class="bi bi-star-fill text-warning me-1" style="font-size:0.65rem;" title="Favoritada"></i>' : ''}
                 ${isMe ? `<span class="msg-status me-1">${msg.visto ? '<span class="text-info"><i class="bi bi-check-all"></i> Visto</span>' : '<span class="text-muted"><i class="bi bi-check"></i> Entregue</span>'}</span>` : ''}
                 ${msg.edited ? '<span>(editada)</span>' : ''}
                 ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
@@ -5038,7 +5231,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉', '💯', '😍', '🤣', '😡', '👏', '💀', '🥰', '🤔', '😎', '✨', '💪', '🤡'];
 
 window.reactToMessage = function(msgIndex, isMe) {
-    const btn = document.querySelector(`.msg-row:nth-child(${msgIndex + 1}) .dropdown [data-bs-toggle="dropdown"]`);
+    const btn = document.querySelector(`.msg-row[data-msg-index="${msgIndex}"] .dropdown [data-bs-toggle="dropdown"]`);
     if (btn) {
         const rect = btn.getBoundingClientRect();
         showReactionPickerAt(rect.left, rect.top, msgIndex, isMe);
@@ -5318,6 +5511,7 @@ window.renderChatContainer = function(opts) {
         participantsId,
         statusBarId,
         onSend = '',
+        onTyping = '',
         onBack = '',
         onClose = '',
         onDelete = '',
@@ -5331,6 +5525,7 @@ window.renderChatContainer = function(opts) {
         onChatActions = '',
         onMute = '',
         onArchive = '',
+        onPin = '',
         onBlock = '',
         onCloseTicket = '',
         onChangeStatus = '',
@@ -5373,11 +5568,18 @@ window.renderChatContainer = function(opts) {
         ? `<button type="button" class="chat-header-close" onclick="${onToggleParticipants}" title="Participantes"><i class="bi bi-people-fill"></i></button>`
         : '';
 
+    const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
+    const isPinned = !!directMeta?.pinned;
+    const isMuted = !!directMeta?.muted;
+    const isArchived = !!directMeta?.archived;
+
     const dropdownItems = [];
     if (onViewProfile) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onViewProfile}"><i class="bi bi-person-circle me-2"></i>Ver perfil</a></li>`);
     if (!isClosed && onCancelOrder) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onCancelOrder}"><i class="bi bi-x-circle me-2"></i>Cancelar pedido</a></li>`);
-    if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi bi-bell-slash me-2"></i>Silenciar notificações</a></li>`);
-    if (onArchive) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onArchive}"><i class="bi bi-archive me-2"></i>Arquivar conversa</a></li>`);
+    if (onPin) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onPin}"><i class="bi ${isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'} me-2"></i>${isPinned ? 'Desafixar conversa' : 'Fixar conversa'}</a></li>`);
+    if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi ${isMuted ? 'bi-bell-fill' : 'bi-bell-slash'} me-2"></i>${isMuted ? 'Reativar notificações' : 'Silenciar notificações'}</a></li>`);
+    if (onArchive) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onArchive}"><i class="bi ${isArchived ? 'bi-archive-fill' : 'bi-archive'} me-2"></i>${isArchived ? 'Desarquivar conversa' : 'Arquivar conversa'}</a></li>`);
+    dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.showStarredMessages()"><i class="bi bi-star me-2"></i>Mensagens favoritas</a></li>`);
     if (showDeleteBtn && onDelete) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDelete}"><i class="bi bi-trash me-2"></i>Apagar conversa</a></li>`);
     if (onCloseTicket) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onCloseTicket}"><i class="bi bi-lock me-2"></i>Encerrar chamado</a></li>`);
     if (onChangeStatus) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onChangeStatus}"><i class="bi bi-arrow-repeat me-2"></i>Alterar status</a></li>`);
@@ -5385,6 +5587,8 @@ window.renderChatContainer = function(opts) {
     if (onDeleteAccounts) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteAccounts}"><i class="bi bi-person-x-fill me-2"></i>Deletar contas</a></li>`);
     if (onDeleteRequester) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteRequester}"><i class="bi bi-person-x-fill me-2"></i>Deletar conta do solicitante</a></li>`);
     if (onDeleteOtherAccount) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteOtherAccount}"><i class="bi bi-person-x-fill me-2"></i>Deletar conta do outro participante</a></li>`);
+
+    const searchBtnHtml = `<button type="button" class="chat-header-close" onclick="window.toggleChatSearch('${msgsId}')" title="Pesquisar na conversa" style="margin-right:4px;"><i class="bi bi-search"></i></button>`;
 
     const dropdownHtml = dropdownItems.length > 0
         ? `<div class="dropdown">
@@ -5416,15 +5620,25 @@ window.renderChatContainer = function(opts) {
         </div>
         <div class="chat-header-info" style="min-width:0;flex:1;">
             <span class="chat-header-name">${partnerName}</span>
-            <span class="chat-header-order-id" style="display:block;font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            <span id="${msgsId}InfoLine" class="chat-header-order-id" style="display:block;font-size:0.65rem;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                 #${String(chatId).slice(-6).toUpperCase()} · ${msgCount} mensagem${msgCount === 1 ? '' : 's'}${isClosed ? ' · <i class="bi bi-lock-fill"></i> Encerrado' : ''}${headerSubtitle ? ' · ' + headerSubtitle : ''}
             </span>
-            ${extraHeaderHtml ? `<div class="mt-1">${extraHeaderHtml}</div>` : ''}
+            <span id="${msgsId}TypingLabel" class="chat-header-typing d-none" style="display:none;font-size:0.68rem;color:#00A884;font-weight:600;">digitando...</span>
+                ${extraHeaderHtml ? `<div class="d-flex justify-content-end mt-1">${extraHeaderHtml}</div>` : ''}
             ${productSummaryHtml}
         </div>
         ${participantsBtnHtml}
+        ${searchBtnHtml}
         ${dropdownHtml}
         ${closeBtnHtml}
+    </div>
+    <div id="${msgsId}SearchBar" class="chat-search-bar d-none">
+        <i class="bi bi-search"></i>
+        <input type="text" placeholder="Pesquisar nesta conversa..." oninput="window.searchInChat('${msgsId}', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();window.searchInChatNav('${msgsId}', event.shiftKey ? -1 : 1);}">
+        <span id="${msgsId}SearchCount" class="chat-search-count d-none"></span>
+        <button type="button" class="chat-search-nav-btn" onclick="window.searchInChatNav('${msgsId}', -1)" title="Anterior"><i class="bi bi-chevron-up"></i></button>
+        <button type="button" class="chat-search-nav-btn" onclick="window.searchInChatNav('${msgsId}', 1)" title="Próxima"><i class="bi bi-chevron-down"></i></button>
+        <i class="bi bi-x-lg chat-search-close" onclick="window.toggleChatSearch('${msgsId}')"></i>
     </div>`;
 
     const statusBarHtml = `
@@ -5491,7 +5705,7 @@ window.renderChatContainer = function(opts) {
             ${onChatActions ? `<button type="button" class="chat-icon-btn" onclick="${onChatActions}" title="Opções do pedido"><i class="bi bi-plus-circle"></i></button>` : ''}
             <button type="button" class="chat-icon-btn" data-voice-input="${inputId}" onclick="${onVoiceInput}('${inputId}')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
             <input type="text" id="${inputId}" class="chat-text-input" placeholder="Digite sua mensagem..." autocomplete="off"
-                   onkeypress="if(event.key==='Enter'){event.preventDefault();${onSend}}">
+                   onkeypress="if(event.key==='Enter'){event.preventDefault();${onSend}}"${onTyping ? ` oninput="${onTyping}"` : ''}>
             <button type="button" class="chat-send-btn" onclick="${onSend}"><i class="bi bi-send-fill"></i></button>
         </div>
     </div>` : '';
@@ -5517,7 +5731,8 @@ window.renderChatContainer = function(opts) {
  * Abre a tela de "Conversas" — lista de todos os usuários do sistema,
  * reutilizando o layout split-panel do whatsappOrdersView.
  */
-window.renderDirectChats = async function() {
+window.renderDirectChats = async function(opts = {}) {
+    const skipBoot = !!opts?.skipBoot;
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
 
@@ -5536,16 +5751,36 @@ window.renderDirectChats = async function() {
     const waSearch = document.getElementById('waContactSearch');
 
     if (waTitle) waTitle.textContent = 'Conversas';
+    window.setWaSideActions?.(true);
+    window.setWaSideProfile?.();
+    document.getElementById('waSideMe')?.classList.remove('d-none');
+    document.getElementById('waSideMyName')?.classList.remove('d-none');
+    document.getElementById('waSideFullscreenBtn')?.classList.add('d-none');
+    document.getElementById('waSideCloseBtn')?.classList.add('d-none');
+    document.body.classList.remove('wa-fullscreen');
+    window.updateWaEmptyState?.('conversas');
     if (waSearch) {
         waSearch.placeholder = 'Buscar pessoa...';
-        waSearch.oninput = function() { window.filterDirectContacts(this.value); };
     }
     if (waView) waView.classList.remove('d-none');
-    document.body.classList.add('wa-locked');
+    document.body.classList.add('wa-locked', 'wa-fullscreen');
 
     window.closeWaChat();
 
+    const bootScreen = document.getElementById('waBootScreen');
+    const bootStartedAt = Date.now();
+    if (bootScreen && !skipBoot) { bootScreen.classList.remove('d-none', 'wa-boot-fade-out'); }
+
     waList.innerHTML = '<div class="text-center py-5 w-100"><div class="spinner-border text-success"></div></div>';
+
+    const hideBootScreen = async () => {
+        if (!bootScreen || skipBoot) return;
+        const elapsed = Date.now() - bootStartedAt;
+        const remaining = Math.max(0, 650 - elapsed);
+        if (remaining) await new Promise(r => setTimeout(r, remaining));
+        bootScreen.classList.add('wa-boot-fade-out');
+        setTimeout(() => bootScreen.classList.add('d-none'), 250);
+    };
 
     try {
         const allUsers = await supabaseFetch(`users?select=id,nome,avatar,last_seen&order=nome.asc`);
@@ -5557,17 +5792,21 @@ window.renderDirectChats = async function() {
 
         const contactMap = {};
         myChats.forEach(chat => {
+            if ((chat.messages?.[0]?.groupType === 'group') || (chat.participants && chat.participants.length > 2)) return;
             const otherId = chat.participants.find(p => String(p) !== String(user.id));
             if (otherId) contactMap[otherId] = chat;
         });
 
-        const otherUsers = allUsers.filter(u => String(u.id) !== String(user.id));
-        if (!allUsers.some(u => String(u.id) === AI_USER_ID)) {
-            allUsers.push(AI_USER_DATA);
-        }
-        if (!otherUsers.some(u => String(u.id) === AI_USER_ID)) {
-            otherUsers.push(AI_USER_DATA);
-        }
+        const groupChats = myChats
+            .filter(c => (c.messages?.[0]?.groupType === 'group' || (c.participants && c.participants.length > 2)) && c.seller_name !== 'Comunidade ElectroMarket')
+            .map(chat => ({ chat, lastMsg: chat.messages?.[chat.messages.length - 1] }))
+            .sort((a, b) => {
+                const ta = a.lastMsg?.timestamp ? new Date(a.lastMsg.timestamp).getTime() : 0;
+                const tb = b.lastMsg?.timestamp ? new Date(b.lastMsg.timestamp).getTime() : 0;
+                return tb - ta;
+            });
+
+        const otherUsers = allUsers.filter(u => String(u.id) !== String(user.id) && String(u.id) !== AI_USER_ID);
         if (!otherUsers.length) {
             waList.innerHTML = `
                 <div class="text-center py-5 px-3" style="color:#999;">
@@ -5597,6 +5836,9 @@ window.renderDirectChats = async function() {
         });
 
         chatsWithMsgs.sort((a, b) => {
+            const pa = a.chat.messages?.[0]?.pinned ? 1 : 0;
+            const pb = b.chat.messages?.[0]?.pinned ? 1 : 0;
+            if (pa !== pb) return pb - pa;
             const ta = a.lastMsg?.timestamp ? new Date(a.lastMsg.timestamp).getTime() : 0;
             const tb = b.lastMsg?.timestamp ? new Date(b.lastMsg.timestamp).getTime() : 0;
             return tb - ta;
@@ -5610,28 +5852,64 @@ window.renderDirectChats = async function() {
         let html = '';
 
         if (chatsWithMsgs.length > 0) {
-            html += `<div class="wa-contact-section-header">Conversas Recentes</div>`;
+            html += `<div class="wa-contact-section-header">Mensagens</div>`;
             html += chatsWithMsgs.map(({ user: u, chat, lastMsg }) => {
                 const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=45`;
                 const online = isRecentlyOnline(u.last_seen);
+                const isPinned = chat.messages?.[0]?.pinned === true;
                 const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
                 const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
                 const unread = (window.currentChat === chat.id) ? 0 : (chat.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0);
+                const sentByMe = lastMsg && lastMsg.senderId && String(lastMsg.senderId) === String(user.id) && lastMsg.type !== 'system';
+                const tickHtml = sentByMe
+                    ? `<i class="bi ${lastMsg.visto ? 'bi-check-all is-read' : 'bi-check'} msg-tick"></i>`
+                    : '';
 
                 return `
-                <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')">
+                <div class="wa-contact${isPinned ? ' wa-contact-pinned' : ''}" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')">
                     <div style="position:relative;flex-shrink:0;">
-                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">
                         <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:12px;height:12px;border:2px solid #fff;"></span>
                     </div>
                     <div class="wa-contact-textbox">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
-                            <small class="text-muted" style="font-size:0.65rem;white-space:nowrap;">${lastTime}</small>
+                            <div class="wa-contact-name">${isPinned ? '<i class="bi bi-pin-angle-fill me-1" style="font-size:0.7rem;color:#667781;"></i>' : ''}${u.nome || 'Usuário'}</div>
+                            <small style="white-space:nowrap;">${lastTime}</small>
                         </div>
-                        <div class="wa-contact-text" style="${unread ? 'font-weight:600;color:#111;' : ''}">${truncateText(lastText, 40)}</div>
+                        <div class="wa-contact-text" style="${unread ? 'font-weight:600;color:#111;' : ''}">${tickHtml}${truncateText(lastText, 40)}</div>
                     </div>
-                    ${unread ? `<span class="badge bg-success wa-contact-badge">${unread}</span>` : ''}
+                    ${unread ? `<span class="wa-contact-badge">${unread}</span>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        if (groupChats.length > 0) {
+            html += `<div class="wa-contact-section-header">Grupos</div>`;
+            html += groupChats.map(({ chat, lastMsg }) => {
+                const groupMeta = chat.messages?.[0]?.groupType === 'group' ? chat.messages[0] : {};
+                const groupName = groupMeta.groupName || chat.seller_name || 'Grupo';
+                const avatar = groupMeta.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&size=45&bold=true`;
+                const lastSenderPrefix = (lastMsg && lastMsg.senderId && lastMsg.type !== 'system')
+                    ? (String(lastMsg.senderId) === String(user.id) ? 'Você: ' : `${(lastMsg.senderName || 'Alguém').split(' ')[0]}: `)
+                    : '';
+                const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Grupo criado');
+                const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
+                const unread = (window.currentChat === chat.id) ? 0 : (chat.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0);
+
+                return `
+                <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${groupName.toLowerCase()}" data-is-group="true" onclick="window.openDirectChat('${chat.id}')">
+                    <div style="position:relative;flex-shrink:0;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">
+                        <span class="wa-group-badge"><i class="bi bi-people-fill"></i></span>
+                    </div>
+                    <div class="wa-contact-textbox">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="wa-contact-name">${groupName}</div>
+                            <small style="white-space:nowrap;">${lastTime}</small>
+                        </div>
+                        <div class="wa-contact-text" style="${unread ? 'font-weight:600;color:#111;' : ''}">${truncateText(lastSenderPrefix + lastText, 40)}</div>
+                    </div>
+                    ${unread ? `<span class="wa-contact-badge">${unread}</span>` : ''}
                 </div>`;
             }).join('');
         }
@@ -5647,18 +5925,22 @@ window.renderDirectChats = async function() {
                 const online = isRecentlyOnline(u.last_seen);
                 const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
                 const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
+                const sentByMe = lastMsg && lastMsg.senderId && String(lastMsg.senderId) === String(user.id) && lastMsg.type !== 'system';
+                const tickHtml = sentByMe
+                    ? `<i class="bi ${lastMsg.visto ? 'bi-check-all is-read' : 'bi-check'} msg-tick"></i>`
+                    : '';
 
                 return `
                 <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')" style="opacity:0.65;">
                     <div style="position:relative;flex-shrink:0;">
-                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">
                     </div>
                     <div class="wa-contact-textbox">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
-                            <small class="text-muted" style="font-size:0.65rem;white-space:nowrap;">${lastTime}</small>
+                            <small style="white-space:nowrap;">${lastTime}</small>
                         </div>
-                        <div class="wa-contact-text">${truncateText(lastText, 40)}</div>
+                        <div class="wa-contact-text">${tickHtml}${truncateText(lastText, 40)}</div>
                     </div>
                 </div>`;
             }).join('');
@@ -5674,7 +5956,7 @@ window.renderDirectChats = async function() {
                 return `
                 <div class="wa-contact" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.startDirectChat('${u.id}')">
                     <div style="position:relative;flex-shrink:0;">
-                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">
                         <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:12px;height:12px;border:2px solid #fff;"></span>
                     </div>
                     <div class="wa-contact-textbox">
@@ -5692,24 +5974,121 @@ window.renderDirectChats = async function() {
             </div>`;
 
         window.closeMobileMenu();
+        await hideBootScreen();
     } catch (e) {
         console.error('Erro ao carregar conversas:', e);
         waList.innerHTML = '<div class="text-center py-5" style="color:#999;"><h6>Erro ao carregar conversas.</h6></div>';
+        await hideBootScreen();
     }
 };
 
-window.filterDirectContacts = function(query) {
-    const q = query.trim().toLowerCase();
+/**
+ * Mostra/esconde os botões de "Nova conversa" e menu (⋮) no cabeçalho da lista lateral.
+ * Só fazem sentido na aba "Conversas" (chat livre), não em "Minhas Vendas/Compras".
+ */
+/**
+ * Preenche o avatar do próprio usuário no cabeçalho da lista lateral (estilo WhatsApp Web),
+ * clicável para abrir a edição do perfil.
+ */
+window.toggleWaChatFullscreen = function() {
+    const btn = document.getElementById('waSideFullscreenBtn');
+    const isFull = document.body.classList.toggle('wa-fullscreen');
+    if (btn) {
+        btn.innerHTML = isFull ? '<i class="bi bi-fullscreen-exit"></i>' : '<i class="bi bi-arrows-fullscreen"></i>';
+        btn.title = isFull ? 'Sair da tela cheia' : 'Tela cheia';
+    }
+};
+
+window.updateWaEmptyState = function(type) {
+    const el = document.getElementById('waEmptyState');
+    if (!el) return;
+    if (type === 'conversas') {
+        el.innerHTML = `
+            <div class="wa-empty-illustration">
+                <img src="https://raw.githubusercontent.com/Guiidtk/tela-de-login/6d511e1e677c6cbdef0a206d9b394e29cee80b2f/Assets/IMG/hacker-animate.svg" alt="ElectroMarket" style="width:220px;height:220px;object-fit:contain;">
+            </div>
+            <p class="wa-empty-title">ElectroMarket</p>
+            <p class="wa-empty-sub">Envie e receba mensagens direto por aqui.<br>Selecione uma conversa ao lado para começar.</p>`;
+    } else if (type === 'buyer') {
+        el.innerHTML = `<i class="bi bi-bag-check"></i><p class="wa-empty-sub">Nenhuma conversa de compra selecionada.<br>Escolha um pedido ao lado para conversar.</p>`;
+    } else if (type === 'seller') {
+        el.innerHTML = `<i class="bi bi-shop"></i><p class="wa-empty-sub">Nenhuma conversa de venda selecionada.<br>Escolha um pedido ao lado para conversar.</p>`;
+    }
+};
+
+window.setWaSideProfile = function() {
+    const img = document.getElementById('waSideMyAvatar');
+    const nameEl = document.getElementById('waSideMyName');
+    const user = getSavedUser();
+    if (!user) return;
+    const avatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'User')}&background=random&size=64`;
+    if (img) img.src = avatar;
+    if (nameEl) nameEl.textContent = user.nome || '';
+};
+
+window.setWaSideActions = function(show) {
+    document.getElementById('waNewChatBtn')?.classList.toggle('d-none', !show);
+    document.getElementById('waHeaderSearchBtn')?.classList.toggle('d-none', !show);
+    document.getElementById('waSideMenuWrap')?.classList.toggle('d-none', !show);
+    // A barra de busca fica sempre visível na tela de Conversas Recentes.
+    document.getElementById('waSideSearchBar')?.classList.remove('d-none');
+};
+
+/** Ícone de lupa no cabeçalho: abre/fecha a busca ao lado dele (estilo WhatsApp Web). */
+window.toggleWaHeaderSearch = function() {
+    const bar = document.getElementById('waSideSearchBar');
+    if (!bar) return;
+    const willShow = bar.classList.contains('d-none');
+    bar.classList.toggle('d-none', !willShow);
+    if (willShow) {
+        const input = document.getElementById('waContactSearch');
+        input?.focus();
+    } else {
+        const input = document.getElementById('waContactSearch');
+        if (input) { input.value = ''; }
+        window.filterWaContacts?.('');
+    }
+};
+
+/** Item do menu (⋮): foca a busca para o usuário iniciar uma nova conversa */
+window.focusNewDirectChat = function() {
+    const search = document.getElementById('waContactSearch');
+    if (search) { search.value = ''; search.focus(); }
+    window.filterDirectContacts('');
+    document.getElementById('archivedChatsList')?.classList.add('d-none');
+};
+
+/** Item do menu (⋮): abre/rola até a seção de conversas arquivadas */
+window.toggleArchivedSection = function() {
+    const list = document.getElementById('archivedChatsList');
+    if (!list) { showToast('Nenhuma conversa arquivada.', 'info'); return; }
+    list.classList.remove('d-none');
+    list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+/**
+ * Filtro de busca em tempo real da lista lateral (estilo WhatsApp Web), usado
+ * tanto na aba "Conversas" (contatos/grupos) quanto em "Minhas Vendas/Compras"
+ * (pedidos). Funciona a cada tecla digitada (oninput), sem precisar apertar Enter.
+ * Cada item da lista (.wa-contact) expõe seu texto pesquisável via
+ * data-contact-name (nome do contato/grupo, ou nome+produto no caso de pedidos).
+ */
+window.filterWaContacts = function(query) {
+    const q = (query || '').trim().toLowerCase();
+    const list = document.getElementById('waContactList');
+    if (!list) return;
+
     let anyVisible = false;
-    document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
-        const name = el.dataset.contactName || '';
+    list.querySelectorAll('.wa-contact').forEach(el => {
+        const name = el.dataset.contactName || el.querySelector('.wa-contact-name')?.textContent?.toLowerCase() || '';
         const show = !q || name.includes(q);
         el.style.display = show ? '' : 'none';
         if (show) anyVisible = true;
     });
-    document.querySelectorAll('#waContactList .wa-contact-section-header').forEach(el => {
+    list.querySelectorAll('.wa-contact-section-header').forEach(el => {
         el.style.display = q ? 'none' : '';
     });
+
     let emptyMsg = document.getElementById('directSearchEmptyMsg');
     if (!anyVisible && q) {
         if (!emptyMsg) {
@@ -5717,12 +6096,17 @@ window.filterDirectContacts = function(query) {
             emptyMsg.id = 'directSearchEmptyMsg';
             emptyMsg.className = 'text-center py-4 px-3';
             emptyMsg.style.color = '#999';
-            emptyMsg.innerHTML = '<i class="bi bi-search fs-4 d-block mb-2"></i><p class="small mb-0">Nenhuma pessoa encontrada.</p>';
-            document.getElementById('waContactList')?.appendChild(emptyMsg);
+            emptyMsg.innerHTML = '<i class="bi bi-search fs-4 d-block mb-2"></i><p class="small mb-0">Nenhum resultado encontrado.</p>';
+            list.appendChild(emptyMsg);
         }
     } else if (emptyMsg) {
         emptyMsg.remove();
     }
+};
+
+/** Alias mantido por compatibilidade — usa o mesmo filtro em tempo real acima. */
+window.filterDirectContacts = function(query) {
+    window.filterWaContacts(query);
 };
 
 window.startDirectChat = async function(targetUserId) {
@@ -5735,7 +6119,8 @@ window.startDirectChat = async function(targetUserId) {
         const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
         const existing = directChats.find(c =>
             c.order_id === null &&
-            c.participants && c.participants.some(p => String(p) === String(user.id)) && c.participants.some(p => String(p) === String(targetUserId)) &&
+            c.participants && c.participants.length === 2 &&
+            c.participants.some(p => String(p) === String(user.id)) && c.participants.some(p => String(p) === String(targetUserId)) &&
             c.messages && c.messages[0]?.type !== 'ticket_meta'
         );
 
@@ -5766,7 +6151,7 @@ window.startDirectChat = async function(targetUserId) {
 
         await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
 
-        await window.renderDirectChats();
+        await window.renderDirectChats({ skipBoot: true });
         if (String(targetUserId) === AI_USER_ID) {
             setTimeout(async () => {
                 await window.openDirectChat(newChat.id);
@@ -5781,6 +6166,1438 @@ window.startDirectChat = async function(targetUserId) {
     }
 };
 
+// -------- SISTEMA DE GRUPOS (WhatsApp-style) --------
+// ---------------------------------------------------------------
+// 1. CONSTANTES E ESTADO GLOBAL
+// ---------------------------------------------------------------
+
+const GROUP_COLOR = '#00A884';
+
+// Estado do fluxo de criação
+let _selectedMembers = {};
+let _allUsersCache = [];
+let _groupAvatarUrl = '';
+
+// ---------------------------------------------------------------
+// 2. GRUPO: FUNÇÕES AUXILIARES
+// ---------------------------------------------------------------
+
+/** Verifica se um chat é grupo */
+function isGroupChat(chat) {
+  return chat && Array.isArray(chat.participants) && chat.participants.length > 2;
+}
+
+/** Retorna a meta message do grupo (messages[0]) */
+function getGroupMeta(chat) {
+  if (!chat || !chat.messages?.[0]) return null;
+  const m = chat.messages[0];
+  if (m.groupType === 'group') return m;
+  // Fallback: o buyer_id é o criador do chat → é um grupo antigo
+  if (isGroupChat(chat)) return m;
+  return null;
+}
+
+/** Verifica se o usuário logado é admin do grupo */
+function isGroupAdmin(chat, userId) {
+  if (!chat || !userId) return false;
+  const meta = getGroupMeta(chat);
+  // 1. Se o meta tem createdBy, esse é o criador (sempre admin)
+  if (meta?.createdBy && String(meta.createdBy) === String(userId)) return true;
+  // 2. Se está na lista de groupAdmins
+  const admins = meta?.groupAdmins || [];
+  if (admins.some(a => String(a) === String(userId))) return true;
+  // 3. Fallback: buyer_id é sempre admin (criador do chat no DB)
+  if (chat.buyer_id && String(chat.buyer_id) === String(userId)) return true;
+  // 4. Último fallback: se é grupo, o primeiro participante é admin
+  if (isGroupChat(chat) && chat.participants?.length) {
+    const owner = chat.participants[0];
+    if (owner && String(owner) === String(userId)) return true;
+  }
+  return false;
+}
+
+/** Obtém o creator (primeiro admin) – meta ou fallback */
+function getGroupCreator(chat) {
+  const meta = getGroupMeta(chat);
+  if (meta?.createdBy) return String(meta.createdBy);
+  if (chat?.buyer_id) return String(chat.buyer_id);
+  if (chat?.participants?.length) return String(chat.participants[0]);
+  return null;
+}
+
+/** Obtém settings do grupo da meta com defaults */
+function getGroupSettings(chat) {
+  const meta = getGroupMeta(chat);
+  return {
+    admins_only_edit_info: true,
+    admins_only_send_msg: false,
+    admins_only_add_members: false,
+    approval_required: false,
+    ...(meta?.groupSettings || {})
+  };
+}
+
+/** Obtém descrição do grupo da meta */
+function getGroupDescription(chat) {
+  const meta = getGroupMeta(chat);
+  return meta?.groupDescription || chat.group_description || '';
+}
+
+/** Gera avatar default do grupo */
+function getGroupAvatar(chat) {
+  const meta = getGroupMeta(chat);
+  const name = meta?.groupName || chat.seller_name || chat.buyer_name || 'Grupo';
+  const avatar = meta?.groupAvatar || chat.group_avatar || '';
+  return avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${GROUP_COLOR.replace('#','')}&color=fff&size=80&bold=true`;
+}
+
+// ---------------------------------------------------------------
+// 3. CRIAÇÃO DE GRUPO / NOVA CONVERSA — FLUXO REAPROVEITADO
+// ---------------------------------------------------------------
+
+/** Abre o modal para iniciar nova conversa individual */
+window.openNewConversationModal = async function () {
+  const user = getSavedUser();
+  if (!user) { showToast('Faça login!', 'warning'); return; }
+
+  const modalEl = document.getElementById('newGroupModal');
+  if (!modalEl) return;
+  modalEl.dataset.mode = 'single';
+
+  // Adapta UI para modo single
+  document.getElementById('newGroupModalTitle').textContent = 'Nova conversa';
+  document.getElementById('newGroupModalSubtitle').textContent = 'Selecione uma pessoa para conversar';
+  document.getElementById('newGroupParticipantTitle').textContent = 'Selecionar pessoa';
+  document.getElementById('newGroupSelectLabel').textContent = 'Escolha um usuário';
+  document.getElementById('newGroupInfoSection')?.classList.add('d-none');
+  document.getElementById('newGroupCreateBtn').innerHTML = '<i class="bi bi-chat-dots me-2"></i>Conversar';
+
+  _selectedMembers = {};
+  _groupAvatarUrl = '';
+
+  const nameInput = document.getElementById('newGroupNameInput');
+  const searchInput = document.getElementById('newGroupMemberSearch');
+  if (nameInput) nameInput.value = '';
+  if (searchInput) searchInput.value = '';
+
+  const modal = window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+  modal?.show();
+
+  const list = document.getElementById('newGroupMemberList');
+  if (list) list.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-success"></div></div>';
+
+  try {
+    const allUsers = await supabaseFetch('users?select=id,nome,avatar&order=nome.asc');
+    _allUsersCache = allUsers.filter(u => String(u.id) !== String(user.id));
+    _renderMemberList();
+  } catch (e) {
+    if (list) list.innerHTML = '<div class="text-center py-4 text-muted small">Erro ao carregar pessoas.</div>';
+  }
+};
+
+/**
+ * Abre o modal de criação de grupo (estilo Falar com o Suporte)
+ */
+window.openNewGroupModal = async function () {
+  const user = getSavedUser();
+  if (!user) { showToast('Faça login!', 'warning'); return; }
+
+  const modalEl = document.getElementById('newGroupModal');
+  if (!modalEl) return;
+  modalEl.dataset.mode = 'group';
+
+  // Restaura UI para modo grupo
+  document.getElementById('newGroupModalTitle').textContent = 'Criar novo grupo';
+  document.getElementById('newGroupModalSubtitle').textContent = 'Selecione os participantes e defina as informações';
+  document.getElementById('newGroupParticipantTitle').textContent = 'Participantes';
+  document.getElementById('newGroupSelectLabel').textContent = 'Selecione pelo menos 2 pessoas';
+  document.getElementById('newGroupInfoSection')?.classList.remove('d-none');
+  document.getElementById('newGroupCreateBtn').innerHTML = '<i class="bi bi-check2 me-2"></i>Criar grupo';
+
+  _selectedMembers = {};
+  _groupAvatarUrl = '';
+
+  // Limpa campos
+  const nameInput = document.getElementById('newGroupNameInput');
+  const searchInput = document.getElementById('newGroupMemberSearch');
+  const preview = document.getElementById('newGroupAvatarPreview');
+  const placeholder = document.getElementById('newGroupAvatarPlaceholder');
+  if (nameInput) nameInput.value = '';
+  if (searchInput) searchInput.value = '';
+  if (preview) { preview.src = ''; preview.classList.add('d-none'); }
+  if (placeholder) placeholder.style.display = '';
+
+  // Cor dos avatares
+  setTimeout(() => {
+    document.querySelectorAll('#groupAvatarColors div').forEach(el => {
+      el.style.border = '2px solid transparent';
+      el.onclick = function () {
+        document.querySelectorAll('#groupAvatarColors div').forEach(d => d.style.border = '2px solid transparent');
+        this.style.border = '2px solid #00A884';
+        _groupAvatarUrl = '';
+        const pv = document.getElementById('newGroupAvatarPreview');
+        const ph = document.getElementById('newGroupAvatarPlaceholder');
+        if (pv) { pv.classList.add('d-none'); }
+        if (ph) { ph.style.display = ''; }
+      };
+    });
+  }, 50);
+
+  // Mostra modal
+  const modal = window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+  modal?.show();
+
+  const list = document.getElementById('newGroupMemberList');
+  if (list) list.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-success"></div></div>';
+
+  try {
+    const allUsers = await supabaseFetch('users?select=id,nome,avatar&order=nome.asc');
+    _allUsersCache = allUsers.filter(u => String(u.id) !== String(user.id));
+    _renderMemberList();
+  } catch (e) {
+    if (list) list.innerHTML = '<div class="text-center py-4 text-muted small">Erro ao carregar pessoas.</div>';
+  }
+};
+
+function _renderMemberList(query) {
+  const list = document.getElementById('newGroupMemberList');
+  if (!list) return;
+  const modalEl = document.getElementById('newGroupModal');
+  const isSingle = modalEl?.dataset?.mode === 'single';
+  const q = (query || '').trim().toLowerCase();
+  const users = _allUsersCache.filter(u => !q || (u.nome || '').toLowerCase().includes(q));
+
+  if (!users.length) {
+    list.innerHTML = '<div class="text-center py-4 text-muted small">Ninguém encontrado.</div>';
+    return;
+  }
+
+  list.innerHTML = users.map(u => {
+    const checked = !!_selectedMembers[u.id];
+    return `
+    <div class="ca-cat-list-item${checked ? ' ca-cat-list-item-selected' : ''}" onclick="window.toggleNewGroupMember('${u.id}')">
+      <div class="d-flex align-items-center gap-2">
+        <div style="width:8px;height:8px;border-radius:50%;background:#00A884;flex-shrink:0;${checked ? '' : 'display:none;'}"></div>
+        ${u.nome || 'Usuário'}
+      </div>
+    </div>`;
+  }).join('');
+
+  _updateSelectedCount();
+  _updateParticipantSummary();
+}
+
+function _updateSelectedCount() {
+  const modalEl = document.getElementById('newGroupModal');
+  const isSingle = modalEl?.dataset?.mode === 'single';
+  const count = Object.keys(_selectedMembers).length;
+  const label = document.getElementById('newGroupSelectedCount');
+  if (label) label.textContent = count > 0
+    ? `Usuário selecionado.`
+    : 'Nenhum usuário selecionado.';
+  const btn = document.getElementById('newGroupCreateBtn');
+  if (btn) btn.disabled = isSingle ? count < 1 : count < 2;
+}
+
+function _updateParticipantSummary() {
+  const summary = document.getElementById('newGroupSelectedSummary');
+  if (!summary) return;
+  const users = _allUsersCache.filter(u => _selectedMembers[u.id]);
+  summary.innerHTML = users.length
+    ? users.map(u => {
+        const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=30`;
+        return `<img src="${avatar}" title="${u.nome}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;margin-right:-6px;border:2px solid #fff;">`;
+      }).join('')
+    : '<span class="text-muted small">Nenhum participante selecionado.</span>';
+}
+
+/** Filtro de busca na lista de membros */
+window.filterNewGroupMembers = function (query) {
+  _renderMemberList(query);
+};
+
+/** Alterna seleção de um membro */
+window.toggleNewGroupMember = function (userId) {
+  const modalEl = document.getElementById('newGroupModal');
+  const isSingle = modalEl?.dataset?.mode === 'single';
+  console.log('toggleNewGroupMember', userId, 'mode:', isSingle ? 'single' : 'group');
+
+  if (isSingle) {
+    if (_selectedMembers[userId]) {
+      delete _selectedMembers[userId];
+    } else {
+      _selectedMembers = {};
+      _selectedMembers[userId] = true;
+    }
+  } else {
+    if (_selectedMembers[userId]) {
+      delete _selectedMembers[userId];
+    } else {
+      _selectedMembers[userId] = true;
+    }
+  }
+  console.log('_selectedMembers keys:', Object.keys(_selectedMembers));
+  const searchInput = document.getElementById('newGroupMemberSearch');
+  _renderMemberList(searchInput?.value || '');
+};
+
+/** Upload de foto do grupo */
+window.uploadGroupAvatar = function (input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  // Preview local
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const preview = document.getElementById('newGroupAvatarPreview');
+    if (preview) {
+      preview.src = e.target.result;
+      preview.classList.remove('d-none');
+    }
+    // Upload para Imgur
+    _uploadToImgur(file).then(url => {
+      if (url) _groupAvatarUrl = url;
+    }).catch(() => {});
+  };
+  reader.readAsDataURL(file);
+};
+
+async function _uploadToImgur(file) {
+  const clientId = window.CONFIG?.IMGUR_CLIENT_ID || window.CONFIG_LOCAL_FALLBACK?.IMGUR_CLIENT_ID || '546c25a59c58ad7';
+  try {
+    const fd = new FormData();
+    fd.append('image', file, file.name);
+    const res = await fetch('https://api.imgur.com/3/image', {
+      method: 'POST',
+      headers: { Authorization: `Client-ID ${clientId}` },
+      body: fd
+    });
+    const json = await res.json();
+    if (json?.success && json?.data?.link) return json.data.link;
+  } catch (e) { /* fallback silencioso */ }
+  return null;
+}
+
+/** Cria grupo ou inicia conversa conforme o modo do modal */
+window.createGroupChat = async function () {
+  const modalEl = document.getElementById('newGroupModal');
+  const mode = modalEl?.dataset?.mode || 'group';
+
+  // ---- MODO SINGLE: inicia conversa individual ----
+  if (mode === 'single') {
+    const memberIds = Object.keys(_selectedMembers);
+    if (!memberIds.length) { showToast('Selecione uma pessoa.', 'warning'); return; }
+    console.log('createGroupChat single mode, selected:', memberIds[0]);
+
+    const modal = window.bootstrap ? bootstrap.Modal.getInstance(modalEl) : null;
+    if (modal) {
+      modal.hide();
+      modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        console.log('Modal fechado, chamando startDirectChat');
+        window.startDirectChat(memberIds[0]);
+      });
+    } else {
+      window.startDirectChat(memberIds[0]);
+    }
+    return;
+  }
+
+  // ---- MODO GROUP: cria grupo ----
+  const user = getSavedUser();
+  if (!user) { showToast('Faça login!', 'warning'); return; }
+
+  const nameInput = document.getElementById('newGroupNameInput');
+  const descInput = document.getElementById('newGroupDescInput');
+  const groupName = nameInput?.value?.trim();
+  const groupDesc = descInput?.value?.trim() || '';
+  const memberIds = Object.keys(_selectedMembers);
+
+  if (!groupName) { showToast('Dê um nome para o grupo.', 'warning'); return; }
+  if (memberIds.length < 2) { showToast('Selecione pelo menos 2 participantes.', 'warning'); return; }
+
+  const allMemberIds = [user.id, ...memberIds];
+  const groupId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const meta = {
+    type: 'direct_chat_meta',
+    createdBy: user.id,
+    createdByName: user.nome,
+    groupType: 'group',
+    groupName: groupName,
+    groupDescription: groupDesc,
+    groupAvatar: _groupAvatarUrl || '',
+    groupCreatedAt: now,
+    groupAdmins: [user.id],
+    groupSettings: {
+      admins_only_edit_info: true,
+      admins_only_send_msg: false,
+      admins_only_add_members: false,
+      approval_required: false
+    }
+  };
+
+  const systemMessages = [
+    { senderId: 'system', text: `${user.nome} criou o grupo "${groupName}"`, timestamp: now, type: 'system', systemType: 'group_created' }
+  ];
+
+  memberIds.forEach(id => {
+    const nome = _allUsersCache.find(u => String(u.id) === String(id))?.nome || 'um participante';
+    systemMessages.push({ senderId: 'system', text: `${user.nome} adicionou ${nome}`, timestamp: now, type: 'system', systemType: 'member_added' });
+  });
+
+  try {
+    const newGroup = {
+      id: groupId, order_id: null, buyer_id: user.id, seller_id: user.id,
+      buyer_name: user.nome, seller_name: groupName,
+      participants: allMemberIds, messages: [meta, ...systemMessages]
+    };
+    await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newGroup) });
+
+    const modal = window.bootstrap ? bootstrap.Modal.getInstance(modalEl) : null;
+    modal?.hide();
+
+    showToast(`Grupo "${groupName}" criado!`, 'success');
+    await window.renderDirectChats({ skipBoot: true });
+    setTimeout(() => window.openDirectChat(groupId), 400);
+  } catch (e) {
+    console.error('Erro ao criar grupo:', e);
+    showToast(`Erro: ${e?.message || e?.details || 'Erro ao criar grupo.'}`, 'error');
+  }
+};
+
+// ---------------------------------------------------------------
+// 4. INFORMAÇÕES DO GRUPO (tela estilo WhatsApp)
+// ---------------------------------------------------------------
+
+/**
+ * Abre a tela de informações do grupo (sobreposição)
+ */
+window.openGroupInfo = async function (chatId) {
+  const user = getSavedUser();
+  if (!user || !chatId) return;
+
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat || !isGroupChat(chat)) return;
+
+    const participantIds = (chat.participants || []).map(String);
+    const idFilter = participantIds.map(id => `"${id}"`).join(',');
+    const users = await supabaseFetch(`users?select=id,nome,avatar,last_seen&id=in.(${idFilter})`);
+    const usersById = {};
+    (users || []).forEach(u => { usersById[String(u.id)] = u; });
+
+    const meta = getGroupMeta(chat);
+    const isAdmin = isGroupAdmin(chat, user.id);
+    const creatorId = getGroupCreator(chat);
+    const groupName = meta?.groupName || chat.seller_name || 'Grupo';
+    const groupDesc = getGroupDescription(chat);
+    const groupAvatar = getGroupAvatar(chat);
+    const createdAt = meta?.groupCreatedAt
+      ? new Date(meta.groupCreatedAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
+      : '???';
+    const settings = getGroupSettings(chat);
+    const groupAdmins = meta?.groupAdmins || [];
+
+    // Cria container fullscreen se não existir
+    let container = document.getElementById('groupInfoContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'groupInfoContainer';
+      container.className = 'wa-group-info-overlay';
+      document.body.appendChild(container);
+    }
+
+    // Monta lista de participantes
+    const participantRows = participantIds.map(id => {
+      const u = usersById[id];
+      const nome = u?.nome || 'Usuário removido';
+      const avatarUrl = normalizeImageUrl(safeParseImages(u?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=random&color=fff`;
+      const isMe = String(id) === String(user.id);
+      const isCreator = creatorId && String(id) === String(creatorId);
+      const isAdminUser = groupAdmins.some(a => String(a) === String(id));
+      const online = isRecentlyOnline(u?.last_seen);
+
+      return `
+      <div class="wa-gi-participant" data-user-id="${id}">
+        <div class="wa-gi-participant-avatar ${online ? 'online' : ''}">
+          <img src="${avatarUrl}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=random&color=fff'">
+          ${online ? '<span class="wa-gi-dot"></span>' : ''}
+        </div>
+        <div class="wa-gi-participant-info">
+          <strong>${nome}${isMe ? ' <small style="color:#667781;font-weight:400;">(você)</small>' : ''}</strong>
+          <div class="wa-gi-participant-badges">
+            ${isCreator ? '<span class="wa-gi-badge wa-gi-badge-creator"><i class="bi bi-star-fill"></i> Criador</span>' : ''}
+            ${isAdminUser && !isCreator ? '<span class="wa-gi-badge wa-gi-badge-admin"><i class="bi bi-shield-fill-check"></i> Admin</span>' : ''}
+          </div>
+        </div>
+        ${isAdmin && !isMe ? `
+        <div class="wa-gi-participant-actions dropdown">
+          <button class="wa-gi-action-btn" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            ${!isAdminUser ? `<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.groupPromoteAdmin('${chatId}','${id}')"><i class="bi bi-shield-fill-check me-2"></i>Promover a admin</a></li>` : ''}
+            ${isAdminUser && !isCreator ? `<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.groupDemoteAdmin('${chatId}','${id}')"><i class="bi bi-shield-slash me-2"></i>Remover admin</a></li>` : ''}
+            <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.groupRemoveMember('${chatId}','${id}','${nome.replace(/'/g, "\\'")}')"><i class="bi bi-person-x me-2"></i>Remover do grupo</a></li>
+          </ul>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="wa-gi-backdrop" onclick="window.closeGroupInfo()"></div>
+      <div class="wa-gi-panel">
+        <div class="wa-gi-header">
+          <button class="wa-gi-close" onclick="window.closeGroupInfo()"><i class="bi bi-arrow-left"></i></button>
+          <h6>Informações do Grupo</h6>
+        </div>
+
+        <div class="wa-gi-body">
+          <!-- Avatar e nome -->
+          <div class="wa-gi-hero text-center py-4">
+            <div class="wa-gi-hero-avatar" onclick="${isAdmin ? `window.groupChangePhoto('${chatId}')` : ''}" style="${isAdmin ? 'cursor:pointer;' : ''}">
+              <img src="${groupAvatar}" id="groupInfoAvatar" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=00A884&color=fff&size=80'">
+              ${isAdmin ? '<div class="wa-gi-hero-overlay"><i class="bi bi-camera-fill"></i></div>' : ''}
+            </div>
+            <h5 id="groupInfoName" class="mt-2 mb-0">${groupName}</h5>
+            ${isAdmin ? `
+            <button class="btn btn-sm btn-outline-secondary mt-1" onclick="window.groupEditName('${chatId}')" style="font-size:0.75rem;">
+              <i class="bi bi-pencil me-1"></i>Editar nome
+            </button>` : ''}
+            ${groupDesc ? `<p id="groupInfoDesc" class="text-muted small mt-1 mb-0">${groupDesc}</p>` : ''}
+            ${isAdmin ? `
+            <button class="btn btn-sm btn-outline-secondary mt-1" onclick="window.groupEditDescription('${chatId}')" style="font-size:0.75rem;">
+              <i class="bi bi-pencil me-1"></i>${groupDesc ? 'Editar descrição' : 'Adicionar descrição'}
+            </button>` : ''}
+            <div class="wa-gi-meta mt-2">
+              <small class="text-muted">Grupo criado em ${createdAt}</small>
+            </div>
+          </div>
+
+          <!-- Configurações -->
+          ${isAdmin ? `
+          <div class="wa-gi-section">
+            <div class="wa-gi-section-title"><i class="bi bi-gear-fill me-2"></i>Configurações do Grupo</div>
+            <div class="wa-gi-setting" onclick="window.groupToggleSetting('${chatId}','admins_only_edit_info')">
+              <div>
+                <div class="small fw-bold">Apenas admins alteram informações</div>
+                <small class="text-muted">Nome, foto e descrição</small>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" ${settings.admins_only_edit_info !== false ? 'checked' : ''} onclick="event.stopPropagation();window.groupToggleSetting('${chatId}','admins_only_edit_info')">
+              </div>
+            </div>
+            <div class="wa-gi-setting" onclick="window.groupToggleSetting('${chatId}','admins_only_send_msg')">
+              <div>
+                <div class="small fw-bold">Apenas admins enviam mensagens</div>
+                <small class="text-muted">Modo anúncio</small>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" ${settings.admins_only_send_msg ? 'checked' : ''} onclick="event.stopPropagation();window.groupToggleSetting('${chatId}','admins_only_send_msg')">
+              </div>
+            </div>
+            <div class="wa-gi-setting" onclick="window.groupToggleSetting('${chatId}','admins_only_add_members')">
+              <div>
+                <div class="small fw-bold">Apenas admins adicionam membros</div>
+                <small class="text-muted">Restringir convites</small>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" ${settings.admins_only_add_members ? 'checked' : ''} onclick="event.stopPropagation();window.groupToggleSetting('${chatId}','admins_only_add_members')">
+              </div>
+            </div>
+            <div class="wa-gi-setting" onclick="window.groupToggleSetting('${chatId}','approval_required')">
+              <div>
+                <div class="small fw-bold">Aprovação de novos membros</div>
+                <small class="text-muted">Admins precisam aprovar entrada</small>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" ${settings.approval_required ? 'checked' : ''} onclick="event.stopPropagation();window.groupToggleSetting('${chatId}','approval_required')">
+              </div>
+            </div>
+          </div>` : ''}
+
+          <!-- Link de convite -->
+          <div class="wa-gi-section">
+            <div class="wa-gi-section-title"><i class="bi bi-link-45deg me-2"></i>Link de Convite</div>
+            <div id="groupInviteLinkSection">
+              <button class="btn btn-sm btn-outline-success w-100" onclick="window.groupCreateInviteLink('${chatId}')">
+                <i class="bi bi-plus-circle me-1"></i>Criar link de convite
+              </button>
+            </div>
+          </div>
+
+          <!-- Participantes -->
+          <div class="wa-gi-section">
+            <div class="wa-gi-section-title d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-people-fill me-2"></i>${participantIds.length} participantes</span>
+              ${isAdmin ? `<button class="btn btn-sm btn-outline-success" onclick="window.groupAddMembers('${chatId}')" style="font-size:0.75rem;"><i class="bi bi-person-plus me-1"></i>Adicionar</button>` : ''}
+            </div>
+            <div class="wa-gi-search">
+              <i class="bi bi-search"></i>
+              <input type="text" placeholder="Buscar participante..." oninput="window.filterGroupParticipants(this.value)">
+            </div>
+            <div id="groupParticipantsList" class="wa-gi-participants">
+              ${participantRows}
+            </div>
+          </div>
+
+          <!-- Ações do grupo -->
+          <div class="wa-gi-section">
+            <button class="btn btn-outline-secondary w-100 mb-2" onclick="window.groupShareLink('${chatId}')">
+              <i class="bi bi-share me-2"></i>Compartilhar link do grupo
+            </button>
+            <button class="btn btn-outline-warning w-100 mb-2" onclick="window.groupLeave('${chatId}')">
+              <i class="bi bi-box-arrow-left me-2"></i>Sair do grupo
+            </button>
+            ${isAdmin ? `
+            <button class="btn btn-outline-danger w-100" onclick="window.groupDelete('${chatId}')">
+              <i class="bi bi-trash me-2"></i>Excluir grupo
+            </button>` : ''}
+          </div>
+        </div>
+      </div>`;
+
+    container.classList.remove('d-none');
+    container.style.display = '';
+    // Animação de entrada
+    requestAnimationFrame(() => {
+      const panel = container.querySelector('.wa-gi-panel');
+      if (panel) panel.classList.add('wa-gi-open');
+    });
+
+  } catch (e) {
+    console.error('Erro ao carregar informações do grupo:', e);
+    showToast('Erro ao carregar informações.', 'error');
+  }
+};
+
+/** Fecha o painel de informações do grupo */
+window.closeGroupInfo = function () {
+  const container = document.getElementById('groupInfoContainer');
+  if (container) {
+    const panel = container.querySelector('.wa-gi-panel');
+    if (panel) panel.classList.remove('wa-gi-open');
+    setTimeout(() => { container.classList.add('d-none'); }, 300);
+  }
+};
+
+// ---------------------------------------------------------------
+// 5. ADMINISTRAÇÃO DO GRUPO
+// ---------------------------------------------------------------
+
+/** Atualiza a meta do grupo (messages[0]) no banco */
+async function updateGroupMeta(chat, newMeta, extraFields) {
+  if (!chat || !newMeta) return;
+  newMeta.groupType = 'group';
+  newMeta.type = newMeta.type || 'direct_chat_meta';
+  chat.messages[0] = newMeta;
+  const payload = { messages: chat.messages, ...(extraFields || {}) };
+  await supabaseFetch(`chats?id=eq.${chat.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+/** Adiciona uma mensagem de sistema e persiste */
+async function addSystemMessage(chat, text, systemType) {
+  chat.messages.push({
+    senderId: 'system', text, timestamp: new Date().toISOString(),
+    type: 'system', systemType
+  });
+}
+
+/** Promover a administrador */
+window.groupPromoteAdmin = async function (chatId, userId) {
+  const user = getSavedUser();
+  if (!user || !chatId || !userId) return;
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat || !isGroupAdmin(chat, user.id)) return;
+    const meta = getGroupMeta(chat);
+    const admins = meta?.groupAdmins || [];
+    if (admins.some(a => String(a) === String(userId))) { showToast('Já é admin.', 'info'); return; }
+    admins.push(userId);
+    meta.groupAdmins = admins;
+    await addSystemMessage(chat, `${user.nome} promoveu um participante a administrador`, 'admin_promoted');
+    await updateGroupMeta(chat, meta);
+    showToast('Administrador promovido.', 'success');
+    window.closeGroupInfo();
+    setTimeout(() => window.openGroupInfo(chatId), 300);
+  } catch (e) { showToast('Erro ao promover admin.', 'error'); }
+};
+
+/** Remover administrador */
+window.groupDemoteAdmin = async function (chatId, userId) {
+  const user = getSavedUser();
+  if (!user || !chatId || !userId) return;
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat || !isGroupAdmin(chat, user.id)) return;
+    const meta = getGroupMeta(chat);
+    if (!meta) return;
+    meta.groupAdmins = (meta.groupAdmins || []).filter(a => String(a) !== String(userId));
+    await addSystemMessage(chat, `${user.nome} removeu administrador`, 'admin_demoted');
+    await updateGroupMeta(chat, meta);
+    showToast('Admin removido.', 'info');
+    window.closeGroupInfo();
+    setTimeout(() => window.openGroupInfo(chatId), 300);
+  } catch (e) { showToast('Erro ao remover admin.', 'error'); }
+};
+
+/** Editar nome do grupo */
+window.groupEditName = async function (chatId) {
+  const newName = prompt('Novo nome do grupo:');
+  if (!newName || !newName.trim()) return;
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    const user = getSavedUser();
+    const meta = getGroupMeta(chat);
+    if (!meta) return;
+    meta.groupName = newName.trim();
+    chat.seller_name = newName.trim();
+    chat.messages[0] = meta;
+    await addSystemMessage(chat, `${user.nome} alterou o nome do grupo para "${newName.trim()}"`, 'group_renamed');
+    await supabaseFetch(`chats?id=eq.${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ seller_name: newName.trim(), messages: chat.messages })
+    });
+    showToast('Nome do grupo alterado.', 'success');
+    window.closeGroupInfo();
+    if (window.currentChat === chatId) {
+      setTimeout(() => window.openDirectChat(chatId), 200);
+    }
+  } catch (e) { showToast('Erro ao alterar nome.', 'error'); }
+};
+
+/** Editar descrição do grupo */
+window.groupEditDescription = async function (chatId) {
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    const meta = getGroupMeta(chat);
+    if (!meta) return;
+    const current = meta.groupDescription || '';
+    const newDesc = prompt('Descrição do grupo:', current);
+    if (newDesc === null) return;
+    const user = getSavedUser();
+    meta.groupDescription = newDesc.trim();
+    const sysText = newDesc.trim()
+      ? `${user.nome} alterou a descrição do grupo`
+      : `${user.nome} removeu a descrição do grupo`;
+    await addSystemMessage(chat, sysText, 'description_changed');
+    await updateGroupMeta(chat, meta);
+    showToast('Descrição alterada.', 'success');
+    window.closeGroupInfo();
+  } catch (e) { showToast('Erro ao alterar descrição.', 'error'); }
+};
+
+/** Alternar configuração do grupo */
+window.groupToggleSetting = async function (chatId, setting) {
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    const meta = getGroupMeta(chat);
+    if (!meta) return;
+    if (!meta.groupSettings) meta.groupSettings = {};
+    meta.groupSettings[setting] = !meta.groupSettings[setting];
+    await updateGroupMeta(chat, meta);
+  } catch (e) { showToast('Erro ao alterar configuração.', 'error'); }
+};
+
+/** Alterar foto do grupo */
+window.groupChangePhoto = async function (chatId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async function (e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await _uploadToImgur(file);
+    if (!url) { showToast('Erro ao fazer upload da foto.', 'error'); return; }
+    try {
+      const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+      const chat = chatResult?.[0];
+      if (!chat) return;
+      const meta = getGroupMeta(chat);
+      const user = getSavedUser();
+      meta.groupAvatar = url;
+      await addSystemMessage(chat, `${user.nome} alterou a foto do grupo`, 'photo_changed');
+      await updateGroupMeta(chat, meta);
+      showToast('Foto do grupo alterada.', 'success');
+      window.closeGroupInfo();
+      if (window.currentChat === chatId) {
+        setTimeout(() => window.openDirectChat(chatId), 200);
+      }
+    } catch (e) { showToast('Erro ao alterar foto.', 'error'); }
+  };
+  input.click();
+};
+
+// ---------------------------------------------------------------
+// 6. PARTICIPANTES
+// ---------------------------------------------------------------
+
+/** Adicionar membros ao grupo */
+window.groupAddMembers = async function (chatId) {
+  const user = getSavedUser();
+  if (!user || !chatId) return;
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    const settings = getGroupSettings(chat);
+    if (!isGroupAdmin(chat, user.id) && settings.admins_only_add_members !== false) {
+      showToast('Só administradores podem adicionar membros.', 'warning');
+      return;
+    }
+
+    const currentParticipants = (chat.participants || []).map(String);
+    const allUsers = await supabaseFetch('users?select=id,nome,avatar&order=nome.asc');
+    const available = allUsers.filter(u => !currentParticipants.includes(String(u.id)));
+
+    if (!available.length) { showToast('Todos os usuários já estão no grupo.', 'info'); return; }
+
+    // Modal de seleção simples
+    const modalHtml = `
+      <div class="modal fade" id="groupAddMemberModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h6 class="modal-title"><i class="bi bi-person-plus me-2" style="color:${GROUP_COLOR};"></i>Adicionar participantes</h6>
+              <button type="button" class="ml-auth-close" data-bs-dismiss="modal" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="modal-body">
+              <input type="text" id="groupAddMemberSearch" class="form-control form-control-sm mb-2" placeholder="Buscar..." oninput="window._filterGroupAddMembers(this.value)">
+              <div id="groupAddMemberList" class="wa-group-member-list"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="ml-btn ml-btn-outline" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="ml-btn ml-btn-primary" onclick="window._confirmAddMembers('${chatId}')"><i class="bi bi-check2 me-1"></i>Adicionar</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    let existing = document.getElementById('groupAddMemberModal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    window._groupAddSelected = {};
+    window._groupAddAvailable = available;
+
+    _renderAddMemberList();
+
+    const modal = new bootstrap.Modal(document.getElementById('groupAddMemberModal'));
+    modal.show();
+
+  } catch (e) { showToast('Erro ao carregar usuários.', 'error'); }
+};
+
+function _renderAddMemberList(query) {
+  const list = document.getElementById('groupAddMemberList');
+  if (!list) return;
+  const q = (query || '').trim().toLowerCase();
+  const users = window._groupAddAvailable.filter(u => !q || (u.nome || '').toLowerCase().includes(q));
+  if (!users.length) {
+    list.innerHTML = '<div class="text-center py-4 text-muted small">Ninguém encontrado.</div>';
+    return;
+  }
+  list.innerHTML = users.map(u => {
+    const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=40`;
+    const checked = !!window._groupAddSelected[u.id];
+    return `
+    <div class="wa-group-member-row${checked ? ' selected' : ''}" onclick="window._toggleGroupAddMember('${u.id}')">
+      <input type="checkbox" class="form-check-input" ${checked ? 'checked' : ''} onclick="event.stopPropagation();window._toggleGroupAddMember('${u.id}')">
+      <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=40'">
+      <span class="small">${u.nome || 'Usuário'}</span>
+    </div>`;
+  }).join('');
+}
+
+window._toggleGroupAddMember = function (userId) {
+  if (window._groupAddSelected[userId]) {
+    delete window._groupAddSelected[userId];
+  } else {
+    window._groupAddSelected[userId] = true;
+  }
+  const search = document.getElementById('groupAddMemberSearch');
+  _renderAddMemberList(search?.value || '');
+};
+
+window._filterGroupAddMembers = function (query) {
+  _renderAddMemberList(query);
+};
+
+window._confirmAddMembers = async function (chatId) {
+  const user = getSavedUser();
+  const selected = Object.keys(window._groupAddSelected);
+  if (!selected.length) { showToast('Selecione pelo menos um participante.', 'warning'); return; }
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    let participants = chat.participants || [];
+    const now = new Date().toISOString();
+    selected.forEach(id => {
+      if (!participants.some(p => String(p) === String(id))) {
+        participants.push(id);
+        const nome = window._groupAddAvailable.find(u => String(u.id) === String(id))?.nome || 'Alguém';
+        chat.messages.push({
+          senderId: 'system',
+          text: `${user.nome} adicionou ${nome}`,
+          timestamp: now,
+          type: 'system',
+          systemType: 'member_added'
+        });
+      }
+    });
+    chat.participants = participants;
+    await supabaseFetch(`chats?id=eq.${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ participants, messages: chat.messages })
+    });
+    bootstrap.Modal.getInstance(document.getElementById('groupAddMemberModal'))?.hide();
+    showToast(`${selected.length} participante${selected.length > 1 ? 's' : ''} adicionado${selected.length > 1 ? 's' : ''}.`, 'success');
+    window.closeGroupInfo();
+  } catch (e) { showToast('Erro ao adicionar.', 'error'); }
+};
+
+/** Remover membro do grupo */
+window.groupRemoveMember = async function (chatId, userId, userName) {
+  if (!confirm(`Remover ${userName || 'este participante'} do grupo?`)) return;
+  const user = getSavedUser();
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    if (!isGroupAdmin(chat, user.id)) { showToast('Só administradores podem remover membros.', 'warning'); return; }
+    const meta = getGroupMeta(chat);
+    chat.participants = (chat.participants || []).filter(p => String(p) !== String(userId));
+    if (meta) {
+      meta.groupAdmins = (meta.groupAdmins || []).filter(a => String(a) !== String(userId));
+      chat.messages[0] = meta;
+    }
+    await addSystemMessage(chat, `${userName || 'Um participante'} foi removido do grupo por ${user.nome}`, 'member_removed');
+    await supabaseFetch(`chats?id=eq.${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ participants: chat.participants, messages: chat.messages })
+    });
+    showToast(`${userName || 'Participante'} removido.`, 'info');
+    window.closeGroupInfo();
+    if (window.currentChat === chatId) {
+      setTimeout(() => window.openDirectChat(chatId), 200);
+    }
+  } catch (e) { showToast('Erro ao remover.', 'error'); }
+};
+
+/** Sair do grupo */
+window.groupLeave = async function (chatId) {
+  if (!confirm('Tem certeza que deseja sair deste grupo?')) return;
+  const user = getSavedUser();
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    const meta = getGroupMeta(chat);
+    chat.participants = (chat.participants || []).filter(p => String(p) !== String(user.id));
+    if (meta) {
+      meta.groupAdmins = (meta.groupAdmins || []).filter(a => String(a) !== String(user.id));
+      chat.messages[0] = meta;
+    }
+    await addSystemMessage(chat, `${user.nome} saiu do grupo`, 'member_left');
+    await supabaseFetch(`chats?id=eq.${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ participants: chat.participants, messages: chat.messages })
+    });
+    showToast('Você saiu do grupo.', 'info');
+    window.closeGroupInfo();
+    window.closeDirectChat();
+    window.renderDirectChats({ skipBoot: true });
+  } catch (e) { showToast('Erro ao sair do grupo.', 'error'); }
+};
+
+/** Excluir grupo (só criador) */
+window.groupDelete = async function (chatId) {
+  if (!confirm('Tem certeza que deseja excluir este grupo?\nEssa ação não pode ser desfeita.')) return;
+  const user = getSavedUser();
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
+    if (!isGroupAdmin(chat, user.id)) { showToast('Só administradores podem excluir o grupo.', 'warning'); return; }
+    await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'DELETE' });
+    showToast('Grupo excluído.', 'info');
+    window.closeGroupInfo();
+    window.closeDirectChat();
+    window.renderDirectChats({ skipBoot: true });
+  } catch (e) { showToast('Erro ao excluir grupo.', 'error'); }
+};
+
+// ---------------------------------------------------------------
+// 7. LINK DE CONVITE
+// ---------------------------------------------------------------
+
+window.groupCreateInviteLink = async function (chatId) {
+  const user = getSavedUser();
+  try {
+    const code = crypto.randomUUID().slice(0, 8);
+    const invite = {
+      id: crypto.randomUUID(),
+      group_id: chatId,
+      code: code,
+      created_by: user.id,
+      created_at: new Date().toISOString(),
+      max_uses: 0,
+      use_count: 0,
+      revoked: false
+    };
+    await supabaseFetch('group_invites', { method: 'POST', body: JSON.stringify(invite) });
+    const link = `${window.location.origin}${window.location.pathname}?join_group=${code}`;
+    const section = document.getElementById('groupInviteLinkSection');
+    if (section) {
+      section.innerHTML = `
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control" value="${link}" readonly onclick="this.select()">
+          <button class="btn btn-outline-success" onclick="navigator.clipboard.writeText('${link}');showToast('Link copiado!','success')"><i class="bi bi-copy"></i></button>
+          <button class="btn btn-outline-danger" onclick="window.groupRevokeInvite('${code}','${chatId}')"><i class="bi bi-x-lg"></i></button>
+        </div>`;
+    }
+    showToast('Link de convite criado!', 'success');
+  } catch (e) { showToast('Erro ao criar link.', 'error'); }
+};
+
+window.groupRevokeInvite = async function (code, chatId) {
+  if (!confirm('Revogar este link de convite?')) return;
+  try {
+    await supabaseFetch(`group_invites?code=eq.${code}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ revoked: true })
+    });
+    showToast('Link revogado.', 'info');
+    const section = document.getElementById('groupInviteLinkSection');
+    if (section) {
+      section.innerHTML = `
+        <button class="btn btn-sm btn-outline-success w-100" onclick="window.groupCreateInviteLink('${chatId}')">
+          <i class="bi bi-plus-circle me-1"></i>Criar novo link de convite
+        </button>`;
+    }
+  } catch (e) { showToast('Erro ao revogar.', 'error'); }
+};
+
+window.groupShareLink = async function (chatId) {
+  try {
+    // Procura um invite válido existente
+    const invites = await supabaseFetch(`group_invites?group_id=eq.${chatId}&revoked=eq.false&limit=1`);
+    let code;
+    if (invites?.length) {
+      code = invites[0].code;
+    } else {
+      // Cria um novo automaticamente
+      code = crypto.randomUUID().slice(0, 8);
+      await supabaseFetch('group_invites', { method: 'POST', body: JSON.stringify({
+        id: crypto.randomUUID(), group_id: chatId, code,
+        created_by: getSavedUser()?.id, created_at: new Date().toISOString(),
+        max_uses: 0, use_count: 0, revoked: false
+      })});
+    }
+    const link = `${window.location.origin}${window.location.pathname}?join_group=${code}`;
+    if (navigator.share) {
+      await navigator.share({ title: 'Convite para grupo', text: 'Entre no grupo pelo link:', url: link }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(link);
+      showToast('Link copiado!', 'success');
+    }
+  } catch (e) { showToast('Erro ao compartilhar.', 'error'); }
+};
+
+/** Entrar no grupo via link (chamado no load da página) */
+window.joinGroupByInvite = async function (code) {
+  if (!code) return;
+  const user = getSavedUser();
+  if (!user) { showToast('Faça login para entrar no grupo.', 'warning'); return; }
+  try {
+    const invites = await supabaseFetch(`group_invites?code=eq.${code}&revoked=eq.false&limit=1`);
+    if (!invites?.length) { showToast('Link inválido ou expirado.', 'error'); return; }
+    const invite = invites[0];
+    const chatResult = await supabaseFetch(`chats?id=eq.${invite.group_id}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) { showToast('Grupo não encontrado.', 'error'); return; }
+    if ((chat.participants || []).some(p => String(p) === String(user.id))) {
+      showToast('Você já está no grupo.', 'info');
+      setTimeout(() => window.openDirectChat(invite.group_id), 300);
+      return;
+    }
+    const settings = getGroupSettings(chat);
+    if (settings.approval_required) {
+      // Solicita aprovação
+      const existing = await supabaseFetch(`group_join_requests?group_id=eq.${invite.group_id}&user_id=eq.${user.id}&status=eq.pending`);
+      if (existing?.length) { showToast('Solicitação já enviada.', 'info'); return; }
+      await supabaseFetch('group_join_requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          group_id: invite.group_id,
+          user_id: user.id,
+          status: 'pending'
+        })
+      });
+      showToast('Solicitação de entrada enviada. Aguarde aprovação.', 'success');
+    } else {
+      chat.participants = [...(chat.participants || []), user.id];
+      chat.messages.push({
+        senderId: 'system',
+        text: `${user.nome} entrou no grupo via link de convite`,
+        timestamp: new Date().toISOString(),
+        type: 'system',
+        systemType: 'member_joined'
+      });
+      await supabaseFetch(`chats?id=eq.${invite.group_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ participants: chat.participants, messages: chat.messages })
+      });
+      await supabaseFetch(`group_invites?code=eq.${code}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ use_count: (invite.use_count || 0) + 1 })
+      });
+      showToast('Você entrou no grupo!', 'success');
+      setTimeout(() => window.openDirectChat(invite.group_id), 400);
+    }
+    window.renderDirectChats({ skipBoot: true });
+  } catch (e) { showToast('Erro ao entrar no grupo.', 'error'); }
+};
+
+// ---------------------------------------------------------------
+// 8. FILTRO DE PARTICIPANTES NA TELA DE INFO
+// ---------------------------------------------------------------
+
+window.filterGroupParticipants = function (query) {
+  const q = (query || '').trim().toLowerCase();
+  const list = document.getElementById('groupParticipantsList');
+  if (!list) return;
+  list.querySelectorAll('.wa-gi-participant').forEach(el => {
+    const name = el.querySelector('strong')?.textContent?.toLowerCase() || '';
+    el.style.display = !q || name.includes(q) ? '' : 'none';
+  });
+};
+
+// ---------------------------------------------------------------
+// 9. CORES DO AVATAR (click handlers)
+// ---------------------------------------------------------------
+
+document.addEventListener('DOMContentLoaded', function () {
+  const colors = document.getElementById('groupAvatarColors');
+  if (colors) {
+    colors.querySelectorAll('[data-color]').forEach(el => {
+      el.addEventListener('click', function () {
+        const c = this.dataset.color;
+        const preview = document.getElementById('newGroupAvatarPreview');
+        const placeholder = document.getElementById('newGroupAvatarPlaceholder');
+        if (preview) {
+          preview.src = `https://ui-avatars.com/api/?name=G&background=${c}&color=fff&size=80`;
+          preview.classList.remove('d-none');
+        }
+        if (placeholder) placeholder.classList.add('d-none');
+      });
+    });
+  }
+});
+
+// ---------------------------------------------------------------
+// 10. INTEGRAÇÃO — ADICIONA BOTÃO INFO NO HEADER DO CHAT
+// ---------------------------------------------------------------
+
+window._initGroupUI = function () {
+  const origOpenDirectChat = window.openDirectChat;
+  if (!window._groupPatched && typeof origOpenDirectChat === 'function') {
+    window._origOpenDirectChat = origOpenDirectChat;
+    window.openDirectChat = async function (chatId) {
+      await window._origOpenDirectChat(chatId);
+      setTimeout(() => {
+        try {
+          const chatActive = document.getElementById('waChatActive');
+          if (!chatActive || chatActive.classList.contains('d-none')) return;
+          const header = chatActive.querySelector('.chat-header');
+          if (!header || header.querySelector('[data-group-info-btn]')) return;
+          const chatEl = document.querySelector(`.wa-contact[data-direct-chat-id="${chatId}"]`);
+          const isGroup = chatEl?.querySelector('.wa-group-badge');
+          if (!isGroup) return;
+          // Não adiciona botão info para a Comunidade ou DuckDuckGo
+          const isSpecial = chatEl?.dataset?.contactName === 'comunidade electromarket' || chatEl?.dataset?.contactName === 'duckduckgo';
+          if (isGroup && !isSpecial) {
+            const actionsDiv = header.querySelector('.d-flex.align-items-center.gap-1');
+            if (actionsDiv) {
+              const infoBtn = document.createElement('button');
+              infoBtn.type = 'button';
+              infoBtn.className = 'chat-icon-btn';
+              infoBtn.setAttribute('data-group-info-btn', '');
+              infoBtn.innerHTML = '<i class="bi bi-info-circle"></i>';
+              infoBtn.title = 'Informações do grupo';
+              infoBtn.onclick = async () => await window.openGroupInfo(chatId);
+              actionsDiv.prepend(infoBtn);
+            }
+          }
+        } catch (e) { /* silencioso */ }
+      }, 300);
+    };
+    window._groupPatched = true;
+  }
+};
+
+// Inicializa após carregamento
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', window._initGroupUI);
+} else {
+  window._initGroupUI();
+}
+
+// ---------------------------------------------------------------
+// 11. LEITURA DE MENSAGENS EM GRUPO (read receipts)
+// ---------------------------------------------------------------
+
+/**
+ * Marca mensagens como lidas para grupos. Para cada mensagem não lida
+ * de outro remetente, adiciona o ID do usuário logado ao array `readBy`.
+ */
+window.markGroupMessagesRead = async function (chat) {
+  const user = getSavedUser();
+  if (!user || !chat || !chat.messages) return false;
+
+  let changed = false;
+  const now = new Date().toISOString();
+
+  chat.messages.forEach(msg => {
+    if (msg.type === 'system' || msg.type === 'direct_chat_meta') return;
+    if (String(msg.senderId) === String(user.id)) return;
+    if (msg.readBy && msg.readBy.some(r => String(r) === String(user.id))) return;
+
+    if (!msg.readBy) msg.readBy = [];
+    msg.readBy.push(user.id);
+    changed = true;
+  });
+
+  if (changed) {
+    try {
+      await supabaseFetch(`chats?id=eq.${chat.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ messages: chat.messages })
+      });
+      // Atualiza badge
+      const contactEl = document.querySelector(`.wa-contact[data-direct-chat-id="${chat.id}"]`);
+      if (contactEl) {
+        contactEl.querySelector('.wa-contact-badge')?.remove();
+        const textEl = contactEl.querySelector('.wa-contact-text');
+        if (textEl) textEl.style.removeProperty('font-weight');
+      }
+    } catch (e) { /* silencioso */ }
+  }
+
+  return changed;
+};
+
+// ---------------------------------------------------------------
+// 12. ESTATÍSTICAS DE LEITURA (exibe "Visto por X pessoas")
+// ---------------------------------------------------------------
+
+window.getGroupReadReceiptText = function (msg, chat, userId) {
+  if (!msg || !chat || !msg.readBy) return '';
+  if (String(msg.senderId) !== String(userId)) return '';
+
+  const total = chat.participants?.length || 0;
+  const readCount = msg.readBy.length;
+  const notReadCount = Math.max(0, total - readCount - 1); // -1 para o próprio remetente
+
+  if (readCount === 0) return '✔️ Enviada';
+  if (readCount === 1 && String(msg.readBy[0]) === String(userId)) return '✔️ Enviada';
+
+  const names = [];
+  msg.readBy.slice(0, 3).forEach(id => {
+    // Tenta pegar nome do cache
+    const u = (window._groupUsersCache || {})[id];
+    if (u) names.push(u.nome?.split(' ')[0]);
+  });
+
+  if (names.length > 0) {
+    return `✅ Visto por ${names.join(', ')}${notReadCount > 0 ? ` e +${notReadCount}` : ''}`;
+  }
+  return `✅ Visto por ${readCount} pessoa${readCount > 1 ? 's' : ''}`;
+};
+
+window._groupUsersCache = {};
+
+// Patches loadDirectChatMessages to add group read receipts
+(function patchGroupReadReceipts() {
+  const origLoad = window.loadDirectChatMessages;
+  if (typeof origLoad !== 'function') return;
+
+  window.loadDirectChatMessages = async function (chatId, silent = false) {
+    await origLoad(chatId, silent);
+    try {
+      const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+      const chat = chatResult?.[0];
+      if (chat && (chat.messages?.[0]?.groupType === 'group' || (chat.participants && chat.participants.length > 2))) {
+        await window.markGroupMessagesRead(chat);
+      }
+    } catch (e) { /* silencioso */ }
+  };
+})();
+
+// ---------------------------------------------------------------
+// 13. JOIN GROUP VIA INVITE LINK (handle URL parameter)
+// ---------------------------------------------------------------
+
+(function checkJoinGroupParam() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('join_group');
+  if (code) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => window.joinGroupByInvite(code));
+    } else {
+      setTimeout(() => window.joinGroupByInvite(code), 1000);
+    }
+  }
+})();
+
+/** Abre a Comunidade ElectroMarket (antigo "Chat Geral"). Na primeira vez, cria o
+ *  grupo já com todo mundo cadastrado; nas próximas, só garante que usuários novos
+ *  (cadastrados depois) entrem também.
+ *  Não usa um id fixo — identifica o grupo por order_id nulo + seller_name dentre os
+ *  nomes conhecidos (atual + nome antigo "Chat Geral", para não duplicar o grupo em
+ *  bases que já tinham o grupo criado antes da renomeação), reaproveitando as colunas
+ *  que os chats diretos já usam (sem precisar de coluna nova). */
+/** Abre conversa com o assistente DuckDuckGo */
+window.openAIChat = async function() {
+    if (!getSavedUser()) { showToast('Faça login!', 'warning'); return; }
+    showToast('Abrindo DuckDuckGo...', 'info', 1500);
+    await window.startDirectChat(AI_USER_ID);
+};
+
+window.openGeneralChat = async function() {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+
+    const GENERAL_CHAT_NAME = 'Comunidade ElectroMarket';
+    const LEGACY_NAMES = ['Chat Geral', GENERAL_CHAT_NAME];
+
+    showToast(`Abrindo ${GENERAL_CHAT_NAME}...`, 'info', 1500);
+
+    try {
+        const allUsers = await supabaseFetch('users?select=id,nome&order=nome.asc');
+        const allIds = allUsers.map(u => String(u.id)).filter(id => String(id) !== AI_USER_ID);
+
+        const nameFilter = LEGACY_NAMES.map(n => `"${n}"`).join(',');
+        const existing = await supabaseFetch(`chats?order_id=is.null&seller_name=in.(${nameFilter})&select=*`);
+
+        let chatId;
+
+        if (existing && existing.length > 0) {
+            const chat = existing[0];
+            chatId = chat.id;
+            const current = (chat.participants || []).map(String);
+            const merged = Array.from(new Set([...current, ...allIds]));
+            const needsRename = chat.seller_name !== GENERAL_CHAT_NAME || chat.buyer_name !== GENERAL_CHAT_NAME;
+            if (merged.length !== current.length || needsRename) {
+                await supabaseFetch(`chats?id=eq.${chatId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        participants: merged,
+                        ...(needsRename ? { seller_name: GENERAL_CHAT_NAME, buyer_name: GENERAL_CHAT_NAME } : {})
+                    })
+                });
+            }
+        } else {
+            chatId = crypto.randomUUID();
+            const newChat = {
+                id: chatId,
+                order_id: null,
+                buyer_id: user.id,
+                seller_id: user.id,
+                buyer_name: GENERAL_CHAT_NAME,
+                seller_name: GENERAL_CHAT_NAME,
+                participants: allIds,
+                messages: [
+                    { type: 'direct_chat_meta', createdBy: user.id, createdByName: user.nome },
+                    { senderId: 'system', text: `${GENERAL_CHAT_NAME} criada — todos os usuários cadastrados participam por aqui.`, timestamp: new Date().toISOString(), type: 'system' }
+                ]
+            };
+            await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
+        }
+
+        await window.openDirectChat(chatId);
+    } catch (e) {
+        console.error(`Erro ao abrir a ${GENERAL_CHAT_NAME}:`, e);
+        const detail = e?.message || e?.hint || e?.details || '';
+        showToast(detail ? `Erro ao abrir: ${detail}` : 'Erro ao abrir.', 'error');
+    }
+};
+
+/** Mostra/esconde (e monta, na primeira vez) o painel com a lista de participantes
+ *  de um grupo, integrado ao próprio chat — sem precisar abrir modal. */
+window.toggleDirectChatParticipants = async function(chatId) {
+    const panel = document.getElementById(`dparticipants_${chatId}`);
+    if (!panel) return;
+
+    const willShow = panel.classList.contains('d-none');
+    panel.classList.toggle('d-none');
+    if (!willShow) return;
+
+    panel.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div></div>';
+
+    try {
+        const chatData = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatData?.[0];
+        const participantIds = (chat?.participants || []).map(String).filter(id => String(id) !== AI_USER_ID);
+
+        if (!participantIds.length) {
+            panel.innerHTML = '<div class="small text-muted px-1">Nenhum participante encontrado.</div>';
+            return;
+        }
+
+        const idFilter = participantIds.map(id => `"${id}"`).join(',');
+        const users = await supabaseFetch(`users?select=id,nome,avatar,tipo&id=in.(${idFilter})`);
+        const usersById = {};
+        (users || []).forEach(u => { usersById[String(u.id)] = u; });
+
+        const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
+        const creatorId = directMeta?.createdBy ? String(directMeta.createdBy) : null;
+        const me = getSavedUser();
+
+        const rows = participantIds.map(id => {
+            const u = usersById[id];
+            const isAI = id === AI_USER_ID;
+            const nome = u?.nome || (isAI ? 'DuckDuckGo' : 'Usuário removido');
+            const avatarUrl = isAI
+                ? AI_USER_DATA.avatar
+                : (normalizeImageUrl(safeParseImages(u?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=random&color=fff`);
+            const isMe = String(id) === String(me?.id);
+            const tipo = u?.tipo || 'CLIENTE';
+            const tipoLabel = tipo === 'ADMIN' ? 'Administrador' : (tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
+
+            return `<div class="chat-participant-row">
+                <img src="${avatarUrl}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=random&color=fff'">
+                <div class="chat-participant-info">
+                    <strong>${nome}${isMe ? ' (você)' : ''}</strong>
+                    <small>${tipoLabel}</small>
+                </div>
+            </div>`;
+        }).join('');
+
+        panel.innerHTML = `<div class="small fw-bold mb-1" style="color:#667781;"><i class="bi bi-people-fill me-1"></i>${participantIds.length} participantes</div>${rows}`;
+    } catch (e) {
+        console.error('Erro ao carregar participantes:', e);
+        panel.innerHTML = '<div class="small text-danger px-1">Erro ao carregar participantes.</div>';
+    }
+};
+
 window.openDirectChat = async function(chatId) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
@@ -5792,14 +7609,19 @@ window.openDirectChat = async function(chatId) {
         const chat = chatResult?.[0];
         if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
 
-        const otherId = chat.participants.find(p => String(p) !== String(user.id));
+        const isGroup = Array.isArray(chat.participants) && chat.participants.length > 2;
+        const otherId = isGroup ? null : chat.participants.find(p => String(p) !== String(user.id));
         let otherName = 'Usuário';
         let otherAvatar = `https://ui-avatars.com/api/?name=User&background=random&size=40`;
         let otherLastSeen = null;
         let otherEmail = '';
         let otherPhone = '';
 
-        if (otherId) {
+        if (isGroup) {
+            const groupMeta = chat.messages?.[0]?.groupType === 'group' ? chat.messages[0] : {};
+            otherName = groupMeta.groupName || chat.seller_name || 'Grupo';
+            otherAvatar = groupMeta.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=00A884&color=fff&size=40&bold=true`;
+        } else if (otherId) {
             if (String(otherId) === AI_USER_ID) {
                 otherName = 'DuckDuckGo';
                 otherAvatar = 'https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3';
@@ -5826,7 +7648,7 @@ window.openDirectChat = async function(chatId) {
         const attachLinkId = `dattachLink_${chatId}`;
         const statusBarId = `dstatusBar_${chatId}`;
 
-        const partnerDotClass = isRecentlyOnline(otherLastSeen) ? 'online' : 'offline';
+        const partnerDotClass = isGroup ? '' : (isRecentlyOnline(otherLastSeen) ? 'online' : 'offline');
 
         const html = window.renderChatContainer({
             chatId,
@@ -5837,27 +7659,34 @@ window.openDirectChat = async function(chatId) {
             previewId,
             attachPanelId: attachId,
             attachLinkId,
+            participantsId: `dparticipants_${chatId}`,
             statusBarId,
+            onToggleParticipants: isGroup ? `window.toggleDirectChatParticipants('${chatId}')` : '',
             onSend: 'window.sendDirectChatMessage(event)',
+            onTyping: `window.notifyDirectChatTyping('${chatId}')`,
             onBack: 'window.closeDirectChat()',
             onClose: 'window.closeDirectChat()',
-            onViewProfile: `window.viewDirectChatPartnerProfile('${otherId}')`,
+            onViewProfile: isGroup ? '' : `window.viewDirectChatPartnerProfile('${otherId}')`,
+            onPin: `window.pinDirectChat('${chatId}')`,
             onMute: `window.muteDirectChat('${chatId}')`,
             onArchive: `window.archiveDirectChat('${chatId}')`,
-            onBlock: `window.blockDirectChatUser('${otherId}')`,
+            onBlock: isGroup ? '' : `window.blockDirectChatUser('${otherId}')`,
             onToggleAttachPanel: 'window.toggleChatAttachPanel()',
             onConfirmAttach: 'window.confirmDirectChatAttach()',
             onSendLocation: 'window.sendDirectChatLocation',
         onSendFile: 'window.sendDirectChatImageFile',
         showBackBtn: true,
-        showCloseBtn: true,
+        showCloseBtn: false,
             showDeleteBtn: true,
             onDelete: `window.deleteDirectChat('${chatId}')`,
             showProductSummary: false,
             showAttach: true,
-            statusInfo: String(otherId) === AI_USER_ID
+            headerSubtitle: isGroup ? `${chat.participants.length} participantes` : '',
+            statusInfo: isGroup
+                ? { class: 'secondary mb-0 py-1', text: `<div style="font-size:0.75rem;color:#667781;"><i class="bi bi-people-fill me-1"></i>Grupo com ${chat.participants.length} participantes</div>` }
+                : (String(otherId) === AI_USER_ID
                 ? { class: 'secondary mb-0 py-1', text: '<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;"><span><i class="bi bi-search me-1"></i>Busca na Web</span><span><i class="bi bi-globe2 me-1"></i>DuckDuckGo</span></div>' }
-                : { class: 'secondary mb-0 py-1', text: `<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;">${otherEmail ? `<span><i class="bi bi-envelope-fill me-1" style="font-size:0.65rem;"></i>${otherEmail}</span>` : ''}${otherPhone ? `<span><i class="bi bi-telephone-fill me-1" style="font-size:0.65rem;"></i>${otherPhone}</span>` : ''}</div>` }
+                : { class: 'secondary mb-0 py-1', text: `<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;">${otherEmail ? `<span><i class="bi bi-envelope-fill me-1" style="font-size:0.65rem;"></i>${otherEmail}</span>` : ''}${otherPhone ? `<span><i class="bi bi-telephone-fill me-1" style="font-size:0.65rem;"></i>${otherPhone}</span>` : ''}</div>` })
         });
 
         const panel = document.getElementById('waChatActive');
@@ -5865,6 +7694,22 @@ window.openDirectChat = async function(chatId) {
             panel.innerHTML = html;
             panel.classList.remove('d-none');
             panel.classList.add('d-flex');
+
+            // Comunidade: troca avatar para ícone de pessoas
+            if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
+                const avatarWrap = panel.querySelector('.chat-header-avatar-wrap');
+                if (avatarWrap) {
+                    const img = avatarWrap.querySelector('img');
+                    if (img) img.style.display = 'none';
+                    let icon = avatarWrap.querySelector('.wa-header-group-icon');
+                    if (!icon) {
+                        icon = document.createElement('div');
+                        icon.className = 'wa-header-group-icon';
+                        icon.innerHTML = '<i class="bi bi-people-fill"></i>';
+                        avatarWrap.insertBefore(icon, avatarWrap.firstChild);
+                    }
+                }
+            }
         }
 
         if (partnerDotClass) {
@@ -5887,6 +7732,7 @@ window.openDirectChat = async function(chatId) {
 
         await loadDirectChatMessages(chatId);
         startDirectChatPolling(chatId);
+        startDirectTypingWatcher(chatId, otherId, msgsId);
     } catch (e) {
         console.error('Erro ao abrir conversa:', e);
         showToast('Erro ao abrir conversa.', 'error');
@@ -5895,6 +7741,7 @@ window.openDirectChat = async function(chatId) {
 
 window.closeDirectChat = function() {
     stopDirectChatPolling();
+    stopDirectTypingWatcher();
     window.currentChat = null;
     window.lastChatSignature = null;
     window._chatActiveElements = null;
@@ -5905,26 +7752,66 @@ window.closeDirectChat = function() {
     document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
 };
 
-let directChatPollInterval = null;
-
-function startDirectChatPolling(chatId) {
-    stopDirectChatPolling();
-    directChatPollInterval = setInterval(() => {
+const _directChatPoller = window.ChatCore.createPoller(
+    (id, silent) => loadDirectChatMessages(id, silent),
+    (id) => {
         const panel = document.getElementById('waChatActive');
-        if (!panel || panel.classList.contains('d-none') || window.currentChat !== chatId) {
-            stopDirectChatPolling();
-            return;
-        }
-        loadDirectChatMessages(chatId, true);
-    }, 4000);
+        return !!panel && !panel.classList.contains('d-none') && window.currentChat === id;
+    },
+    4000
+);
+function startDirectChatPolling(chatId) { _directChatPoller.start(chatId); }
+function stopDirectChatPolling() { _directChatPoller.stop(); }
+
+// -------- Indicador "digitando..." do chat direto (Conversas) --------
+// Não temos websocket, então usamos um polling leve (só a coluna messages)
+// bem mais rápido que o polling normal de mensagens, só pra checar se a
+// outra pessoa está com o campo de texto ativo há pouco tempo.
+let _directTypingInterval = null;
+let _directTypingLastSent = {};
+
+function startDirectTypingWatcher(chatId, otherId, msgsId) {
+    stopDirectTypingWatcher();
+    if (!otherId) return;
+    const infoLine = document.getElementById(`${msgsId}InfoLine`);
+    const typingLabel = document.getElementById(`${msgsId}TypingLabel`);
+    if (!typingLabel) return;
+    _directTypingInterval = setInterval(async () => {
+        if (window.currentChat !== chatId) { stopDirectTypingWatcher(); return; }
+        try {
+            const res = await supabaseFetch(`chats?id=eq.${chatId}&select=messages&limit=1`);
+            const meta = res?.[0]?.messages?.[0];
+            const typing = meta?.typing;
+            const isTyping = !!(typing && String(typing.userId) === String(otherId) &&
+                (Date.now() - new Date(typing.ts).getTime()) < 3500);
+            typingLabel.classList.toggle('d-none', !isTyping);
+            typingLabel.style.display = isTyping ? 'block' : 'none';
+            if (infoLine) infoLine.style.display = isTyping ? 'none' : 'block';
+        } catch (e) { /* silencioso — só um indicador visual, sem toast de erro */ }
+    }, 1800);
+}
+function stopDirectTypingWatcher() {
+    if (_directTypingInterval) { clearInterval(_directTypingInterval); _directTypingInterval = null; }
 }
 
-function stopDirectChatPolling() {
-    if (directChatPollInterval) {
-        clearInterval(directChatPollInterval);
-        directChatPollInterval = null;
-    }
-}
+/** Chamado a cada tecla digitada no campo do chat direto; grava (com throttle
+ *  de ~2.5s) que este usuário está digitando, pra outra ponta mostrar "digitando...". */
+window.notifyDirectChatTyping = async function(chatId) {
+    const user = getSavedUser();
+    if (!user || !chatId) return;
+    const now = Date.now();
+    if (_directTypingLastSent[chatId] && (now - _directTypingLastSent[chatId]) < 2500) return;
+    _directTypingLastSent[chatId] = now;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        const meta = chat?.messages?.[0];
+        if (!meta || meta.type !== 'direct_chat_meta') return;
+        meta.typing = { userId: user.id, ts: new Date().toISOString() };
+        chat.messages[0] = meta;
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+    } catch (e) { /* indicador de digitação não é crítico, ignora falha silenciosamente */ }
+};
 
 async function loadDirectChatMessages(chatId, silent = false) {
     const container = window._chatActiveElements?.container;
@@ -5946,35 +7833,23 @@ async function loadDirectChatMessages(chatId, silent = false) {
             () => loadDirectChatMessages(chatId, true)
         );
 
-        let changed = false;
-        chat.messages.forEach(msg => {
-            if (msg.senderId && String(msg.senderId) !== String(user.id) && !msg.visto) {
-                msg.visto = true; changed = true;
-            }
-        });
-        if (changed) {
-            await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }).catch(() => {});
-            window.updateChatBadge();
-            // Atualiza badge da lista lateral sem re-renderizar tudo
-            const contactEl = document.querySelector(`.wa-contact[data-direct-chat-id="${chatId}"]`);
-            if (contactEl) {
-                const badge = contactEl.querySelector('.badge.bg-success');
-                if (badge) badge.remove();
-                const textEl = contactEl.querySelector('.wa-contact-text');
-                if (textEl) textEl.style.removeProperty('font-weight');
-            }
-        }
+        window.ChatCore.markSeenAndClearBadge(
+            chat, user,
+            (messages) => supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages }) }),
+            `.wa-contact[data-direct-chat-id="${chatId}"]`
+        );
 
-        const signature = JSON.stringify(chat.messages);
-        if (silent && signature === window.lastChatSignature) return;
-        const isNewIncoming = silent && window.lastChatSignature !== null && chat.messages.length > (JSON.parse(window.lastChatSignature || '[]').length || 0);
-        window.lastChatSignature = signature;
+        const { skip, isNewIncoming } = window.ChatCore.diffSignature(chat, silent);
+        if (skip) return;
 
         const wasNearBottom = !silent || (container.scrollHeight - container.scrollTop - container.clientHeight < 120);
         const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'Você')}&background=22c98e&color=fff&size=40`;
 
-        const otherId = chat.participants.find(p => String(p) !== String(user.id));
-        let partnerAvatarSrc = `https://ui-avatars.com/api/?name=User&background=random&size=40`;
+        const chatIsGroup = Array.isArray(chat.participants) && chat.participants.length > 2;
+        const otherId = chatIsGroup ? null : chat.participants.find(p => String(p) !== String(user.id));
+        let partnerAvatarSrc = chatIsGroup
+            ? (chat.messages?.[0]?.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.messages?.[0]?.groupName || chat.seller_name || 'Grupo')}&background=00A884&color=fff&size=40&bold=true`)
+            : `https://ui-avatars.com/api/?name=User&background=random&size=40`;
         try {
             if (otherId) {
                 if (String(otherId) === AI_USER_ID) {
@@ -5987,13 +7862,12 @@ async function loadDirectChatMessages(chatId, silent = false) {
             }
         } catch (e) {}
 
-        const chatMsgs = chat.messages.filter(m => m.type !== 'direct_chat_meta');
-        container.innerHTML = chatMsgs.map((msg, index) => {
+        container.innerHTML = chat.messages.map((msg, index) => {
             return window.renderMsgBubble(msg, index, {
                 userId: user.id, myAvatar, partnerAvatar: partnerAvatarSrc, supportAvatar: partnerAvatarSrc,
                 resolveSenderName: () => msg.senderName || '',
-                actions: { reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage' },
-                useDropdown: true, enableGrouping: true, allMessages: chatMsgs
+                actions: { reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage', star: 'toggleStarMessage' },
+                useDropdown: true, enableGrouping: true, allMessages: chat.messages
             });
         }).join('');
 
@@ -6121,10 +7995,12 @@ window.sendDirectChatLocation = async function(kind) {
         if (!navigator.geolocation) { showToast('Geolocalização não suportada.', 'error'); return; }
         showToast('Obtendo sua localização...', 'info');
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            const maps = `https://www.google.com/maps?q=${latitude},${longitude}`;
-            await sendDirectLocationMessage(maps, `Localização atual: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        }, () => showToast('Não foi possível obter a localização.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
+            try {
+                const { latitude, longitude } = pos.coords;
+                const maps = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                await sendDirectLocationMessage(maps, `Localização atual: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+            } catch (e) { showToast('Erro ao enviar localização.', 'error'); }
+        }, () => showToast('Não foi possível obter a localização. Verifique se o GPS está ativo e o navegador tem permissão.', 'error'), { enableHighAccuracy: true, timeout: 10000 });
         return;
     }
     if (kind === 'stored') {
@@ -6229,6 +8105,23 @@ window.viewDirectChatPartnerProfile = async function(partnerId) {
     new bootstrap.Modal(modalEl).show();
 };
 
+window.pinDirectChat = async function(chatId) {
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) return;
+        const meta = chat.messages?.[0] || {};
+        meta.pinned = !meta.pinned;
+        chat.messages[0] = meta;
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        showToast(meta.pinned ? 'Conversa fixada no topo.' : 'Conversa desafixada.', 'info');
+        // Reordena a lista lateral primeiro (renderDirectChats fecha o chat ativo),
+        // depois reabre a mesma conversa pra atualizar o rótulo do menu "...".
+        await window.renderDirectChats({ skipBoot: true });
+        await window.openDirectChat(chatId);
+    } catch (e) { showToast('Erro ao fixar conversa.', 'error'); }
+};
+
 window.muteDirectChat = async function(chatId) {
     try {
         const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
@@ -6253,7 +8146,7 @@ window.archiveDirectChat = async function(chatId) {
         await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
         showToast(meta.archived ? 'Conversa arquivada.' : 'Conversa desarquivada.', 'info');
         window.closeDirectChat();
-        window.renderDirectChats();
+        window.renderDirectChats({ skipBoot: true });
     } catch (e) { showToast('Erro ao arquivar conversa.', 'error'); }
 };
 
@@ -6275,7 +8168,7 @@ window.blockDirectChatUser = async function(targetId) {
         }
         showToast('Usuário bloqueado.', 'info');
         window.closeDirectChat();
-        window.renderDirectChats();
+        window.renderDirectChats({ skipBoot: true });
     } catch (e) { showToast('Erro ao bloquear usuário.', 'error'); }
 };
 
@@ -6285,7 +8178,7 @@ window.deleteDirectChat = async function(chatId) {
         await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'DELETE' });
         showToast('Conversa apagada.', 'info');
         window.closeDirectChat();
-        window.renderDirectChats();
+        window.renderDirectChats({ skipBoot: true });
     } catch (e) {
         showToast('Erro ao apagar conversa.', 'error');
     }

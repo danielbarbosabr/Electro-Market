@@ -60,7 +60,7 @@
                         </div>
                         <div class="d-flex align-items-center gap-3" style="position:relative;">
                             <a href="#" class="text-white text-decoration-none position-relative" title="Conversas" onclick="event.preventDefault();window.renderDirectChats()">
-                                <i class="bi bi-chat-dots fs-5"></i>
+                                <i class="bi bi-telephone-fill fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-none" id="chatBadgeDesktop" style="font-size: 0.6rem;">0</span>
                             </a>
                             <a href="#" class="text-white text-decoration-none position-relative role-client" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -941,7 +941,7 @@
                     <i class="bi bi-bag"></i> <strong>Minhas Compras</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-client d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
-                    <span><i class="bi bi-chat-dots"></i> <strong>Conversas</strong></span>
+                    <span><i class="bi bi-telephone-fill"></i> <strong>Conversas</strong></span>
                     <span class="badge bg-success rounded-pill d-none" id="chatBadgeMobile">0</span>
                 </a>
 
@@ -1005,8 +1005,12 @@
                     <i class="bi bi-shop"></i> <strong>Minhas Vendas</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
-                    <span><i class="bi bi-chat-dots"></i> <strong>Conversas</strong></span>
+                    <span><i class="bi bi-telephone-fill"></i> <strong>Conversas</strong></span>
                     <span class="badge bg-success rounded-pill d-none" id="chatBadgeSellerMobile">0</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action role-admin d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
+                    <span><i class="bi bi-telephone-fill"></i> <strong>Conversas</strong></span>
+                    <span class="badge bg-success rounded-pill d-none" id="chatBadgeAdminMobile">0</span>
                 </a>
 
                 <hr class="my-2 opacity-10">
@@ -1049,28 +1053,144 @@
     <!-- Modal Chat -->
     <!-- ÁREA DE PEDIDOS ESTILO WHATSAPP WEB (Minhas Vendas / Compras / Solicitações) -->
     <div id="whatsappOrdersView" class="d-none wa-main">
+        <div id="waBootScreen" class="wa-boot-screen d-none">
+            <div class="wa-boot-icon"><i class="bi bi-telephone-fill"></i></div>
+            <h5 class="wa-boot-title">Conversas</h5>
+            <div class="wa-boot-bar"><span></span></div>
+            <p class="wa-boot-subtitle"><i class="bi bi-lock-fill me-1"></i>Suas mensagens ficam só entre você e a outra pessoa</p>
+        </div>
         <section class="wa-side">
             <div class="wa-side__header">
-                <h6 id="waSideTitle" class="mb-0">Minhas Vendas</h6>
-                <button type="button" class="ml-auth-close ms-auto" aria-label="Fechar e voltar ao início"
-                        onclick="window.goHome(); window.updateMobileNavActive('eletronicos');" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                <div class="wa-side__me" id="waSideMe" onclick="window.showProfileEdit()" title="Meu perfil">
+                    <img id="waSideMyAvatar" src="" alt="Você" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=64'">
+                </div>
+                <div class="wa-side__title-block">
+                    <h6 id="waSideTitle" class="mb-0">Conversas</h6>
+                    <span id="waSideMyName" class="wa-side__me-name"></span>
+                </div>
+                <div class="d-flex align-items-center gap-1 ms-auto" id="waSideHeaderActions">
+                    <button type="button" class="ml-auth-close d-none" id="waSideFullscreenBtn" aria-label="Tela cheia" onclick="window.toggleWaChatFullscreen()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-arrows-fullscreen"></i></button>
+                    <button type="button" class="ml-auth-close d-none" id="waSideCloseBtn" aria-label="Fechar" onclick="window.exitWaOrdersView()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                    <div class="dropdown" id="waSideMenuWrap">
+                        <button type="button" class="chat-icon-btn wa-side-action-btn" data-bs-toggle="dropdown" aria-label="Menu" title="Menu"><i class="bi bi-three-dots-vertical"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openNewConversationModal()"><i class="bi bi-chat-square-text me-2"></i>Nova conversa</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openGeneralChat()"><i class="bi bi-people-fill me-2"></i>Comunidade</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleTema()"><i class="bi bi-moon-stars me-2"></i>Alterar tema</a></li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.goHome(); window.updateMobileNavActive('eletronicos');"><i class="bi bi-box-arrow-right me-2"></i>Sair das Conversas</a></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
-            <div class="wa-side__search">
+            <div class="wa-side__search" id="waSideSearchBar">
                 <i class="bi bi-search"></i>
                 <input type="text" id="waContactSearch" placeholder="Buscar conversa..." autocomplete="off" oninput="window.filterWaContacts(this.value)">
+                <i class="bi bi-x-lg wa-side-search-close" onclick="document.getElementById('waContactSearch').value=''; window.filterWaContacts('');"></i>
             </div>
             <div id="waContactList" class="wa-side__list"></div>
         </section>
 
         <section class="wa-chat">
             <!-- Estado vazio: nenhuma conversa selecionada -->
-            <div id="waEmptyState" class="wa-empty-state">
-                <i class="bi bi-chat-square-text"></i>
-                <p>Selecione um pedido ao lado para ver a conversa</p>
-            </div>
+            <div id="waEmptyState" class="wa-empty-state"></div>
 
             <div id="waChatActive" class="d-none h-100 flex-column" style="margin:0;border-radius:0;"></div>
         </section>
+    </div>
+
+    <!-- Modal Criar Grupo (multi-step: selecionar participantes -> nome/foto/descrição) -->
+    <!-- Modal Criar novo grupo (estilo Falar com o Suporte) -->
+    <!-- Modal Criar novo grupo / Nova conversa (reaproveitado) -->
+    <div class="modal fade" id="newGroupModal" tabindex="-1" data-mode="group">
+        <div class="modal-dialog modal-dialog-centered" id="newGroupModalDialog">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-header border-0 pb-0 justify-content-center position-relative">
+                    <div class="text-center">
+                        <h5 class="modal-title fw-bold" id="newGroupModalTitle" style="font-size:1.1rem;">Criar novo grupo</h5>
+                        <p class="text-muted small mb-0" id="newGroupModalSubtitle">Selecione os participantes e defina as informações</p>
+                    </div>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar"><i class="bi bi-x-lg"></i></button>
+                </div>
+
+                <form id="newGroupForm">
+                    <div class="modal-body pt-2">
+                        <!-- Participantes -->
+                        <div class="create-ad-section">
+                            <div class="create-ad-section-title">
+                                <i class="bi bi-people-fill"></i>
+                                <span id="newGroupParticipantTitle">Participantes</span>
+                            </div>
+                            <div class="create-ad-section-body">
+                                <div class="create-ad-label" id="newGroupSelectLabel">Selecione pelo menos 2 pessoas</div>
+                                <div class="ml-field mb-2">
+                                    <input type="text" id="newGroupMemberSearch" placeholder=" " autocomplete="off" oninput="window.filterNewGroupMembers(this.value)">
+                                    <label for="newGroupMemberSearch">Buscar pessoa...</label>
+                                </div>
+                                <div id="newGroupMemberList" class="wa-group-member-list" style="max-height:220px;overflow-y:auto;">
+                                    <div class="text-center py-4"><div class="spinner-border spinner-border-sm text-success"></div></div>
+                                </div>
+                                <p class="small text-muted mt-2 mb-0" id="newGroupSelectedCount">Nenhum participante selecionado.</p>
+                            </div>
+                        </div>
+
+                        <!-- Informações do Grupo (só aparece no modo grupo) -->
+                        <div class="create-ad-section d-none" id="newGroupInfoSection">
+                            <div class="create-ad-section-title">
+                                <i class="bi bi-info-circle-fill"></i>
+                                <span>Informações do Grupo</span>
+                            </div>
+                            <div class="create-ad-section-body">
+                                <div class="text-center mb-3">
+                                    <div class="position-relative d-inline-block">
+                                        <img id="newGroupAvatarPreview" src="" class="d-none rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;">
+                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" style="width:70px;height:70px;border:3px dashed #ccc;" id="newGroupAvatarPlaceholder">
+                                            <i class="bi bi-camera" style="font-size:1.5rem;color:#999;"></i>
+                                        </div>
+                                        <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:26px;height:26px;cursor:pointer;border:2px solid #fff;">
+                                            <i class="bi bi-plus text-white" style="font-size:0.75rem;"></i>
+                                            <input type="file" accept="image/*" hidden onchange="window.uploadGroupAvatar(this)">
+                                        </label>
+                                        <input type="hidden" id="newGroupAvatarInput">
+                                    </div>
+                                    <div class="mt-2 d-flex justify-content-center gap-1" id="groupAvatarColors">
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#FF5733;cursor:pointer;border:2px solid transparent;" data-color="FF5733"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#33FF57;cursor:pointer;border:2px solid transparent;" data-color="33FF57"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#3357FF;cursor:pointer;border:2px solid transparent;" data-color="3357FF"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#F333FF;cursor:pointer;border:2px solid transparent;" data-color="F333FF"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#FF33A8;cursor:pointer;border:2px solid transparent;" data-color="FF33A8"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#33FFF5;cursor:pointer;border:2px solid transparent;" data-color="33FFF5"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#FFD733;cursor:pointer;border:2px solid transparent;" data-color="FFD733"></div>
+                                        <div style="width:20px;height:20px;border-radius:50%;background:#A833FF;cursor:pointer;border:2px solid transparent;" data-color="A833FF"></div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="ml-field">
+                                        <input type="text" id="newGroupNameInput" placeholder=" " maxlength="60" required>
+                                        <label for="newGroupNameInput">Nome do grupo *</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="ml-field">
+                                        <textarea id="newGroupDescInput" placeholder=" " rows="2" maxlength="200"></textarea>
+                                        <label for="newGroupDescInput">Descrição (opcional)</label>
+                                    </div>
+                                </div>
+
+                                <div class="create-ad-label">Participantes selecionados</div>
+                                <div id="newGroupSelectedSummary" class="d-flex align-items-center flex-wrap gap-1"></div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="ml-btn ml-btn-primary flex-grow-1" id="newGroupCreateBtn" onclick="window.createGroupChat()"><i class="bi bi-check2 me-2"></i>Criar grupo</button>
+                            <button type="button" class="ml-btn ml-btn-outline flex-grow-1" data-bs-dismiss="modal"><i class="bi bi-x-lg me-2"></i>Cancelar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Detalhes do Pedido -->
@@ -1614,5 +1734,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Container para a tela de Informações do Grupo (fullscreen overlay) -->
+    <div id="groupInfoContainer" class="d-none" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:1060;"></div>
+
 </body>
 </html>

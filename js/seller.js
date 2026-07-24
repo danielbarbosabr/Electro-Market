@@ -50,10 +50,13 @@ async function renderOrdersListSilently(type) {
         const _orderIds = orders.map(o => o.id);
         const _chats = await supabaseFetch('chats?select=order_id,messages,participants&order_id=in.(' + _orderIds.map(id => '"' + id + '"').join(',') + ')');
         const _unreadMap = {};
+        const _lastTimeMap = {};
         (_chats || []).forEach(c => {
             if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
             const u = c.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0;
             if (u > 0) _unreadMap[c.order_id] = u;
+            const lastMsg = c.messages?.[c.messages.length - 1];
+            if (lastMsg?.timestamp) _lastTimeMap[c.order_id] = lastMsg.timestamp;
         });
 
         waList.innerHTML = orders.map(order => {
@@ -62,25 +65,28 @@ async function renderOrdersListSilently(type) {
             const isBuyer   = user.id === order.buyer_id;
             const partnerName = isBuyer ? order.seller_name : order.buyer_name;
             const _unread  = _unreadMap[order.id] || 0;
+            const _lastTime = _lastTimeMap[order.id] ? new Date(_lastTimeMap[order.id]).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+
+            const isFinished = order.status === 'cancelled' || order.status === 'finished';
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
-                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">${order.status === 'offer_pending' ? 'Cancelar Oferta' : 'Cancelar Pedido'}</button>`;
-            } else if (order.status === 'cancelled' || order.status === 'finished') {
-                actionsHtml = `<button class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash me-1"></i>Remover</button>`;
+                actionsHtml = `<button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">${order.status === 'offer_pending' ? 'Cancelar Oferta' : 'Cancelar Pedido'}</button>`;
             }
 
             return `
-            <div class="wa-contact" data-order-id="${order.id}" onclick="${!isPending && order.status !== 'cancelled' ? `window.showChat('${order.id}')` : ''}" style="${isPending || order.status === 'cancelled' ? 'cursor:default;' : ''}">
+            <div class="wa-contact" data-order-id="${order.id}" data-contact-name="${((partnerName || '') + ' ' + (order.product_title || '')).toLowerCase()}" onclick="${!isPending && !isFinished ? `window.showChat('${order.id}')` : ''}" style="${isPending || isFinished ? 'cursor:default;' : ''}">
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
                     <div class="wa-contact-text" style="${_unread ? 'font-weight:600;color:#111;' : ''}">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
-                    ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
-                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                    ${_lastTime ? `<small class="text-muted" style="font-size:0.65rem;line-height:1;">${_lastTime}</small>` : ''}
                     ${_unread ? `<span class="badge bg-success wa-contact-badge" style="position:static;">${_unread}</span>` : ''}
                     <span class="badge ${st.class} wa-contact-badge" style="position:static;">${st.text}</span>
+                    ${isFinished ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.6rem;line-height:1.4;" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash"></i> Remover</button>` : ''}
+                    ${actionsHtml}
                 </div>
             </div>`;
         }).join('');
@@ -130,6 +136,13 @@ window.renderOrderManagement = async function(type = 'buyer') {
 
         let orders = await supabaseFetch(path);
         ordersCache = orders;
+        window.setWaSideActions?.(false);
+        window.setWaSideProfile?.();
+        document.getElementById('waSideMe')?.classList.add('d-none');
+        document.getElementById('waSideMyName')?.classList.add('d-none');
+        document.getElementById('waSideFullscreenBtn')?.classList.remove('d-none');
+        document.getElementById('waSideCloseBtn')?.classList.remove('d-none');
+        window.updateWaEmptyState?.(type === 'buyer' ? 'buyer' : 'seller');
 
         // Aqui só entram pedidos já aceitos (a tela de chat não faz sentido pra pendentes/ofertas)
         orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
@@ -151,10 +164,13 @@ window.renderOrderManagement = async function(type = 'buyer') {
         const orderIds = orders.map(o => o.id);
         const chats = await supabaseFetch('chats?select=order_id,messages,participants&order_id=in.(' + orderIds.map(id => '"' + id + '"').join(',') + ')');
         const unreadMap = {};
+        const lastTimeMap = {};
         (chats || []).forEach(c => {
             if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
             const u = c.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0;
             if (u > 0) unreadMap[c.order_id] = u;
+            const lastMsg = c.messages?.[c.messages.length - 1];
+            if (lastMsg?.timestamp) lastTimeMap[c.order_id] = lastMsg.timestamp;
         });
 
         waList.innerHTML = orders.map(order => {
@@ -163,29 +179,32 @@ window.renderOrderManagement = async function(type = 'buyer') {
             const isBuyer   = user.id === order.buyer_id;
             const partnerName = isBuyer ? order.seller_name : order.buyer_name;
             const unread    = unreadMap[order.id] || 0;
+            const lastTime = lastTimeMap[order.id] ? new Date(lastTimeMap[order.id]).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+
+            const isFinished = order.status === 'cancelled' || order.status === 'finished';
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
-                actionsHtml = `<button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">${order.status === 'offer_pending' ? 'Cancelar Oferta' : 'Cancelar Pedido'}</button>`;
-            } else if (order.status === 'cancelled' || order.status === 'finished') {
-                actionsHtml = `<button class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash me-1"></i>Remover</button>`;
+                actionsHtml = `<button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); window.cancelOrderBuyer('${order.id}')">${order.status === 'offer_pending' ? 'Cancelar Oferta' : 'Cancelar Pedido'}</button>`;
             }
 
             return `
-            <div class="wa-contact" data-order-id="${order.id}" onclick="${!isPending && order.status !== 'cancelled' ? `window.showChat('${order.id}')` : ''}" style="${isPending || order.status === 'cancelled' ? 'cursor:default;' : ''}">
+            <div class="wa-contact" data-order-id="${order.id}" data-contact-name="${((partnerName || '') + ' ' + (order.product_title || '')).toLowerCase()}" onclick="${!isPending && !isFinished ? `window.showChat('${order.id}')` : ''}" style="${isPending || isFinished ? 'cursor:default;' : ''}">
                 <img src="${order.product_img || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://placehold.co/45'">
                 <div class="wa-contact-textbox">
                     <div class="wa-contact-name">${partnerName || 'Usuário'}</div>
                     <div class="wa-contact-text" style="${unread ? 'font-weight:600;color:#111;' : ''}">${order.product_title || 'Produto'} · ${order.status === 'offer_pending' ? `Oferta: ${formatPreco(order.offer_amount, {htmlGratis:false})}` : formatPreco(order.total, {htmlGratis:false})}</div>
-                    ${actionsHtml ? `<div class="d-flex gap-2 mt-2">${actionsHtml}</div>` : ''}
                 </div>
-                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                    ${lastTime ? `<small class="text-muted" style="font-size:0.65rem;line-height:1;">${lastTime}</small>` : ''}
                     ${unread ? `<span class="badge bg-success wa-contact-badge" style="position:static;">${unread}</span>` : ''}
                     <span class="badge ${st.class} wa-contact-badge" style="position:static;">${st.text}</span>
+                    ${isFinished ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.6rem;line-height:1.4;" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash"></i> Remover</button>` : ''}
+                    ${actionsHtml}
                 </div>
             </div>`;
         }).join('');
-
+        
         window.closeMobileMenu();
         startOrdersPolling(type);
     } catch (e) {
@@ -272,30 +291,6 @@ window.renderSellerRequests = async function() {
         window.closeMobileMenu();
     } catch (e) {
         grid.innerHTML = '<div class="col-12 text-center py-5"><h5>Erro ao carregar solicitações.</h5></div>';
-    }
-};
-
-window.filterWaContacts = function(query) {
-    const q = query.trim().toLowerCase();
-    let anyVisible = false;
-    document.querySelectorAll('#waContactList .wa-contact').forEach(el => {
-        const text = el.textContent.toLowerCase();
-        const show = !q || text.includes(q);
-        el.style.display = show ? '' : 'none';
-        if (show) anyVisible = true;
-    });
-    let emptyMsg = document.getElementById('waSearchEmptyMsg');
-    if (!anyVisible && q) {
-        if (!emptyMsg) {
-            emptyMsg = document.createElement('div');
-            emptyMsg.id = 'waSearchEmptyMsg';
-            emptyMsg.className = 'text-center py-4 px-3';
-            emptyMsg.style.color = '#999';
-            emptyMsg.innerHTML = '<i class="bi bi-search fs-4 d-block mb-2"></i><p class="small mb-0">Nenhuma conversa encontrada.</p>';
-            document.getElementById('waContactList')?.appendChild(emptyMsg);
-        }
-    } else if (emptyMsg) {
-        emptyMsg.remove();
     }
 };
 
