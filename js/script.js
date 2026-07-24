@@ -289,6 +289,9 @@ window.exitWaOrdersView = function() {
     document.body.classList.remove('wa-fullscreen');
     if (typeof window.closeWaChat === 'function') window.closeWaChat();
     if (typeof window.closeDirectChat === 'function') window.closeDirectChat();
+    if (window.location.hash === '#/chat' || window.location.hash.startsWith('#/chat/') || window.location.hash.startsWith('#/direct-chat/')) {
+        history.pushState(null, '', window.location.pathname + window.location.search);
+    }
 };
 
 async function loadPage(query = 'eletronicos', forceRefresh = false) {
@@ -2566,6 +2569,9 @@ let chatAttachType = 'image';
 window.showChat = async function(orderId) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
+    if (window.location.hash !== '#/chat/' + orderId) {
+        history.pushState(null, '', '#/chat/' + orderId);
+    }
     let order = ordersCache.find(o => o.id === orderId);
     if (!order) {
         const result = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
@@ -2674,6 +2680,9 @@ window.closeWaChat = function() {
     document.getElementById('waEmptyState')?.classList.remove('d-none');
     document.getElementById('whatsappOrdersView')?.classList.remove('wa-chat-open');
     document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
+    if (window.location.hash.startsWith('#/chat/') || window.location.hash.startsWith('#/direct-chat/')) {
+        history.pushState(null, '', window.location.pathname + window.location.search);
+    }
 };
 
 const _orderChatPoller = window.ChatCore.createPoller(
@@ -2811,23 +2820,23 @@ function updateChatLogistics(order, user) {
                 buttonsHtml += `<div class="logistics-section"><p class="logistics-section-title">Como vai funcionar a entrega?</p><div class="logistics-options-row"><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','pickup')"><span class="icon-circle" style="background:#6f42c1;"><i class="bi bi-shop"></i></span><span class="option-label">Retirada no Local</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','seller_delivery')"><span class="icon-circle" style="background:#198754;"><i class="bi bi-truck"></i></span><span class="option-label">Entrega pelo Vendedor</span></button><button class="logistics-option-btn" onclick="window.setLogistics('${order.id}','external_app')"><span class="icon-circle" style="background:#fd7e14;"><i class="bi bi-phone"></i></span><span class="option-label">App de Entrega</span></button></div></div>`;
             }
         } else {
-            buttonsHtml += `<div class="alert alert-info rounded-pill text-center small mb-2"><i class="bi bi-hourglass-split me-1"></i>Proposta enviada! Aguardando o outro lado...</div>`;
+            buttonsHtml += `<p class="text-center small mb-2 text-muted"><i class="bi bi-hourglass-split me-1"></i>Proposta enviada! Aguardando o outro lado...</p>`;
         }
     } else if (['shipping', 'awaiting_pickup'].includes(order.status)) {
         if (isBuyer) {
             buttonsHtml += `<button class="ml-attach ml-attach-success w-100 mb-2" onclick="window.confirmReceipt('${order.id}')"><i class="bi bi-box-seam-fill me-1"></i>Confirmar Recebimento</button><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','produto_nao_recebido')"><i class="bi bi-headset me-1"></i>Não recebi o produto</button>`;
         } else {
-            buttonsHtml += `<div class="alert alert-primary rounded-pill text-center small mb-2">Aguardando o comprador confirmar recebimento</div><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
+            buttonsHtml += `<p class="text-center small mb-2 text-muted"><i class="bi bi-hourglass-split me-1"></i>Aguardando o comprador confirmar recebimento</p><button class="ml-attach ml-attach-danger w-100 mb-2" onclick="window.requestOrderSupport('${order.id}','entrega_sem_confirmacao')"><i class="bi bi-headset me-1"></i>Já entreguei, mas o comprador não confirmou</button>`;
         }
     } else if (order.status === 'finished') {
         const reviewedLocal = (uid) => { try { return !!localStorage.getItem(`reviewed_${order.id}_${uid}`); } catch (e) { return false; } };
         if (isBuyer) {
             buttonsHtml += (order.buyer_reviewed || reviewedLocal(user.id))
-                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Avaliação recebida pelo vendedor</div>`
+                ? `<p class="text-center small mb-2 text-muted"><i class="bi bi-patch-check-fill text-success me-1"></i>Avaliação recebida pelo vendedor</p>`
                 : `<button class="ml-attach ml-attach-warning w-100 mb-2" onclick="window.openReviewModal('${order.id}','buyer_rates_seller')"><i class="bi bi-star-fill me-1"></i>Avaliar Vendedor</button>`;
         } else {
             buttonsHtml += (order.seller_reviewed || reviewedLocal(user.id))
-                ? `<div class="alert alert-success rounded-pill text-center small mb-2"><i class="bi bi-patch-check-fill me-1"></i>Avaliação recebida pelo comprador</div>`
+                ? `<p class="text-center small mb-2 text-muted"><i class="bi bi-patch-check-fill text-success me-1"></i>Avaliação recebida pelo comprador</p>`
                 : `<button class="ml-attach ml-attach-warning w-100 mb-2" onclick="window.openReviewModal('${order.id}','seller_rates_buyer')"><i class="bi bi-star-fill me-1"></i>Avaliar Comprador</button>`;
         }
     }
@@ -3771,11 +3780,37 @@ function bootstrapApp() {
         if (sellerMatch) {
             const sid = sellerMatch[1];
             window.showSellerProfile(sid, '');
+            return;
+        }
+
+        const chatMatch = window.location.hash.match(/^#\/chat\/(.+)/);
+        if (chatMatch) {
+            const orderId = chatMatch[1];
+            const user = getSavedUser();
+            if (!user) { showToast('Faça login para acessar a conversa.', 'warning'); return; }
+            const hero = document.getElementById('heroSection');
+            if (hero) hero.classList.add('d-none');
+            const gridMain = document.getElementById('productGridMain');
+            if (gridMain) gridMain.classList.add('d-none');
+            const grid = document.getElementById('productsGrid');
+            if (grid) { grid.classList.remove('order-view-active'); grid.innerHTML = ''; grid.style.display = 'none'; }
+            const waView = document.getElementById('whatsappOrdersView');
+            if (waView) waView.classList.remove('d-none');
+            document.body.classList.add('wa-locked');
+            window.showChat(orderId);
+            return;
+        }
+
+        if (window.location.hash === '#/chat') {
+            const user = getSavedUser();
+            if (!user) { showToast('Faça login!', 'warning'); return; }
+            window.renderDirectChats({ skipBoot: true });
+            return;
         }
     }
     window.addEventListener('hashchange', navigateByHash);
     // Verifica hash na inicialização — ANTES de loadPage
-    window._hashNavigation = window.location.hash.startsWith('#/produto/') || window.location.hash.startsWith('#/vendedor/');
+    window._hashNavigation = window.location.hash.startsWith('#/produto/') || window.location.hash.startsWith('#/vendedor/') || window.location.hash === '#/chat' || window.location.hash.startsWith('#/chat/');
     if (window._hashNavigation) navigateByHash();
 
     // Init
@@ -5079,24 +5114,11 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
         const rating = ratingLine ? parseInt(ratingLine.match(/(\d+)\/5/)?.[1] || 0) : 0;
         const starsHtml = rating > 0 ? Array.from({length:5}, (_,i) => `<i class="bi ${i < rating ? 'bi-star-fill text-warning' : 'bi-star text-muted'} me-1"></i>`).join('') : '';
         const commentText = lines.filter(l => !l.startsWith('Nota:') && !l.startsWith('Avaliação') && !l.startsWith('—')).join('\n').trim();
-        const isMe = msg.senderId === userId;
-        return `
-        <div class="msg-row ${isMe ? 'is-me' : 'is-them'}" data-msg-index="${index}">
-            ${!isMe ? `<img class="msg-avatar" src="${partnerAvatar || ''}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
-            <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}" style="background:${isMe ? '#d9fdd3' : '#fff5f5'};border:1px solid #ffd1d1;">
-                <div class="d-flex align-items-center gap-1 mb-1">
-                    <i class="bi bi-patch-check-fill" style="color:#22c98e;font-size:1rem;"></i>
-                    <span class="fw-bold small" style="color:#22c98e;">Avaliação ${isMe ? 'enviada' : 'recebida'}</span>
-                </div>
-                <div class="mb-1">${starsHtml}</div>
-                ${commentText ? `<p class="mb-1 small" style="white-space:pre-wrap;">${window.formatLinks?.(commentText) ?? commentText}</p>` : ''}
-                ${msg.image ? `<img src="${msg.image}" class="img-fluid rounded mb-1" referrerpolicy="no-referrer" style="max-width:200px;cursor:pointer;" onclick="window.openImageFull('${msg.image}')" onerror="this.onerror=null;this.style.display='none'">` : ''}
-                ${msg.reviewImages && msg.reviewImages.length > 1 ? `<div class="small text-muted">+${msg.reviewImages.length - 1} foto${msg.reviewImages.length > 2 ? 's' : ''}</div>` : ''}
-                ${msg.reviewVideo ? `<a href="${msg.reviewVideo}" target="_blank" class="small text-decoration-none d-block"><i class="bi bi-play-circle-fill me-1" style="color:#ff0000;"></i>Ver vídeo</a>` : ''}
-                <div class="msg-time">${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</div>
-            </div>
-        ${isMe ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
-    </div>`;
+        const headerLine = lines.find(l => l.startsWith('Avaliação'));
+        const isComprador = headerLine && headerLine.includes('do comprador');
+        const whoLabel = isComprador ? 'Avaliação recebida pelo comprador' : 'Avaliação recebida pelo vendedor';
+        const reviewHtml = `<i class="bi bi-patch-check-fill" style="color:#22c98e;font-size:0.9rem;"></i> ${whoLabel}${starsHtml ? ' · ' + starsHtml : ''}${commentText ? '<br><span style="font-size:0.75rem;">' + (window.formatLinks?.(commentText) ?? commentText) + '</span>' : ''}`;
+        return `<div class="text-center my-3"><span class="system-chip">${reviewHtml}</span></div>`;
     }
 
     const isMe = msg.senderId === userId;
@@ -5735,6 +5757,10 @@ window.renderDirectChats = async function(opts = {}) {
     const skipBoot = !!opts?.skipBoot;
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
+
+    if (window.location.hash !== '#/chat') {
+        history.pushState(null, '', '#/chat');
+    }
 
     window.exitWaOrdersView();
 

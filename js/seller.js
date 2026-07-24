@@ -68,6 +68,8 @@ async function renderOrdersListSilently(type) {
             const _lastTime = _lastTimeMap[order.id] ? new Date(_lastTimeMap[order.id]).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
 
             const isFinished = order.status === 'cancelled' || order.status === 'finished';
+            const badgeClass = isFinished ? 'badge-muted' : 'badge-open';
+            const badgeIcon = isFinished ? 'bi-lock-fill' : 'bi-bag-fill';
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
@@ -84,7 +86,7 @@ async function renderOrdersListSilently(type) {
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
                     ${_lastTime ? `<small class="text-muted" style="font-size:0.65rem;line-height:1;">${_lastTime}</small>` : ''}
                     ${_unread ? `<span class="badge bg-success wa-contact-badge" style="position:static;">${_unread}</span>` : ''}
-                    <span class="badge ${st.class} wa-contact-badge" style="position:static;">${st.text}</span>
+                    <span class="admin-row-badge ${badgeClass}" style="font-size:0.55rem;padding:1px 5px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="bi ${badgeIcon} me-1"></i>${st.text}</span>
                     ${isFinished ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.6rem;line-height:1.4;" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash"></i> Remover</button>` : ''}
                     ${actionsHtml}
                 </div>
@@ -182,6 +184,8 @@ window.renderOrderManagement = async function(type = 'buyer') {
             const lastTime = lastTimeMap[order.id] ? new Date(lastTimeMap[order.id]).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
 
             const isFinished = order.status === 'cancelled' || order.status === 'finished';
+            const badgeClass = isFinished ? 'badge-muted' : 'badge-open';
+            const badgeIcon = isFinished ? 'bi-lock-fill' : 'bi-bag-fill';
 
             let actionsHtml = '';
             if (isPending && type === 'buyer') {
@@ -198,7 +202,7 @@ window.renderOrderManagement = async function(type = 'buyer') {
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
                     ${lastTime ? `<small class="text-muted" style="font-size:0.65rem;line-height:1;">${lastTime}</small>` : ''}
                     ${unread ? `<span class="badge bg-success wa-contact-badge" style="position:static;">${unread}</span>` : ''}
-                    <span class="badge ${st.class} wa-contact-badge" style="position:static;">${st.text}</span>
+                    <span class="admin-row-badge ${badgeClass}" style="font-size:0.55rem;padding:1px 5px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><i class="bi ${badgeIcon} me-1"></i>${st.text}</span>
                     ${isFinished ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.6rem;line-height:1.4;" onclick="event.stopPropagation(); window.removeOrderFromHistory('${order.id}', '${type}')"><i class="bi bi-trash"></i> Remover</button>` : ''}
                     ${actionsHtml}
                 </div>
@@ -276,11 +280,11 @@ window.renderSellerRequests = async function() {
                     <p class="small mb-1"><i class="bi bi-person-fill me-2 text-muted"></i><strong>${buyer.nome || order.buyer_name || 'Cliente'}</strong></p>
                     ${buyer.telefone ? `<p class="small mb-1"><i class="bi bi-telephone-fill me-2 text-muted"></i>${buyer.telefone}</p>` : ''}
                     ${buyer.endereco ? `<p class="small mb-2"><i class="bi bi-geo-alt-fill me-2 text-muted"></i>${buyer.endereco}${buyer.cep ? `, CEP ${buyer.cep}` : ''} — ${buyer.cidade || ''}/${buyer.estado || ''}</p>` : `<p class="small mb-2 text-muted"><i class="bi bi-geo-alt-fill me-2"></i>Endereço não informado</p>`}
-                    <div class="d-flex flex-column gap-2 mt-2">
-                        <button class="ml-attach ml-attach-success w-100" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
+                    <div class="d-flex flex-row gap-2 mt-2">
+                        <button class="ml-attach ml-attach-success flex-fill" onclick="window.updateOrderStatus('${order.id}', 'accepted')">
                             <i class="bi bi-check-lg me-1"></i>${isOffer ? 'Aceitar Oferta' : 'Aceitar'}
                         </button>
-                        <button class="ml-attach ml-attach-danger w-100" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
+                        <button class="ml-attach ml-attach-danger flex-fill" onclick="window.updateOrderStatus('${order.id}', 'cancelled')">
                             <i class="bi bi-x-lg me-1"></i>${isOffer ? 'Recusar Oferta' : 'Recusar'}
                         </button>
                     </div>
