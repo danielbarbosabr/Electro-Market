@@ -289,7 +289,8 @@ window.exitWaOrdersView = function() {
     document.body.classList.remove('wa-fullscreen');
     if (typeof window.closeWaChat === 'function') window.closeWaChat();
     if (typeof window.closeDirectChat === 'function') window.closeDirectChat();
-    if (window.location.hash === '#/chat' || window.location.hash.startsWith('#/chat/') || window.location.hash.startsWith('#/direct-chat/')) {
+    const _h = window.location.hash;
+    if (_h.startsWith('#/chat/mensagem') || _h.startsWith('#/chat/')) {
         history.pushState(null, '', window.location.pathname + window.location.search);
     }
 };
@@ -2680,8 +2681,14 @@ window.closeWaChat = function() {
     document.getElementById('waEmptyState')?.classList.remove('d-none');
     document.getElementById('whatsappOrdersView')?.classList.remove('wa-chat-open');
     document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
-    if (window.location.hash.startsWith('#/chat/') || window.location.hash.startsWith('#/direct-chat/')) {
-        history.pushState(null, '', window.location.pathname + window.location.search);
+    const _h = window.location.hash;
+    if (_h.startsWith('#/chat/mensagem_') || _h.startsWith('#/chat/mensagem') || _h.startsWith('#/chat/')) {
+        const waView = document.getElementById('whatsappOrdersView');
+        if (!waView || waView.classList.contains('d-none')) {
+            history.pushState(null, '', window.location.pathname + window.location.search);
+        } else {
+            history.pushState(null, '', '#/chat/mensagem');
+        }
     }
 };
 
@@ -3783,9 +3790,25 @@ function bootstrapApp() {
             return;
         }
 
-        const chatMatch = window.location.hash.match(/^#\/chat\/(.+)/);
-        if (chatMatch) {
-            const orderId = chatMatch[1];
+        const directChatMatch = window.location.hash.match(/^#\/chat\/mensagem_(.+)/);
+        if (directChatMatch) {
+            const chatId = directChatMatch[1];
+            const user = getSavedUser();
+            if (!user) { showToast('Faça login!', 'warning'); return; }
+            window.renderDirectChats({ skipBoot: false, openChatId: chatId });
+            return;
+        }
+
+        if (window.location.hash === '#/chat/mensagem') {
+            const user = getSavedUser();
+            if (!user) { showToast('Faça login!', 'warning'); return; }
+            window.renderDirectChats({ skipBoot: false });
+            return;
+        }
+
+        const orderChatMatch = window.location.hash.match(/^#\/chat\/(.+)/);
+        if (orderChatMatch) {
+            const orderId = orderChatMatch[1];
             const user = getSavedUser();
             if (!user) { showToast('Faça login para acessar a conversa.', 'warning'); return; }
             const hero = document.getElementById('heroSection');
@@ -3800,19 +3823,10 @@ function bootstrapApp() {
             window.showChat(orderId);
             return;
         }
-
-        if (window.location.hash === '#/chat') {
-            const user = getSavedUser();
-            if (!user) { showToast('Faça login!', 'warning'); return; }
-            window.renderDirectChats({ skipBoot: true });
-            return;
-        }
     }
     window.addEventListener('hashchange', navigateByHash);
     // Verifica hash na inicialização — ANTES de loadPage
-    window._hashNavigation = window.location.hash.startsWith('#/produto/') || window.location.hash.startsWith('#/vendedor/') || window.location.hash === '#/chat' || window.location.hash.startsWith('#/chat/');
-    if (window._hashNavigation) navigateByHash();
-
+    window._hashNavigation = window.location.hash.startsWith('#/produto/') || window.location.hash.startsWith('#/vendedor/') || window.location.hash.startsWith('#/chat/mensagem') || window.location.hash.startsWith('#/chat/');
     // Init
     updateUI();
     window.renderCart();
@@ -3820,6 +3834,13 @@ function bootstrapApp() {
     window.updateChatBadge();
     if (window._chatBadgeInterval) clearInterval(window._chatBadgeInterval);
     window._chatBadgeInterval = setInterval(() => window.updateChatBadge(), 10000);
+
+    if (window._hashNavigation) {
+        navigateByHash();
+        if (window.location.hash.startsWith('#/chat/mensagem') || window.location.hash.startsWith('#/chat/')) {
+            window._hashNavigation = false; return;
+        }
+    }
 
     const user = getEffectiveUser();
     if (user?.tipo === 'VENDEDOR') {
@@ -5758,11 +5779,11 @@ window.renderDirectChats = async function(opts = {}) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
 
-    if (window.location.hash !== '#/chat') {
-        history.pushState(null, '', '#/chat');
-    }
-
     window.exitWaOrdersView();
+
+    if (window.location.hash !== '#/chat/mensagem') {
+        history.pushState(null, '', '#/chat/mensagem');
+    }
 
     const hero = document.getElementById('heroSection');
     if (hero) hero.classList.add('d-none');
@@ -6001,10 +6022,16 @@ window.renderDirectChats = async function(opts = {}) {
 
         window.closeMobileMenu();
         await hideBootScreen();
+        if (opts.openChatId) {
+            setTimeout(() => window.openDirectChat(opts.openChatId), 300);
+        }
     } catch (e) {
         console.error('Erro ao carregar conversas:', e);
         waList.innerHTML = '<div class="text-center py-5" style="color:#999;"><h6>Erro ao carregar conversas.</h6></div>';
         await hideBootScreen();
+        if (opts.openChatId) {
+            setTimeout(() => window.openDirectChat(opts.openChatId), 600);
+        }
     }
 };
 
@@ -7627,6 +7654,9 @@ window.toggleDirectChatParticipants = async function(chatId) {
 window.openDirectChat = async function(chatId) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
+    if (window.location.hash !== '#/chat/mensagem_' + chatId) {
+        history.pushState(null, '', '#/chat/mensagem_' + chatId);
+    }
     if (window.currentChat !== chatId) window.lastChatSignature = null;
     window.currentChat = chatId;
 
