@@ -38,8 +38,6 @@ async function renderOrdersListSilently(type) {
         const previousSignature = JSON.stringify(ordersCache.map(o => `${o.id}:${o.status}:${o.agree_buyer}:${o.agree_seller}`));
         ordersCache = orders;
 
-        const _hiddenIds = getHiddenOrderIds();
-        orders = orders.filter(o => !_hiddenIds.includes(o.id));
         orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
         orders = orders.slice().sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
 
@@ -149,8 +147,6 @@ window.renderOrderManagement = async function(type = 'buyer') {
         window.updateWaEmptyState?.(type === 'buyer' ? 'buyer' : 'seller');
 
         // Aqui só entram pedidos já aceitos (a tela de chat não faz sentido pra pendentes/ofertas)
-        const _hiddenIds = getHiddenOrderIds();
-        orders = orders.filter(o => !_hiddenIds.includes(o.id));
         orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
 
         // Mais recentes primeiro, como numa lista de conversas de verdade
@@ -336,56 +332,57 @@ window.updateOrderStatus = async function(orderId, newStatus) {
     } catch { showToast('Erro ao atualizar pedido.', 'error'); }
 };
 
-/**
- * IDs de pedido que o usuário já pediu pra remover do histórico, guardados
- * localmente (por usuário). Serve de rede de segurança: o Supabase, quando o
- * RLS barra um DELETE, não devolve erro nenhum — ele responde "sucesso" (204)
- * mesmo sem apagar nada. Por isso o app não tem como saber, só pela resposta,
- * se a exclusão realmente aconteceu no banco. Guardando o ID aqui e filtrando
- * na hora de montar a lista, o "Remover" funciona sempre pra quem clicou,
- * mesmo que o banco não deixe apagar a linha de verdade.
- */
-function getHiddenOrderIds() {
-    const user = getSavedUser();
-    if (!user) return [];
-    try { return JSON.parse(localStorage.getItem(`hiddenOrders_${user.id}`) || '[]'); }
-    catch { return []; }
-}
-function hideOrderLocally(orderId) {
-    const user = getSavedUser();
-    if (!user) return;
-    const ids = getHiddenOrderIds();
-    if (!ids.includes(orderId)) ids.push(orderId);
-    try { localStorage.setItem(`hiddenOrders_${user.id}`, JSON.stringify(ids)); } catch {}
-}
-window.getHiddenOrderIds = getHiddenOrderIds;
-
 window.removeOrderFromHistory = async function(orderId, type) {
     if (!confirm('Deseja remover este registro do seu histórico?')) return;
 
     // O comprador não tem permissão pra apagar o registro em `orders` (só o
     // vendedor tem), então só o vendedor tenta apagar o pedido também — o
-    // comprador só tenta apagar a conversa.
+    // comprador só tenta apagar a conversa. Nenhum fallback local aqui: o que
+    // acontece na tela reflete só o resultado real do DELETE no banco.
     const isBuyer = type === 'buyer';
 
+    // Pega a mensagem de erro de verdade que o Supabase/PostgREST devolveu
+    // (message/details/hint), em vez de um texto genérico — assim dá pra ler
+    // a causa direto na tela, sem precisar abrir o console do navegador.
+    const describeErr = (err) => err?.message || err?.error_description || err?.hint || err?.details || err?.error || JSON.stringify(err) || 'erro desconhecido';
+
+    let ok = false;
+    let errMsg = '';
     try {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
+        ok = true;
     } catch (err) {
+        errMsg = describeErr(err);
         console.error('Erro ao remover conversa:', err);
     }
 
     if (!isBuyer) {
+        // Em vez de apagar as avaliações/opiniões ligadas a esse pedido,
+        // só tira o vínculo com o pedido (order_id = null). Isso resolve o
+        // erro 409 (chave estrangeira) do DELETE do pedido sem perder a
+        // opinião do produto nem a nota do vendedor/comprador — elas
+        // continuam existindo, só que "soltas", sem depender mais do pedido.
+        try {
+            await supabaseFetch(`avaliacoes?order_id=eq.${orderId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ order_id: null })
+            });
+        } catch (err) {
+            console.error('Erro ao desvincular avaliações do pedido:', err);
+            // Se não der pra desvincular por algum motivo, tenta apagar mesmo
+            // assim, pra pelo menos o pedido conseguir ser removido.
+            try { await supabaseFetch(`avaliacoes?order_id=eq.${orderId}`, { method: 'DELETE' }); } catch (e2) {}
+        }
         try {
             await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
         } catch (err) {
+            ok = false;
+            errMsg = describeErr(err);
             console.error('Erro ao remover pedido:', err);
         }
     }
 
-    // Independente do resultado no banco, some da lista pra quem clicou.
-    hideOrderLocally(orderId);
-
-    showToast('Conversa removida do histórico!', 'info');
+    showToast(ok ? 'Conversa removida do histórico!' : `Erro ao remover: ${errMsg}`, ok ? 'info' : 'error');
     window.renderOrderManagement(type);
 };
 
