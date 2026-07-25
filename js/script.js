@@ -5361,16 +5361,20 @@ window.loadProductReviews = async function(productId) {
             try {
                 const rows = await supabaseFetch(`avaliacoes?order_id=in.(${orderIds.join(',')})&select=*`);
                 if (rows && rows.length > 0) {
-                    avaliacoes = rows.map(r => ({
-                        rating:          r.rating || 0,
-                        comment:         r.comment || '',
-                        images:          (typeof r.images === 'string' ? JSON.parse(r.images) : r.images) || [],
-                        videos:          (typeof r.videos === 'string' ? JSON.parse(r.videos) : r.videos) || [],
-                        avaliador_nome:  r.avaliador_nome || 'Anônimo',
-                        avaliador_avatar: r.avaliador_avatar || '',
-                        avaliador_id:    r.avaliador_id || '',
-                        created_at:      r.created_at
-                    }));
+                    avaliacoes = rows.map(r => {
+                        const isBuyerReviewer = r.avaliado_id !== r.buyer_id;
+                        const reviewerName = isBuyerReviewer ? (r.buyer_name || 'Anônimo') : 'Vendedor';
+                        return {
+                            rating:          r.rating || 0,
+                            comment:         r.comentario || '',
+                            images:          [],
+                            videos:          [],
+                            avaliador_nome:  reviewerName,
+                            avaliador_avatar: '',
+                            avaliador_id:    isBuyerReviewer ? r.buyer_id : r.seller_id || '',
+                            created_at:      r.created_at
+                        };
+                    });
                 }
             } catch (e) {
                 // Tabela não disponível — fallback para chat
@@ -5463,21 +5467,43 @@ window.loadProductReviews = async function(productId) {
 
 window.showUserReviews = async function(userId, userName) {
     try {
-        const chats = await supabaseFetch(`chats?participants=cs.{${userId}}&select=messages,created_at&limit=100`);
         const avaliacoes = [];
-        (chats || []).forEach(chat => {
-            (chat.messages || []).forEach(m => {
-                if (m.type === 'review' && m.avaliadoId === userId) {
+
+        // 1) Tenta da tabela avaliacoes (persistente)
+        try {
+            const rows = await supabaseFetch(`avaliacoes?avaliado_id=eq.${userId}&select=*`);
+            if (rows && rows.length > 0) {
+                rows.forEach(r => {
+                    const isBuyerReviewer = r.avaliado_id !== r.buyer_id;
+                    const reviewerName = isBuyerReviewer ? (r.buyer_name || 'Anônimo') : 'Vendedor';
                     avaliacoes.push({
-                        rating:         m.rating || 0,
-                        comment:        m.reviewComment || '',
-                        images:         m.reviewImages || [],
-                        avaliador_nome: m.senderName || 'Anônimo',
-                        created_at:     m.timestamp || chat.created_at
+                        rating:         r.rating || 0,
+                        comment:        r.comentario || '',
+                        images:         [],
+                        avaliador_nome: reviewerName,
+                        created_at:     r.created_at
                     });
-                }
+                });
+            }
+        } catch (e) {}
+
+        // 2) Fallback: ler dos chats.messages (avaliações antigas)
+        if (avaliacoes.length === 0) {
+            const chats = await supabaseFetch(`chats?participants=cs.{${userId}}&select=messages,created_at&limit=100`);
+            (chats || []).forEach(chat => {
+                (chat.messages || []).forEach(m => {
+                    if (m.type === 'review' && m.avaliadoId === userId) {
+                        avaliacoes.push({
+                            rating:         m.rating || 0,
+                            comment:        m.reviewComment || '',
+                            images:         m.reviewImages || [],
+                            avaliador_nome: m.senderName || 'Anônimo',
+                            created_at:     m.timestamp || chat.created_at
+                        });
+                    }
+                });
             });
-        });
+        }
         avaliacoes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         const total = avaliacoes.length;
         const avg = total > 0 ? (avaliacoes.reduce((s, a) => s + (a.rating || 0), 0) / total).toFixed(1) : '—';

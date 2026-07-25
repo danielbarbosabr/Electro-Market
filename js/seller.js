@@ -653,9 +653,10 @@ window.submitReview = async function() {
 
         // Envia a avaliação como mensagem no chat
         const reviewerAvatar = (() => { try { const links = safeParseImages(user.avatar); return links[0] || ''; } catch { return ''; } })();
+        let chat;
         try {
             const chatData = await supabaseFetch(`chats?order_id=eq.${orderId}&limit=1`);
-            const chat = chatData?.[0];
+            chat = chatData?.[0];
             if (chat) {
                 const targetName = isSellerRatingBuyer ? (chat.buyer_name || 'Comprador') : (chat.seller_name || 'Vendedor');
                 const stars = '★'.repeat(currentReviewRating) + '☆'.repeat(5 - currentReviewRating);
@@ -692,17 +693,20 @@ window.submitReview = async function() {
 
         // Salva na tabela avaliacoes (persistente, sobrevive à exclusão do chat)
         try {
+            const sellerId = isSellerRatingBuyer ? user.id : targetId;
+            const buyerId  = isSellerRatingBuyer ? targetId : user.id;
+            const buyerName = chat?.buyer_name || (isSellerRatingBuyer ? user.nome : 'Comprador') || 'Anônimo';
             await supabaseFetch('avaliacoes', {
                 method: 'POST',
                 body: JSON.stringify({
-                    order_id:       orderId,
-                    tipo:           mode,
-                    avaliador_nome: user.nome || 'Usuário',
-                    avaliado_id:    targetId,
-                    rating:         currentReviewRating,
-                    comment:        comment || '',
-                    images:         reviewImages.length > 0 ? JSON.stringify(reviewImages) : '[]',
-                    videos:         '[]'
+                    id:          'aval_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+                    order_id:    orderId,
+                    seller_id:   sellerId,
+                    buyer_id:    buyerId,
+                    buyer_name:  buyerName,
+                    rating:      currentReviewRating,
+                    comentario:  comment || '',
+                    avaliado_id: targetId
                 })
             });
         } catch (e) {
