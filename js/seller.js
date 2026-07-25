@@ -691,24 +691,59 @@ window.submitReview = async function() {
             console.error('Erro ao enviar avaliação pro chat:', e);
         }
 
-        // Salva na tabela avaliacoes (persistente, sobrevive à exclusão do chat)
+        // Salva na tabela avaliacoes (persistente, sobrevive à exclusão do chat E do pedido),
+        // usando só as colunas que já existem hoje (sem alterar o banco):
+        //   - avaliação sobre a PESSOA (vendedor/comprador): avaliado_id = id do usuário avaliado.
+        //   - opinião sobre o PRODUTO: avaliado_id = 'PROD_<id do produto>' (uma "chave" que
+        //     nunca é igual ao id de um usuário de verdade, então nunca se mistura com as
+        //     avaliações de vendedor/comprador nem aparece nelas).
+        // As imagens continuam guardadas dentro de `comentario`, junto com um marcador
+        // '\n---IMAGENS---\n', igual já era feito — e são extraídas de volta na exibição.
         try {
             const sellerId = isSellerRatingBuyer ? user.id : targetId;
             const buyerId  = isSellerRatingBuyer ? targetId : user.id;
             const buyerName = chat?.buyer_name || (isSellerRatingBuyer ? user.nome : 'Comprador') || 'Anônimo';
-            await supabaseFetch('avaliacoes', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id:          'aval_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
-                    order_id:    orderId,
-                    seller_id:   sellerId,
-                    buyer_id:    buyerId,
-                    buyer_name:  buyerName,
-                    rating:      currentReviewRating,
-                    comentario:  comment + (reviewImages.length > 0 ? '\n---IMAGENS---\n' + reviewImages.join('\n') : ''),
-                    avaliado_id: targetId
-                })
-            });
+            const genId = () => 'aval_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+            const comentarioComImagens = comment + (reviewImages.length > 0 ? '\n---IMAGENS---\n' + reviewImages.join('\n') : '');
+            const baseFields = {
+                order_id:   orderId,
+                seller_id:  sellerId,
+                buyer_id:   buyerId,
+                buyer_name: buyerName,
+                rating:     currentReviewRating,
+                comentario: comentarioComImagens
+            };
+
+            if (isSellerRatingBuyer) {
+                // Vendedor avaliando o comprador: só a avaliação sobre a pessoa.
+                await supabaseFetch('avaliacoes', {
+                    method: 'POST',
+                    body: JSON.stringify({ ...baseFields, id: genId(), avaliado_id: targetId })
+                });
+            } else {
+                // Comprador avaliando após a compra: registra a opinião sobre o
+                // PRODUTO e, separadamente, a avaliação sobre o VENDEDOR — dois
+                // registros totalmente independentes.
+                let productId = null;
+                try {
+                    const orderData = await supabaseFetch(`orders?id=eq.${orderId}&select=product_id&limit=1`);
+                    productId = orderData?.[0]?.product_id || null;
+                } catch (e) {}
+
+                const inserts = [
+                    supabaseFetch('avaliacoes', {
+                        method: 'POST',
+                        body: JSON.stringify({ ...baseFields, id: genId(), avaliado_id: targetId })
+                    })
+                ];
+                if (productId) {
+                    inserts.push(supabaseFetch('avaliacoes', {
+                        method: 'POST',
+                        body: JSON.stringify({ ...baseFields, id: genId(), avaliado_id: 'PROD_' + productId })
+                    }));
+                }
+                await Promise.all(inserts);
+            }
         } catch (e) {
             console.warn('Erro ao salvar avaliação na tabela:', e);
         }

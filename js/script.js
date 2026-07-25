@@ -5352,77 +5352,44 @@ window.loadProductReviews = async function(productId) {
     try {
         let avaliacoes = [];
 
-        // 1) Pega os pedidos deste produto
-        const orders = await supabaseFetch(`orders?product_id=eq.${productId}&select=id`);
-        const orderIds = orders && orders.length > 0 ? orders.map(o => o.id) : [];
-
-        // 2) Tenta ler da tabela avaliacoes primeiro (persistente)
-        if (orderIds.length > 0) {
-            try {
-                const rows = await supabaseFetch(`avaliacoes?order_id=in.(${orderIds.join(',')})&select=*`);
-                if (rows && rows.length > 0) {
-                    avaliacoes = rows.map(r => {
-                        const isBuyerReviewer = r.avaliado_id !== r.buyer_id;
-                        const reviewerName = isBuyerReviewer ? (r.buyer_name || 'Anônimo') : 'Vendedor';
-                        const raw = r.comentario || '';
-                        const imgSep = '\n---IMAGENS---\n';
-                        const imgIdx = raw.indexOf(imgSep);
-                        const comment = imgIdx === -1 ? raw : raw.slice(0, imgIdx);
-                        const images = imgIdx === -1 ? [] : raw.slice(imgIdx + imgSep.length).split('\n').filter(Boolean);
-                        return {
-                            rating:          r.rating || 0,
-                            comment:         comment,
-                            images:          images,
-                            videos:          [],
-                            avaliador_nome:  reviewerName,
-                            avaliador_id:    isBuyerReviewer ? r.buyer_id : r.seller_id || '',
-                            created_at:      r.created_at || new Date().toISOString()
-                        };
-                    });
-                    // Busca os avatares dos avaliadores na tabela users
-                    const reviewerIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
-                    if (reviewerIds.length > 0) {
-                        try {
-                            const users = await supabaseFetch(`users?select=id,avatar&id=in.(${reviewerIds.join(',')})`);
-                            const avatarMap = {};
-                            (users || []).forEach(u => { avatarMap[u.id] = safeParseImages(u.avatar)[0] || ''; });
-                            avaliacoes.forEach(a => { a.avaliador_avatar = avatarMap[a.avaliador_id] || ''; });
-                        } catch (e) {}
-                    }
-                }
-            } catch (e) {
-                // Tabela não disponível — fallback para chat
-            }
-        }
-
-        // 3) Fallback: ler dos chats.messages (pra avaliações antigas que não foram pra tabela)
-        if (avaliacoes.length === 0 && orderIds.length > 0) {
-            try {
-                const chats = await supabaseFetch(`chats?order_id=in.(${orderIds.join(',')})&select=messages`);
-                (chats || []).forEach(chat => {
-                    (chat.messages || []).forEach(m => {
-                        if (m.type === 'review') {
-                            avaliacoes.push({
-                                rating:         m.rating || 0,
-                                comment:        m.reviewComment || m.text?.split('\n\n')[1]?.trim() || '',
-                                images:         m.reviewImages || (m.image ? [m.image] : []),
-                                avaliador_nome: m.senderName || 'Anônimo',
-                                avaliador_id:   m.senderId || '',
-                                created_at:     m.timestamp || chat.created_at || new Date().toISOString()
-                            });
-                        }
-                    });
+        // Opiniões do produto são gravadas com avaliado_id = 'PROD_<id do produto>'
+        // (em vez do id de uma pessoa). Isso usa só as colunas que já existem na
+        // tabela avaliacoes — sem precisar de nenhuma coluna nova — e busca direto
+        // pelo produto, sem passar por pedidos/conversas. Por isso sobrevive à
+        // exclusão do pedido/chat, e nunca se mistura com avaliações de vendedor
+        // ou comprador (que usam avaliado_id = id da pessoa avaliada).
+        try {
+            const rows = await supabaseFetch(`avaliacoes?avaliado_id=eq.PROD_${productId}&select=*`);
+            if (rows && rows.length > 0) {
+                avaliacoes = rows.map(r => {
+                    const raw = r.comentario || '';
+                    const imgSep = '\n---IMAGENS---\n';
+                    const imgIdx = raw.indexOf(imgSep);
+                    const comment = imgIdx === -1 ? raw : raw.slice(0, imgIdx);
+                    const images = imgIdx === -1 ? [] : raw.slice(imgIdx + imgSep.length).split('\n').filter(Boolean);
+                    return {
+                        rating:          r.rating || 0,
+                        comment:         comment,
+                        images:          images,
+                        videos:          [],
+                        avaliador_nome:  r.buyer_name || 'Anônimo',
+                        avaliador_id:    r.buyer_id || '',
+                        created_at:      r.created_at || new Date().toISOString()
+                    };
                 });
-                const revIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
-                if (revIds.length > 0) {
+                // Busca os avatares dos avaliadores na tabela users
+                const reviewerIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
+                if (reviewerIds.length > 0) {
                     try {
-                        const users = await supabaseFetch(`users?select=id,avatar&id=in.(${revIds.join(',')})`);
+                        const users = await supabaseFetch(`users?select=id,avatar&id=in.(${reviewerIds.join(',')})`);
                         const avatarMap = {};
                         (users || []).forEach(u => { avatarMap[u.id] = safeParseImages(u.avatar)[0] || ''; });
                         avaliacoes.forEach(a => { a.avaliador_avatar = avatarMap[a.avaliador_id] || ''; });
                     } catch (e) {}
                 }
-            } catch (e) {}
+            }
+        } catch (e) {
+            console.error('Erro ao carregar avaliações:', e);
         }
 
         if (avaliacoes.length === 0) {
@@ -5496,6 +5463,9 @@ window.showUserReviews = async function(userId, userName) {
         try {
             const rows = await supabaseFetch(`avaliacoes?avaliado_id=eq.${userId}&select=*`);
             if (rows && rows.length > 0) {
+                // avaliado_id aqui é sempre o id de uma pessoa (nunca 'PROD_<id>',
+                // que é o valor usado pras opiniões de produto), então já vem
+                // naturalmente separado das opiniões do produto.
                 rows.forEach(r => {
                     const isBuyerReviewer = r.avaliado_id !== r.buyer_id;
                     const reviewerName = isBuyerReviewer ? (r.buyer_name || 'Anônimo') : 'Vendedor';
