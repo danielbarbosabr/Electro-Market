@@ -705,7 +705,7 @@ window.submitReview = async function() {
                     buyer_id:    buyerId,
                     buyer_name:  buyerName,
                     rating:      currentReviewRating,
-                    comentario:  comment || '',
+                    comentario:  comment + (reviewImages.length > 0 ? '\n---IMAGENS---\n' + reviewImages.join('\n') : ''),
                     avaliado_id: targetId
                 })
             });

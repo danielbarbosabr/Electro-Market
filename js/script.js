@@ -5364,17 +5364,31 @@ window.loadProductReviews = async function(productId) {
                     avaliacoes = rows.map(r => {
                         const isBuyerReviewer = r.avaliado_id !== r.buyer_id;
                         const reviewerName = isBuyerReviewer ? (r.buyer_name || 'Anônimo') : 'Vendedor';
+                        const raw = r.comentario || '';
+                        const imgSep = '\n---IMAGENS---\n';
+                        const imgIdx = raw.indexOf(imgSep);
+                        const comment = imgIdx === -1 ? raw : raw.slice(0, imgIdx);
+                        const images = imgIdx === -1 ? [] : raw.slice(imgIdx + imgSep.length).split('\n').filter(Boolean);
                         return {
                             rating:          r.rating || 0,
-                            comment:         r.comentario || '',
-                            images:          [],
+                            comment:         comment,
+                            images:          images,
                             videos:          [],
                             avaliador_nome:  reviewerName,
-                            avaliador_avatar: '',
                             avaliador_id:    isBuyerReviewer ? r.buyer_id : r.seller_id || '',
-                            created_at:      r.created_at
+                            created_at:      r.created_at || new Date().toISOString()
                         };
                     });
+                    // Busca os avatares dos avaliadores na tabela users
+                    const reviewerIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
+                    if (reviewerIds.length > 0) {
+                        try {
+                            const users = await supabaseFetch(`users?select=id,avatar&id=in.(${reviewerIds.join(',')})`);
+                            const avatarMap = {};
+                            (users || []).forEach(u => { avatarMap[u.id] = safeParseImages(u.avatar)[0] || ''; });
+                            avaliacoes.forEach(a => { a.avaliador_avatar = avatarMap[a.avaliador_id] || ''; });
+                        } catch (e) {}
+                    }
                 }
             } catch (e) {
                 // Tabela não disponível — fallback para chat
@@ -5393,12 +5407,21 @@ window.loadProductReviews = async function(productId) {
                                 comment:        m.reviewComment || m.text?.split('\n\n')[1]?.trim() || '',
                                 images:         m.reviewImages || (m.image ? [m.image] : []),
                                 avaliador_nome: m.senderName || 'Anônimo',
-                                avaliador_avatar: m.avaliadorAvatar || '',
-                                created_at:     m.timestamp || chat.created_at
+                                avaliador_id:   m.senderId || '',
+                                created_at:     m.timestamp || chat.created_at || new Date().toISOString()
                             });
                         }
                     });
                 });
+                const revIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
+                if (revIds.length > 0) {
+                    try {
+                        const users = await supabaseFetch(`users?select=id,avatar&id=in.(${revIds.join(',')})`);
+                        const avatarMap = {};
+                        (users || []).forEach(u => { avatarMap[u.id] = safeParseImages(u.avatar)[0] || ''; });
+                        avaliacoes.forEach(a => { a.avaliador_avatar = avatarMap[a.avaliador_id] || ''; });
+                    } catch (e) {}
+                }
             } catch (e) {}
         }
 
@@ -5476,14 +5499,30 @@ window.showUserReviews = async function(userId, userName) {
                 rows.forEach(r => {
                     const isBuyerReviewer = r.avaliado_id !== r.buyer_id;
                     const reviewerName = isBuyerReviewer ? (r.buyer_name || 'Anônimo') : 'Vendedor';
+                    const raw = r.comentario || '';
+                    const imgSep = '\n---IMAGENS---\n';
+                    const imgIdx = raw.indexOf(imgSep);
+                    const comment = imgIdx === -1 ? raw : raw.slice(0, imgIdx);
+                    const images = imgIdx === -1 ? [] : raw.slice(imgIdx + imgSep.length).split('\n').filter(Boolean);
                     avaliacoes.push({
                         rating:         r.rating || 0,
-                        comment:        r.comentario || '',
-                        images:         [],
+                        comment:        comment,
+                        images:         images,
                         avaliador_nome: reviewerName,
+                        avaliador_id:   isBuyerReviewer ? r.buyer_id : r.seller_id || '',
                         created_at:     r.created_at
                     });
                 });
+                // Busca avatares dos avaliadores
+                const revIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
+                if (revIds.length > 0) {
+                    try {
+                        const users = await supabaseFetch(`users?select=id,avatar&id=in.(${revIds.join(',')})`);
+                        const avatarMap = {};
+                        (users || []).forEach(u => { avatarMap[u.id] = u.avatar; });
+                        avaliacoes.forEach(a => { a.avaliador_avatar = avatarMap[a.avaliador_id] || ''; });
+                    } catch (e) {}
+                }
             }
         } catch (e) {}
 
@@ -5498,11 +5537,21 @@ window.showUserReviews = async function(userId, userName) {
                             comment:        m.reviewComment || '',
                             images:         m.reviewImages || [],
                             avaliador_nome: m.senderName || 'Anônimo',
-                            created_at:     m.timestamp || chat.created_at
+                            avaliador_id:   m.senderId || '',
+                            created_at:     m.timestamp || chat.created_at || new Date().toISOString()
                         });
                     }
                 });
             });
+            const revIds = [...new Set(avaliacoes.map(a => a.avaliador_id).filter(Boolean))];
+            if (revIds.length > 0) {
+                try {
+                    const users = await supabaseFetch(`users?select=id,avatar&id=in.(${revIds.join(',')})`);
+                    const avatarMap = {};
+                    (users || []).forEach(u => { avatarMap[u.id] = safeParseImages(u.avatar)[0] || ''; });
+                    avaliacoes.forEach(a => { a.avaliador_avatar = avatarMap[a.avaliador_id] || ''; });
+                } catch (e) {}
+            }
         }
         avaliacoes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         const total = avaliacoes.length;
