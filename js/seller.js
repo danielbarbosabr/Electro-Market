@@ -38,6 +38,8 @@ async function renderOrdersListSilently(type) {
         const previousSignature = JSON.stringify(ordersCache.map(o => `${o.id}:${o.status}:${o.agree_buyer}:${o.agree_seller}`));
         ordersCache = orders;
 
+        const _hiddenIds = getHiddenOrderIds();
+        orders = orders.filter(o => !_hiddenIds.includes(o.id));
         orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
         orders = orders.slice().sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
 
@@ -147,6 +149,8 @@ window.renderOrderManagement = async function(type = 'buyer') {
         window.updateWaEmptyState?.(type === 'buyer' ? 'buyer' : 'seller');
 
         // Aqui só entram pedidos já aceitos (a tela de chat não faz sentido pra pendentes/ofertas)
+        const _hiddenIds = getHiddenOrderIds();
+        orders = orders.filter(o => !_hiddenIds.includes(o.id));
         orders = orders.filter(o => (o.status !== 'pending' && o.status !== 'offer_pending') || type === 'buyer');
 
         // Mais recentes primeiro, como numa lista de conversas de verdade
@@ -332,17 +336,57 @@ window.updateOrderStatus = async function(orderId, newStatus) {
     } catch { showToast('Erro ao atualizar pedido.', 'error'); }
 };
 
+/**
+ * IDs de pedido que o usuário já pediu pra remover do histórico, guardados
+ * localmente (por usuário). Serve de rede de segurança: o Supabase, quando o
+ * RLS barra um DELETE, não devolve erro nenhum — ele responde "sucesso" (204)
+ * mesmo sem apagar nada. Por isso o app não tem como saber, só pela resposta,
+ * se a exclusão realmente aconteceu no banco. Guardando o ID aqui e filtrando
+ * na hora de montar a lista, o "Remover" funciona sempre pra quem clicou,
+ * mesmo que o banco não deixe apagar a linha de verdade.
+ */
+function getHiddenOrderIds() {
+    const user = getSavedUser();
+    if (!user) return [];
+    try { return JSON.parse(localStorage.getItem(`hiddenOrders_${user.id}`) || '[]'); }
+    catch { return []; }
+}
+function hideOrderLocally(orderId) {
+    const user = getSavedUser();
+    if (!user) return;
+    const ids = getHiddenOrderIds();
+    if (!ids.includes(orderId)) ids.push(orderId);
+    try { localStorage.setItem(`hiddenOrders_${user.id}`, JSON.stringify(ids)); } catch {}
+}
+window.getHiddenOrderIds = getHiddenOrderIds;
+
 window.removeOrderFromHistory = async function(orderId, type) {
     if (!confirm('Deseja remover este registro do seu histórico?')) return;
+
+    // O comprador não tem permissão pra apagar o registro em `orders` (só o
+    // vendedor tem), então só o vendedor tenta apagar o pedido também — o
+    // comprador só tenta apagar a conversa.
+    const isBuyer = type === 'buyer';
+
     try {
         await supabaseFetch(`chats?order_id=eq.${orderId}`, { method: 'DELETE' });
-        await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
-        showToast('Pedido removido do histórico!', 'info');
-        window.renderOrderManagement(type);
-    } catch (err) { 
-        console.error("Erro ao remover:", err);
-        showToast('Erro ao remover registro. Verifique a conexão.', 'error'); 
+    } catch (err) {
+        console.error('Erro ao remover conversa:', err);
     }
+
+    if (!isBuyer) {
+        try {
+            await supabaseFetch(`orders?id=eq.${orderId}`, { method: 'DELETE' });
+        } catch (err) {
+            console.error('Erro ao remover pedido:', err);
+        }
+    }
+
+    // Independente do resultado no banco, some da lista pra quem clicou.
+    hideOrderLocally(orderId);
+
+    showToast('Conversa removida do histórico!', 'info');
+    window.renderOrderManagement(type);
 };
 
 window.deleteProduct = async function(pid) {
@@ -612,7 +656,20 @@ window.submitReview = async function() {
     const img1 = document.getElementById('reviewImage1')?.value.trim() || '';
     const img2 = document.getElementById('reviewImage2')?.value.trim() || '';
     const img3 = document.getElementById('reviewImage3')?.value.trim() || '';
-    const reviewImages = [img1, img2, img3].filter(Boolean);
+
+    // CORREÇÃO: enquanto a foto ainda está subindo, o campo mostra "Enviando..."
+    // no lugar do link. Se a pessoa clicasse em "Enviar Avaliação" nesse meio
+    // tempo, esse texto ("Enviando...") era salvo como se fosse a URL da
+    // imagem — a foto ficava "anexada" no banco, mas quebrada (e por isso
+    // escondida pelo onerror na hora de exibir, parecendo que não tem foto).
+    if ([img1, img2, img3].some(v => v === 'Enviando...')) {
+        showToast('Aguarde a foto terminar de enviar antes de avaliar.', 'warning');
+        return;
+    }
+    // Só aceita valores que realmente parecem um link de imagem (protege contra
+    // qualquer outro texto que não seja uma URL válida acabar salvo como foto).
+    const isImgUrl = (v) => /^https?:\/\//i.test(v);
+    const reviewImages = [img1, img2, img3].filter(isImgUrl);
     const reviewVideo = '';
 
     try {
@@ -859,6 +916,12 @@ window.handleReviewImageUpload = async function(input) {
     if (!files.length) return;
     let slot = 1;
     while (slot <= 3 && document.getElementById(`reviewImage${slot}`).value.trim()) slot++;
+
+    // Trava o botão "Enviar Avaliação" enquanto a(s) foto(s) sobem, pra evitar
+    // que a avaliação seja enviada com o texto "Enviando..." no lugar do link.
+    const submitBtn = document.querySelector('#reviewModal button[onclick="window.submitReview()"]');
+    if (submitBtn) submitBtn.disabled = true;
+
     for (const file of files) {
         if (slot > 3) break;
         const field = document.getElementById(`reviewImage${slot}`);
@@ -875,6 +938,7 @@ window.handleReviewImageUpload = async function(input) {
         slot++;
     }
     input.value = '';
+    if (submitBtn) submitBtn.disabled = false;
 };
 
 // ============================================
