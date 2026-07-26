@@ -479,14 +479,6 @@ window.confirmReceipt = async function(orderId) {
 // CHECKOUT GLOBAL (placeholder)
 // ============================================
 
-window.finalizarCompraCarrinho = function() {
-    if (cart.length === 0) {
-        showToast('Seu carrinho está vazio!', 'warning');
-        return;
-    }
-    showToast('Processando seu pedido... Por favor, aguarde.', 'info');
-    alert('Funcionalidade de Checkout Global em desenvolvimento. Por enquanto, utilize o botão "Solicitar Compra" em cada item.');
-};
 
 // ============================================
 // FUNÇÕES DE TELA (visualização de produto, etc.)

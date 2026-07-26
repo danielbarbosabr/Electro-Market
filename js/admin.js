@@ -940,19 +940,6 @@ window.toggleAdminChatsTabAttachPanel = function() {
     }
 };
 
-window.setAdminChatsTabAttachType = function(type) {
-    adminChatsTabAttachType = type;
-    document.querySelectorAll('#adminChatsTabAttachPanel .chat-attach-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.attachType === type);
-    });
-    const mapping = { image: 'adminChatsTabAttachPanelImageBox', file: 'adminChatsTabAttachPanelFileBox', location: 'adminChatsTabAttachPanelLocationBox' };
-    Object.entries(mapping).forEach(([t, id]) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('d-none', type !== t);
-    });
-    const input = document.getElementById('adminChatsTabAttachLinkInput');
-    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem...' : 'Cole o link do arquivo...';
-};
 
 window.confirmAdminChatsTabAttach = async function(orderId) {
     const input = document.getElementById('adminChatsTabAttachLinkInput');
@@ -1374,28 +1361,7 @@ window.adminChatsModalBack = function() {
 
 let adminChatsModalAttachType = 'image'; // 'image' | 'file'
 
-window.toggleAdminChatsModalAttachPanel = function() {
-    const panel = document.getElementById('adminChatsModalAttachPanel');
-    if (!panel) return;
-    panel.classList.toggle('d-none');
-    if (!panel.classList.contains('d-none')) {
-        document.getElementById('adminChatsModalAttachLinkInput')?.focus();
-    }
-};
 
-window.setAdminChatsModalAttachType = function(type) {
-    adminChatsModalAttachType = type;
-    document.querySelectorAll('#adminChatsModalAttachPanel .chat-attach-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.attachType === type);
-    });
-    const mapping = { image: 'adminChatsModalAttachPanelImageBox', file: 'adminChatsModalAttachPanelFileBox', location: 'adminChatsModalAttachPanelLocationBox' };
-    Object.entries(mapping).forEach(([t, id]) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('d-none', type !== t);
-    });
-    const input = document.getElementById('adminChatsModalAttachLinkInput');
-    if (input) input.placeholder = type === 'image' ? 'Cole o link da imagem...' : 'Cole o link do arquivo...';
-};
 
 window.confirmAdminChatsModalAttach = async function(orderId) {
     const input = document.getElementById('adminChatsModalAttachLinkInput');
@@ -1661,9 +1627,6 @@ window.renderAdminSupportTab = function(chats, orders, users) {
     showTab('conversas');
 };
 
-window.filterAdminSupportContacts = function(query) {
-    window._adminSupportBuildList?.(query);
-};
 
 window.adminSupportSelect = async function(id, type) {
     window._adminActiveSupportId = id;
@@ -1799,53 +1762,6 @@ window.adminSupportSelect = async function(id, type) {
 };
 
 /** Exibe perfil do parceiro da conversa no admin support */
-window.adminSupportViewProfile = async function() {
-    const id = window._adminActiveSupportId;
-    if (!id) return;
-    const order = adminOrdersCache.find(o => o.id === id);
-    if (!order) return;
-    const isBuyer = confirm('Ver perfil do Comprador? Cancelar para ver o Vendedor.');
-    const partnerId = isBuyer ? order.buyer_id : order.seller_id;
-    const partnerName = isBuyer ? order.buyer_name : order.seller_name;
-    let partner = null;
-    try {
-        const r = await supabaseFetch(`users?select=nome,avatar,vendedor_rating,rating_count,created_at,last_seen&id=eq.${partnerId}&limit=1`);
-        partner = r?.[0];
-    } catch (e) {}
-    const avatar = normalizeImageUrl(safeParseImages(partner?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}&background=random&size=100`;
-    const rating = partner?.vendedor_rating ? parseFloat(partner.vendedor_rating).toFixed(1) : '—';
-    const ratingCount = partner?.rating_count || 0;
-    const memberSince = partner?.created_at ? new Date(partner.created_at).toLocaleDateString('pt-BR', {month:'long', year:'numeric'}) : '—';
-    const online = isRecentlyOnline(partner?.last_seen);
-    let modalEl = document.getElementById('partnerProfileModal');
-    if (!modalEl) {
-        modalEl = document.createElement('div');
-        modalEl.id = 'partnerProfileModal';
-        modalEl.className = 'modal fade';
-        modalEl.tabIndex = -1;
-        document.body.appendChild(modalEl);
-    }
-    modalEl.innerHTML = `
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
-                <div class="modal-body text-center p-4">
-                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar" style="border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
-                    <div class="position-relative d-inline-block mb-3">
-                        <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" class="border" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=80'">
-                        <span class="presence-dot ${online ? 'online' : 'offline'}" style="width:16px;height:16px;border:2px solid #fff;"></span>
-                    </div>
-                    <h5 class="fw-bold mb-1">${partner?.nome || partnerName || 'Usuário'}</h5>
-                    <p class="small mb-2 fw-bold ${online ? 'text-success' : 'text-muted'}">${online ? '● Online agora' : '○ Offline'}</p>
-                    <div class="d-flex justify-content-center gap-4 mb-2">
-                        <div><small class="text-muted d-block">Avaliação</small><strong>${rating}</strong> <small class="text-muted">/5</small></div>
-                        <div><small class="text-muted d-block">Avaliações</small><strong>${ratingCount}</strong></div>
-                    </div>
-                    <p class="small text-muted mb-0">Membro desde ${memberSince}</p>
-                </div>
-            </div>
-        </div>`;
-    new bootstrap.Modal(modalEl).show();
-};
 
 /** Altera o status de um pedido pelo admin support */
 window.adminSupportChangeStatus = async function() {
@@ -2260,26 +2176,6 @@ window.adminSupportCloseChat = async function(orderId) {
     } catch(e) { showToast('Erro ao encerrar atendimento.', 'error'); }
 };
 
-window.adminSupportCloseTicket = async function(ticketId) {
-    if (!confirm('Encerrar este chamado?\nUma mensagem de encerramento será registrada.')) return;
-    const user = getSavedUser();
-    try {
-        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
-        const ticket = result?.[0];
-        if (!ticket) return;
-        const messages = ticket.messages || [];
-        messages.push({
-            type: 'system', senderId: 'system',
-            text: `Chamado encerrado por ${user.nome} (Suporte).`,
-            timestamp: new Date().toISOString()
-        });
-        const closedChat = withChatClosed({ messages }, true);
-        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages: closedChat.messages }) });
-        showToast('Chamado encerrado.', 'success');
-        window.adminSupportSelect(ticketId, 'ticket');
-        if (window._adminSupportBuildList) window._adminSupportBuildList();
-    } catch(e) { showToast('Erro ao encerrar chamado.', 'error'); }
-};
 
 window.adminSupportDelete = async function(id, type) {
     const label = type === 'order' ? 'conversa e o pedido' : 'chamado';
@@ -2360,30 +2256,6 @@ window.adminSetTicketStatus = async function(ticketId, newStatus) {
     } catch (e) { showToast('Erro ao alterar status.', 'error'); }
 };
 
-window.adminDeleteTicketAccounts = async function(ticketId) {
-    if (!confirm('Tem certeza que deseja DELETAR AS CONTAS dos envolvidos? Esta ação não pode ser desfeita.')) return;
-    try {
-        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
-        const chat = result?.[0];
-        if (!chat) return;
-        const meta = (chat.messages || []).find(m => m.type === 'ticket_meta') || {};
-        const userIds = [chat.buyer_id];
-        if (meta.related_order_id) {
-            const orderData = await supabaseFetch(`orders?id=eq.${meta.related_order_id}&limit=1`);
-            const order = orderData?.[0];
-            if (order) {
-                if (order.buyer_id && !userIds.includes(order.buyer_id)) userIds.push(order.buyer_id);
-                if (order.seller_id && !userIds.includes(order.seller_id)) userIds.push(order.seller_id);
-            }
-        }
-        for (const uid of userIds) {
-            if (uid) await supabaseFetch(`users?id=eq.${uid}`, { method: 'DELETE' });
-        }
-        showToast(`${userIds.length} conta(s) deletada(s).`, 'warning');
-        window.adminSupportBack();
-        adminRefreshCurrentView();
-    } catch (e) { showToast('Erro ao deletar contas.', 'error'); }
-};
 
 window.adminDeleteUserAccount = async function(userId, label) {
     if (!userId) { showToast('Usuário não identificado.', 'error'); return; }
@@ -2740,10 +2612,6 @@ window.adminChatsTabBack = function() {
 };
 
 /** Handler do formulario de escrita (mesmo esquema do chat cliente <-> vendedor) */
-window.adminChatsTabSendForm = async function(event, orderId) {
-    event.preventDefault();
-    return window.adminChatsTabSend(orderId);
-};
 
 /** Envia uma mensagem como membro da equipe de suporte, direto na aba "Chats" — 
  *  ou salva a edição em andamento, se houver uma (ver window.startAdminChatsTabEdit). */
@@ -2986,92 +2854,8 @@ window.toggleSupportDescriptionField = function() {
 };
 
 /** Mostra um estado de carregamento rápido enquanto checa se já existe um chamado em aberto */
-window.showSupportChatLoading = function() {
-    document.getElementById('supportRequestForm')?.classList.add('d-none');
-    document.getElementById('supportModalDialog')?.classList.add('modal-fullscreen');
-    document.body.classList.add('support-chat-fullscreen');
-    document.querySelector('#supportRequestModal .modal-header')?.classList.add('d-none');
-    const chatView = document.getElementById('supportChatView');
-    if (chatView) { chatView.classList.remove('d-none'); chatView.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>'; }
-};
 
 /** Entra na etapa 2 (conversa) do modal de suporte, pro chamado indicado */
-window.enterSupportChatMode = function(ticketId, subjectLabel) {
-    window._activeSupportTicketId = ticketId;
-    window.currentChat = ticketId;
-    supportChatLastSignature = null;
-    document.getElementById('supportRequestForm')?.classList.add('d-none');
-    document.getElementById('supportModalDialog')?.classList.add('modal-fullscreen');
-    document.body.classList.add('support-chat-fullscreen');
-    document.querySelector('#supportRequestModal .modal-header')?.classList.add('d-none');
-    const title = document.getElementById('supportModalTitle');
-    if (title) title.innerHTML = '<i class="bi bi-headset me-2"></i>Atendimento do Suporte';
-
-    const msgsId       = `supportMsgs_${ticketId}`;
-    const inputId      = `supportInput_${ticketId}`;
-    const previewId    = `supportPreview_${ticketId}`;
-    const attachId     = `supportAttach_${ticketId}`;
-    const attachLinkId = `supportAttachLink_${ticketId}`;
-    const statusId     = `supportStatusBar_${ticketId}`;
-    const logisticsId  = `supportLogistics_${ticketId}`;
-    const logisticsBtnsId = `supportLogisticsBtns_${ticketId}`;
-
-    const chatView = document.getElementById('supportChatView');
-    if (chatView) {
-        chatView.innerHTML = window.renderChatContainer({
-            chatId: ticketId,
-            partner: { name: 'Suporte', avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40` },
-            msgsId,
-            inputId,
-            previewId,
-            attachPanelId: attachId,
-            attachLinkId,
-            statusBarId: statusId,
-            onSend: 'window.sendMySupportMessage()',
-            onBack: 'window.showSupportRequestForm()',
-            onClose: 'window.closeSupportChatModal()',
-            onToggleAttachPanel: 'window.toggleSupportAttachPanel()',
-            onConfirmAttach: `window.confirmSupportAttach()`,
-            onSendLocation: 'window.sendSupportChatLocation',
-            onSendFile: 'window.sendSupportChatFile',
-            showBackBtn: true,
-            showCloseBtn: false,
-            showAttach: true,
-            showProductSummary: false,
-            statusInfo: { text: `<i class="bi bi-headset me-1"></i>${subjectLabel || 'Solicitação Aberta'}`, class: 'info' }
-        });
-        chatView.classList.remove('d-none');
-    }
-
-    // Adiciona botão IA no input do suporte
-    setTimeout(() => {
-        const sendBtn = chatView?.querySelector('.chat-send-btn');
-        if (sendBtn && !document.getElementById('supportAiBtn')) {
-            const aiBtn = document.createElement('button');
-            aiBtn.id = 'supportAiBtn';
-            aiBtn.type = 'button';
-            aiBtn.className = 'chat-send-btn';
-            aiBtn.title = 'Responder com IA';
-            aiBtn.style.cssText = 'background:#6f42c1;margin-right:4px;';
-            aiBtn.innerHTML = '<i class="bi bi-stars"></i>';
-            aiBtn.onclick = window.suggestSupportReply;
-            sendBtn.parentNode.insertBefore(aiBtn, sendBtn);
-        }
-    }, 300);
-
-    window._chatActiveElements = {
-        input:       document.getElementById(inputId),
-        container:   document.getElementById(msgsId),
-        statusBar:   document.getElementById(statusId),
-        logistics:   document.getElementById(logisticsId),
-        logisticsBtns: document.getElementById(logisticsBtnsId),
-        attachPanel: document.getElementById(attachId),
-        preview:     document.getElementById(previewId)
-    };
-
-    loadMySupportTicket(ticketId);
-    startSupportChatPolling(ticketId);
-};
 
 const _supportChatPoller = window.ChatCore.createPoller(
     (id, silent) => loadMySupportTicket(id, silent),
@@ -3087,39 +2871,6 @@ function stopSupportChatPolling() { _supportChatPoller.stop(); }
 /** Abre um modal listando as pessoas da conversa de suporte (igual ao
  *  botão de participantes dos outros chats): o usuário que abriu o
  *  chamado e a equipe de atendimento. */
-window.openSupportParticipants = async function() {
-    const ticketId = window._activeSupportTicketId;
-    const body = document.getElementById('supportParticipantsBody');
-    if (!ticketId || !body) return;
-    body.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div></div>';
-    try {
-        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
-        const ticket = normalizeTicket(result?.[0]);
-        if (!ticket) { body.innerHTML = '<p class="text-muted text-center">Chamado não encontrado.</p>'; }
-        else {
-            const requesterAvatar = safeParseImages(ticket.requester_avatar)[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent((ticket.requester_name || '?').slice(0,2))}&background=e50914&color=fff&size=40`;
-            const roleLabel = ticket.requester_role === 'ADMIN' ? 'Administrador' : (ticket.requester_role === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
-            body.innerHTML = `
-                <div class="chat-participant-row">
-                    <img src="${requesterAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=e50914&color=fff&size=40'">
-                    <div class="chat-participant-info">
-                        <strong>${ticket.requester_name || 'Visitante'}</strong>
-                        <small>${ticket.requester_email || 'E-mail não informado'} • ${roleLabel} • Quem abriu o chamado</small>
-                    </div>
-                </div>
-                <div class="chat-participant-row">
-                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent('Suporte')}&background=ffc107&color=1c1c1c&size=40" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">
-                    <div class="chat-participant-info">
-                        <strong>Equipe de Suporte</strong>
-                        <small>Atendimento ao cliente • ElectroMarket</small>
-                    </div>
-                </div>`;
-        }
-    } catch (e) {
-        body.innerHTML = '<p class="text-muted text-center">Erro ao carregar participantes.</p>';
-    }
-    try { new bootstrap.Modal(document.getElementById('supportParticipantsModal')).show(); } catch (e) {}
-};
 
 /** Fecha o modal de suporte e para o polling — chamado pelo X do modal */
 window.closeSupportChatModal = function() {
@@ -3298,30 +3049,6 @@ window.sendMySupportMessage = async function() {
 };
 
 /** Começa a responder a uma mensagem específica do chamado (preview acima do input) */
-window.startSupportReply = async function(index) {
-    const ticketId = window._activeSupportTicketId;
-    if (!ticketId) return;
-    const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
-    const msg = result?.[0]?.messages?.[index];
-    if (!msg) return;
-
-    supportReplyIndex = index;
-    supportEditIndex  = null;
-
-    const preview = window._chatActiveElements?.preview;
-    if (preview) {
-        preview.classList.remove('d-none');
-        preview.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="small text-truncate" style="max-width: 85%;">
-                    <strong class="text-primary d-block">Respondendo a ${msg.isStaff ? (msg.senderName || 'Suporte') : 'você mesmo'}</strong>
-                    <span class="text-muted">${msg.text}</span>
-                </div>
-                <i class="bi bi-x-lg cursor-pointer" onclick="window.cancelSupportReplyOrEdit()"></i>
-            </div>`;
-    }
-    window._chatActiveElements?.input?.focus();
-};
 
 /** Começa a editar uma mensagem já enviada pelo próprio usuário */
 window.startSupportEdit = async function(index) {
@@ -3363,40 +3090,8 @@ window.cancelSupportReplyOrEdit = function() {
 };
 
 /** Copia o texto de uma mensagem do chamado de suporte */
-window.copySupportMessageText = async function(index) {
-    const ticketId = window._activeSupportTicketId;
-    if (!ticketId) return;
-    try {
-        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
-        const msg = result?.[0]?.messages?.[index];
-        if (!msg?.text) return;
-        await navigator.clipboard.writeText(msg.text);
-        showToast('Mensagem copiada!', 'success', 1500);
-    } catch (e) {
-        showToast('Não foi possível copiar.', 'error');
-    }
-};
 
 /** Apaga (soft-delete) uma mensagem própria dentro do chamado de suporte */
-window.deleteSupportMessage = async function(index) {
-    const ticketId = window._activeSupportTicketId;
-    if (!ticketId) return;
-    if (!confirm('Apagar esta mensagem para todos?')) return;
-    try {
-        const result = await supabaseFetch(`chats?id=eq.${ticketId}&limit=1`);
-        const ticket = result?.[0];
-        if (!ticket?.messages?.[index]) return;
-        ticket.messages[index].text    = '';
-        ticket.messages[index].image   = null;
-        ticket.messages[index].file    = null;
-        ticket.messages[index].deleted = true;
-        await supabaseFetch(`chats?id=eq.${ticketId}`, { method: 'PATCH', body: JSON.stringify({ messages: ticket.messages }) });
-        supportChatLastSignature = null;
-        loadMySupportTicket(ticketId);
-    } catch (e) {
-        showToast('Erro ao apagar mensagem.', 'error');
-    }
-};
 
 // -------- Anexo de imagem/arquivo no chat de suporte --------
 
@@ -3492,9 +3187,6 @@ window.sendSupportChatFile = async function(input) {
  * comprador não recebeu o produto, ou o vendedor entregou mas não teve
  * confirmação — abre o chamado já com o pedido vinculado.
  */
-window.reportOrderProblem = function(orderId, category) {
-    window.openSupportRequestModal(category, orderId);
-};
 
 // -------- Visão do administrador sobre um chamado (mesmo design do chat) --------
 
@@ -3712,17 +3404,6 @@ window.sendAdminTicketLocation = async function() {
 
 window.toggleAdminTicketAttachPanel = function() {
     document.getElementById('adminTicketAttachPanel')?.classList.toggle('d-none');
-};
-window.setAdminTicketAttachType = function(type) {
-    adminTicketAttachType = type;
-    document.querySelectorAll('#adminTicketAttachPanel .chat-attach-tab').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-attach-type') === type);
-    });
-    const mapping = { image: 'adminTicketAttachPanelImageBox', file: 'adminTicketAttachPanelFileBox', location: 'adminTicketAttachPanelLocationBox' };
-    Object.entries(mapping).forEach(([t, id]) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('d-none', type !== t);
-    });
 };
 window.confirmAdminTicketAttach = async function() {
     const ticketId = window._activeSupportTicketId;

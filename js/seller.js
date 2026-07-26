@@ -396,17 +396,6 @@ window.deleteProduct = async function(pid) {
     } catch { showToast('Erro ao excluir produto.', 'error'); }
 };
 
-window.resetAnnounceModal = function() {
-    const form = document.getElementById('announceForm');
-    if (form) {
-        form.reset();
-        delete form.dataset.editingId;
-        const modalTitle = document.querySelector('#announceModal .modal-title');
-        const submitBtn  = document.querySelector('#announceForm button[type="submit"]');
-        if (modalTitle) modalTitle.textContent = 'O que você quer vender?';
-        if (submitBtn)  submitBtn.textContent   = 'Publicar Anúncio';
-    }
-};
 
 window.setLogistics = async function(orderId, logisticsType) {
     const user  = getSavedUser();

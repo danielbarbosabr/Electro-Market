@@ -2514,15 +2514,7 @@ document.addEventListener('touchend', function(e) {
 }, { passive: true });
 
 /** Alterna o menu de ações de uma notificação */
-window.toggleNotifMenu = function(btn) {
-    const menu = btn.nextElementSibling;
-    if (menu) menu.classList.toggle('open');
-};
 
-window.closeNotifMenu = function(el) {
-    const menu = el.closest('.notif-item-actions-menu');
-    if (menu) menu.classList.remove('open');
-};
 
 /** Marca/desmarca uma notificação como lida */
 window.toggleNotifRead = function(idx) {
@@ -2550,20 +2542,6 @@ window.deleteSingleNotif = function(idx) {
 };
 
 /** Marca todas como lidas */
-window.markAllRead = function() {
-    const user = getSavedUser();
-    if (user && notificationsCache.length) {
-        const unread = notificationsCache.filter(n => !n.read);
-        if (unread.length) {
-            supabaseFetch(`notifications?user_id=eq.${user.id}&read=eq.false`, { method: 'PATCH', body: JSON.stringify({ read: true }) }).catch(() => {});
-        }
-    }
-    notificationsCache.forEach(n => n.read = true);
-    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
-    loadNotifications();
-    updateNotifBadges();
-    showToast('Todas as notificações marcadas como lidas.', 'success');
-};
 
 /** Exclui todas as notificações com confirmação */
 window.deleteAllNotifs = function() {
@@ -3149,14 +3127,6 @@ async function sendLocationMessage(mapsUrl, text) {
     } catch { showToast('Erro ao enviar localização.', 'error'); }
 }
 
-window.setChatDocType = function(docType) {
-    const orderId = window.currentChat;
-    const input = document.getElementById(`attachLink_${orderId}File`) || document.getElementById('chatAttachLinkInputFile');
-    if (!input) return;
-    const prefixo = docType ? `[${docType}] ` : '';
-    if (!input.value.startsWith('[')) input.value = prefixo + input.value;
-    input.focus();
-};
 
 window.confirmChatAttach = async function() {
     if (chatAttachType === 'location') { window.sendChatLocation('other'); return; }
@@ -6321,28 +6291,8 @@ window.setWaSideActions = function(show) {
 };
 
 /** Ícone de lupa no cabeçalho: abre/fecha a busca ao lado dele (estilo WhatsApp Web). */
-window.toggleWaHeaderSearch = function() {
-    const bar = document.getElementById('waSideSearchBar');
-    if (!bar) return;
-    const willShow = bar.classList.contains('d-none');
-    bar.classList.toggle('d-none', !willShow);
-    if (willShow) {
-        const input = document.getElementById('waContactSearch');
-        input?.focus();
-    } else {
-        const input = document.getElementById('waContactSearch');
-        if (input) { input.value = ''; }
-        window.filterWaContacts?.('');
-    }
-};
 
 /** Item do menu (⋮): foca a busca para o usuário iniciar uma nova conversa */
-window.focusNewDirectChat = function() {
-    const search = document.getElementById('waContactSearch');
-    if (search) { search.value = ''; search.focus(); }
-    window.filterDirectContacts('');
-    document.getElementById('archivedChatsList')?.classList.add('d-none');
-};
 
 /** Botão "Arquivadas" do menu lateral: mostra/esconde a lista de conversas arquivadas
  *  e reflete isso no destaque verde do ícone. */
@@ -7002,26 +6952,7 @@ window.openGroupInfo = async function (chatId) {
                 <input class="form-check-input" type="checkbox" ${settings.admins_only_add_members ? 'checked' : ''} onclick="event.stopPropagation();window.groupToggleSetting('${chatId}','admins_only_add_members')">
               </div>
             </div>
-            <div class="wa-gi-setting" onclick="window.groupToggleSetting('${chatId}','approval_required')">
-              <div>
-                <div class="small fw-bold">Aprovação de novos membros</div>
-                <small class="text-muted">Admins precisam aprovar entrada</small>
-              </div>
-              <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" ${settings.approval_required ? 'checked' : ''} onclick="event.stopPropagation();window.groupToggleSetting('${chatId}','approval_required')">
-              </div>
-            </div>
           </div>` : ''}
-
-          <!-- Link de convite -->
-          <div class="wa-gi-section">
-            <div class="wa-gi-section-title"><i class="bi bi-link-45deg me-2"></i>Link de Convite</div>
-            <div id="groupInviteLinkSection">
-              <button class="btn btn-sm btn-outline-success w-100" onclick="window.groupCreateInviteLink('${chatId}')">
-                <i class="bi bi-plus-circle me-1"></i>Criar link de convite
-              </button>
-            </div>
-          </div>
 
           <!-- Participantes -->
           <div class="wa-gi-section">
@@ -7040,9 +6971,6 @@ window.openGroupInfo = async function (chatId) {
 
           <!-- Ações do grupo -->
           <div class="wa-gi-section">
-            <button class="btn btn-outline-secondary w-100 mb-2" onclick="window.groupShareLink('${chatId}')">
-              <i class="bi bi-share me-2"></i>Compartilhar link do grupo
-            </button>
             <button class="btn btn-outline-warning w-100 mb-2" onclick="window.groupLeave('${chatId}')">
               <i class="bi bi-box-arrow-left me-2"></i>Sair do grupo
             </button>
@@ -7635,135 +7563,6 @@ window.groupDelete = async function (chatId) {
 // 7. LINK DE CONVITE
 // ---------------------------------------------------------------
 
-window.groupCreateInviteLink = async function (chatId) {
-  const user = getSavedUser();
-  try {
-    const code = crypto.randomUUID().slice(0, 8);
-    const invite = {
-      id: crypto.randomUUID(),
-      group_id: chatId,
-      code: code,
-      created_by: user.id,
-      created_at: new Date().toISOString(),
-      max_uses: 0,
-      use_count: 0,
-      revoked: false
-    };
-    await supabaseFetch('group_invites', { method: 'POST', body: JSON.stringify(invite) });
-    const link = `${window.location.origin}${window.location.pathname}?join_group=${code}`;
-    const section = document.getElementById('groupInviteLinkSection');
-    if (section) {
-      section.innerHTML = `
-        <div class="input-group input-group-sm">
-          <input type="text" class="form-control" value="${link}" readonly onclick="this.select()">
-          <button class="btn btn-outline-success" onclick="navigator.clipboard.writeText('${link}');showToast('Link copiado!','success')"><i class="bi bi-copy"></i></button>
-          <button class="btn btn-outline-danger" onclick="window.groupRevokeInvite('${code}','${chatId}')"><i class="bi bi-x-lg"></i></button>
-        </div>`;
-    }
-    showToast('Link de convite criado!', 'success');
-  } catch (e) { showToast('Erro ao criar link.', 'error'); }
-};
-
-window.groupRevokeInvite = async function (code, chatId) {
-  if (!confirm('Revogar este link de convite?')) return;
-  try {
-    await supabaseFetch(`group_invites?code=eq.${code}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ revoked: true })
-    });
-    showToast('Link revogado.', 'info');
-    const section = document.getElementById('groupInviteLinkSection');
-    if (section) {
-      section.innerHTML = `
-        <button class="btn btn-sm btn-outline-success w-100" onclick="window.groupCreateInviteLink('${chatId}')">
-          <i class="bi bi-plus-circle me-1"></i>Criar novo link de convite
-        </button>`;
-    }
-  } catch (e) { showToast('Erro ao revogar.', 'error'); }
-};
-
-window.groupShareLink = async function (chatId) {
-  try {
-    // Procura um invite válido existente
-    const invites = await supabaseFetch(`group_invites?group_id=eq.${chatId}&revoked=eq.false&limit=1`);
-    let code;
-    if (invites?.length) {
-      code = invites[0].code;
-    } else {
-      // Cria um novo automaticamente
-      code = crypto.randomUUID().slice(0, 8);
-      await supabaseFetch('group_invites', { method: 'POST', body: JSON.stringify({
-        id: crypto.randomUUID(), group_id: chatId, code,
-        created_by: getSavedUser()?.id, created_at: new Date().toISOString(),
-        max_uses: 0, use_count: 0, revoked: false
-      })});
-    }
-    const link = `${window.location.origin}${window.location.pathname}?join_group=${code}`;
-    if (navigator.share) {
-      await navigator.share({ title: 'Convite para grupo', text: 'Entre no grupo pelo link:', url: link }).catch(() => {});
-    } else {
-      await navigator.clipboard.writeText(link);
-      showToast('Link copiado!', 'success');
-    }
-  } catch (e) { showToast('Erro ao compartilhar.', 'error'); }
-};
-
-/** Entrar no grupo via link (chamado no load da página) */
-window.joinGroupByInvite = async function (code) {
-  if (!code) return;
-  const user = getSavedUser();
-  if (!user) { showToast('Faça login para entrar no grupo.', 'warning'); return; }
-  try {
-    const invites = await supabaseFetch(`group_invites?code=eq.${code}&revoked=eq.false&limit=1`);
-    if (!invites?.length) { showToast('Link inválido ou expirado.', 'error'); return; }
-    const invite = invites[0];
-    const chatResult = await supabaseFetch(`chats?id=eq.${invite.group_id}&limit=1`);
-    const chat = chatResult?.[0];
-    if (!chat) { showToast('Grupo não encontrado.', 'error'); return; }
-    if ((chat.participants || []).some(p => String(p) === String(user.id))) {
-      showToast('Você já está no grupo.', 'info');
-      setTimeout(() => window.openDirectChat(invite.group_id), 300);
-      return;
-    }
-    const settings = getGroupSettings(chat);
-    if (settings.approval_required) {
-      // Solicita aprovação
-      const existing = await supabaseFetch(`group_join_requests?group_id=eq.${invite.group_id}&user_id=eq.${user.id}&status=eq.pending`);
-      if (existing?.length) { showToast('Solicitação já enviada.', 'info'); return; }
-      await supabaseFetch('group_join_requests', {
-        method: 'POST',
-        body: JSON.stringify({
-          id: crypto.randomUUID(),
-          group_id: invite.group_id,
-          user_id: user.id,
-          status: 'pending'
-        })
-      });
-      showToast('Solicitação de entrada enviada. Aguarde aprovação.', 'success');
-    } else {
-      chat.participants = [...(chat.participants || []), user.id];
-      chat.messages.push({
-        senderId: 'system',
-        text: `${user.nome} entrou no grupo via link de convite`,
-        timestamp: new Date().toISOString(),
-        type: 'system',
-        systemType: 'member_joined'
-      });
-      await supabaseFetch(`chats?id=eq.${invite.group_id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ participants: chat.participants, messages: chat.messages })
-      });
-      await supabaseFetch(`group_invites?code=eq.${code}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ use_count: (invite.use_count || 0) + 1 })
-      });
-      showToast('Você entrou no grupo!', 'success');
-      setTimeout(() => window.openDirectChat(invite.group_id), 400);
-    }
-    window.renderDirectChats({ skipBoot: true });
-  } catch (e) { showToast('Erro ao entrar no grupo.', 'error'); }
-};
-
 // ---------------------------------------------------------------
 // 8. FILTRO DE PARTICIPANTES NA TELA DE INFO
 // ---------------------------------------------------------------
@@ -7896,29 +7695,6 @@ window.markGroupMessagesRead = async function (chat) {
 // 12. ESTATÍSTICAS DE LEITURA (exibe "Visto por X pessoas")
 // ---------------------------------------------------------------
 
-window.getGroupReadReceiptText = function (msg, chat, userId) {
-  if (!msg || !chat || !msg.readBy) return '';
-  if (String(msg.senderId) !== String(userId)) return '';
-
-  const total = chat.participants?.length || 0;
-  const readCount = msg.readBy.length;
-  const notReadCount = Math.max(0, total - readCount - 1); // -1 para o próprio remetente
-
-  if (readCount === 0) return '✔️ Enviada';
-  if (readCount === 1 && String(msg.readBy[0]) === String(userId)) return '✔️ Enviada';
-
-  const names = [];
-  msg.readBy.slice(0, 3).forEach(id => {
-    // Tenta pegar nome do cache
-    const u = (window._groupUsersCache || {})[id];
-    if (u) names.push(u.nome?.split(' ')[0]);
-  });
-
-  if (names.length > 0) {
-    return `✅ Visto por ${names.join(', ')}${notReadCount > 0 ? ` e +${notReadCount}` : ''}`;
-  }
-  return `✅ Visto por ${readCount} pessoa${readCount > 1 ? 's' : ''}`;
-};
 
 window._groupUsersCache = {};
 
@@ -7939,22 +7715,6 @@ window._groupUsersCache = {};
   };
 })();
 
-// ---------------------------------------------------------------
-// 13. JOIN GROUP VIA INVITE LINK (handle URL parameter)
-// ---------------------------------------------------------------
-
-(function checkJoinGroupParam() {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('join_group');
-  if (code) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => window.joinGroupByInvite(code));
-    } else {
-      setTimeout(() => window.joinGroupByInvite(code), 1000);
-    }
-  }
-})();
-
 /** Abre a Comunidade ElectroMarket (antigo "Chat Geral"). Na primeira vez, cria o
  *  grupo já com todo mundo cadastrado; nas próximas, só garante que usuários novos
  *  (cadastrados depois) entrem também.
@@ -7963,11 +7723,6 @@ window._groupUsersCache = {};
  *  bases que já tinham o grupo criado antes da renomeação), reaproveitando as colunas
  *  que os chats diretos já usam (sem precisar de coluna nova). */
 /** Abre conversa com o assistente DuckDuckGo */
-window.openAIChat = async function() {
-    if (!getSavedUser()) { showToast('Faça login!', 'warning'); return; }
-    showToast('Abrindo DuckDuckGo...', 'info', 1500);
-    await window.startDirectChat(AI_USER_ID);
-};
 
 // ============================================
 // COMUNIDADE ElectroMarket — FEED ESTILO TWITTER

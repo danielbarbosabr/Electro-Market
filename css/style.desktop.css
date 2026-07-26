@@ -3802,7 +3802,7 @@ body.dark-theme .wa-boot-bar {
     height: 72px;
     box-sizing: border-box;
     padding: 10px 20px;
-    border-bottom: 1px solid rgb(237,237,237);
+    border-bottom: 1px solid rgba(0,0,0,0.12);
     cursor: pointer;
     transition: background 0.15s ease;
 }
