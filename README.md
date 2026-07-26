@@ -2,6 +2,8 @@
 
 *Plataforma completa de e-commerce para compra, venda e negociação de produtos eletrônicos.*
 
+<img src="https://api.iconify.design/bi/link-45deg.svg?color=%234FC3F7" width="16" height="16"> [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
+
 ![Status](https://img.shields.io/badge/status-alpha-green)
 ![Versão](https://img.shields.io/badge/versão-2.0.0-blue)
 ![Licença](https://img.shields.io/badge/licença-MIT-yellow)
@@ -18,7 +20,7 @@
 
 ## <img src="https://api.iconify.design/bi/info-circle-fill.svg?color=%234FC3F7" width="20" height="20"> Sobre o Projeto
 
-O **ElectroMarket** é uma plataforma web de compra e venda de produtos eletrônicos, desenvolvida como projeto integrador do curso de graduação da **Faculdade Anhanguera**. A aplicação simula um marketplace completo, permitindo que usuários se cadastrem como **clientes** ou **vendedores**, anunciem produtos, realizem pedidos, avaliem uns aos outros e negociem entregas através de um **chat em tempo real** — incluindo chats individuais, chats em grupo e um canal de suporte com a administração.
+O **ElectroMarket** é uma plataforma web de compra e venda de produtos eletrônicos, desenvolvida como projeto integrador do curso de graduação. <img src="https://api.iconify.design/bi/mortarboard-fill.svg?color=%234FC3F7" width="18" height="18"> Projeto feito para a **Faculdade Anhanguera de Sumaré**. A aplicação simula um marketplace completo, permitindo que usuários se cadastrem como **clientes** ou **vendedores**, anunciem produtos, realizem pedidos, avaliem uns aos outros e negociem entregas através de um **chat em tempo real** — incluindo chats individuais, chats em grupo e um canal de suporte com a administração.
 
 O sistema foi construído com foco em:
 - Arquitetura **serverless** (front-end + Backend as a Service)
@@ -26,7 +28,7 @@ O sistema foi construído com foco em:
 - Design responsivo (mobile-first)
 - Gerenciamento real de estado via **Supabase**
 - Credenciais nunca expostas no código-fonte (config via variáveis de ambiente)
-- Desenvolvido **sem nenhum custo**, utilizando apenas os planos gratuitos do Supabase, Vercel e demais APIs externas
+- Desenvolvido **sem gastar nada**, utilizando apenas os planos gratuitos do Supabase, Vercel e demais APIs externas
 
 ---
 
@@ -160,12 +162,6 @@ vercel dev
 
 ---
 
-## <img src="https://api.iconify.design/bi/globe.svg?color=%234FC3F7" width="20" height="20"> Demonstração Online
-
-O projeto está disponível em: [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
-
----
-
 ## <img src="https://api.iconify.design/bi/people-fill.svg?color=%234FC3F7" width="20" height="20"> Equipe
 
 | Nome | Função |
@@ -178,7 +174,7 @@ O projeto está disponível em: [https://eletromarket-pi.vercel.app/](https://el
 
 ## <img src="https://api.iconify.design/bi/file-earmark-text-fill.svg?color=%234FC3F7" width="20" height="20"> Licença
 
-Este projeto é parte de um trabalho acadêmico da **Faculdade Anhanguera** e está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
+Este projeto é parte de um trabalho acadêmico da **Faculdade Anhanguera de Sumaré** e está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
 
 ---
 
