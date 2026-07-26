@@ -1,9 +1,11 @@
 # <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> ElectroMarket
 
+*Plataforma completa de e-commerce para compra, venda e negociação de produtos eletrônicos.*
+
 <img src="https://api.iconify.design/bi/link-45deg.svg?color=%234FC3F7" width="16" height="16"> [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
 
 ![Status](https://img.shields.io/badge/status-alpha-green)
-![Deployments](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/danielbarbosabr/Electro-Market/main/.github/badges/deployments.json)
+[![Deployments](https://img.shields.io/badge/deployments-175-blue)](https://github.com/danielbarbosabr/Electro-Market/deployments)
 ![Licença](https://img.shields.io/badge/licença-MIT-yellow)
 
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
