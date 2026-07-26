@@ -1,6 +1,6 @@
 # <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> ElectroMarket
 
-# <img src="https://api.iconify.design/bi/link-45deg.svg?color=%234FC3F7" width="16" height="16"> [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
+ <img src="https://api.iconify.design/bi/link-45deg.svg?color=%234FC3F7" width="16" height="16"> [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
 
 ![Status](https://img.shields.io/badge/status-alpha-green)
 [![Deployments](https://img.shields.io/badge/deployments-175-blue)](https://github.com/danielbarbosabr/Electro-Market/deployments)
