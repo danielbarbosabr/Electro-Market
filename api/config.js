@@ -12,8 +12,8 @@ module.exports = (req, res) => {
   }
 
   res.status(200).json({
-    SUPABASE_URL,
-    SUPABASE_KEY,
-    GOOGLE_CLIENT_ID
+    SUPABASE_URL: true,
+    SUPABASE_KEY: true,
+    GOOGLE_CLIENT_ID: !!GOOGLE_CLIENT_ID
   });
 };
