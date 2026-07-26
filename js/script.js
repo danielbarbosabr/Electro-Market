@@ -1967,9 +1967,9 @@ window.showDetail = async function(pid) {
     // Carrega avaliações do produto
     window.loadProductReviews(pid);
     // Atualiza a URL para permitir compartilhamento
-    if (window.location.hash !== '#/produto/' + pid) {
-        history.pushState(null, '', '#/produto/' + pid);
-    }
+            if (window.location.hash !== '#/produto/' + pid) {
+                history.pushState(null, '', '#/produto/' + pid);
+            }
 };
 
 /** Fecha a página de detalhes em tela cheia e restaura exatamente a tela anterior
@@ -2685,9 +2685,9 @@ let chatAttachType = 'image';
 window.showChat = async function(orderId) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
-    if (window.location.hash !== '#/chat/' + orderId) {
-        history.pushState(null, '', '#/chat/' + orderId);
-    }
+            if (window.location.hash !== '#/chat/' + orderId) {
+                history.pushState(null, '', '#/chat/' + orderId);
+            }
     let order = ordersCache.find(o => o.id === orderId);
     if (!order) {
         const result = await supabaseFetch(`orders?id=eq.${orderId}&limit=1`);
