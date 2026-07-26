@@ -165,7 +165,7 @@ vercel dev
 | Nome | Função |
 |------|--------|
 | <img src="https://api.iconify.design/bi/person-fill.svg?color=%234FC3F7" width="18" height="18"> Daniel Barbosa de Lima | Desenvolvedor Full Stack |
-| <img src="https://cdn.simpleicons.org/deepseek" width="18" height="18"> Deep Seek | Documentação / Testes |
+| <img src="https://cdn.simpleicons.org/deepseek" width="18" height="18"> DeepSeek | Documentação / Testes |
 | <img src="https://cdn.simpleicons.org/anthropic" width="18" height="18"> Claude | Design / UI/UX |
 
 ---
