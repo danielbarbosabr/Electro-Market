@@ -3487,6 +3487,8 @@ body.admin-chat-fullscreen .admin-standalone-page .admin-chat-main {
     position: relative;
 }
 
+
+
 /* -------- Barra de ícones à esquerda (estilo WhatsApp Web) -------- */
 .wa-rail {
     width: 68px;
@@ -3546,6 +3548,15 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
 
 @media (max-width: 768px) {
     .wa-rail { display: none; }
+}
+
+/* Oculta a barra de ícones (wa-rail) e o botão "Nova conversa" no modo de
+   pedidos (compras/vendas), deixando apenas a lista lateral + área de chat */
+#whatsappOrdersView.wa-order-mode .wa-rail {
+    display: none;
+}
+#whatsappOrdersView.wa-order-mode .wa-side-action-btn[title="Nova conversa"] {
+    display: none;
 }
 
 /* -------- Tela de "boot" da aba Conversas (estilo WhatsApp Web) -------- */

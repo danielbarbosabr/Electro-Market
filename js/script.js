@@ -278,7 +278,8 @@ async function supabaseFetch(path, options = {}) {
 window.exitWaOrdersView = function() {
     stopOrdersPolling();
     stopDirectChatPolling();
-    document.getElementById('whatsappOrdersView')?.classList.add('d-none');
+    const woView = document.getElementById('whatsappOrdersView');
+    if (woView) { woView.classList.add('d-none'); woView.classList.remove('wa-order-mode'); }
     document.getElementById('productGridMain')?.classList.remove('d-none');
     document.body.classList.remove('wa-locked', 'admin-chat-fullscreen', 'wa-fullscreen');
     document.body.style.overflow = '';
@@ -5974,10 +5975,6 @@ window.renderChatContainer = function(opts) {
 // CHAT DIRETO (Conversas Livres — WhatsApp-like)
 // ============================================
 
-/**
- * Abre a tela de "Conversas" — lista de todos os usuários do sistema,
- * reutilizando o layout split-panel do whatsappOrdersView.
- */
 /** Marca no menu lateral (ícones da esquerda) qual seção está aberta agora,
  *  deixando ela verde e tirando o destaque das demais. */
 window.setWaRailActive = function (key) {
@@ -5987,6 +5984,10 @@ window.setWaRailActive = function (key) {
     if (btn) btn.classList.add('active');
 };
 
+/**
+ * Abre a tela de "Conversas" — lista de todos os usuários do sistema,
+ * reutilizando o layout split-panel do whatsappOrdersView.
+ */
 window.renderDirectChats = async function(opts = {}) {
     const skipBoot = !!opts?.skipBoot;
     const user = getSavedUser();
@@ -6023,7 +6024,10 @@ window.renderDirectChats = async function(opts = {}) {
     if (waSearch) {
         waSearch.placeholder = 'Buscar pessoa...';
     }
-    if (waView) waView.classList.remove('d-none');
+    if (waView) {
+        waView.classList.remove('d-none');
+        waView.classList.remove('wa-order-mode');
+    }
     document.body.classList.add('wa-locked', 'wa-fullscreen');
 
     window.closeWaChat();

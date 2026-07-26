@@ -60,7 +60,7 @@
                         </div>
                         <div class="d-flex align-items-center gap-3" style="position:relative;">
                             <a href="#" class="text-white text-decoration-none position-relative" title="Conversas" onclick="event.preventDefault();window.renderDirectChats()">
-                                <i class="bi bi-telephone-fill fs-5"></i>
+                                <i class="bi bi-telephone fs-5"></i>
                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success d-none" id="chatBadgeDesktop" style="font-size: 0.6rem;">0</span>
                             </a>
                             <a href="#" class="text-white text-decoration-none position-relative role-client" title="Carrinho" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
@@ -941,7 +941,7 @@
                     <i class="bi bi-bag"></i> <strong>Minhas Compras</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-client d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
-                    <span><i class="bi bi-telephone-fill"></i> <strong>Conversas</strong></span>
+                    <span><i class="bi bi-telephone"></i> <strong>Conversas</strong></span>
                     <span class="badge bg-success rounded-pill d-none" id="chatBadgeMobile">0</span>
                 </a>
 
@@ -1005,11 +1005,11 @@
                     <i class="bi bi-shop"></i> <strong>Minhas Vendas</strong>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-seller d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
-                    <span><i class="bi bi-telephone-fill"></i> <strong>Conversas</strong></span>
+                    <span><i class="bi bi-telephone"></i> <strong>Conversas</strong></span>
                     <span class="badge bg-success rounded-pill d-none" id="chatBadgeSellerMobile">0</span>
                 </a>
                 <a href="#" class="list-group-item list-group-item-action role-admin d-none d-flex justify-content-between align-items-center" onclick="window.renderDirectChats(); window.closeMobileMenu();">
-                    <span><i class="bi bi-telephone-fill"></i> <strong>Conversas</strong></span>
+                    <span><i class="bi bi-telephone"></i> <strong>Conversas</strong></span>
                     <span class="badge bg-success rounded-pill d-none" id="chatBadgeAdminMobile">0</span>
                 </a>
 
@@ -1057,12 +1057,12 @@
     <!-- ÁREA DE PEDIDOS ESTILO WHATSAPP WEB (Minhas Vendas / Compras / Solicitações) -->
     <div id="whatsappOrdersView" class="d-none wa-main">
         <div id="waBootScreen" class="wa-boot-screen d-none">
-            <div class="wa-boot-icon"><i class="bi bi-telephone-fill"></i></div>
+            <div class="wa-boot-icon"><i class="bi bi-telephone"></i></div>
             <h5 class="wa-boot-title">Conversas</h5>
             <div class="wa-boot-bar"><span></span></div>
             <p class="wa-boot-subtitle"><i class="bi bi-lock-fill me-1"></i>Suas mensagens ficam só entre você e a outra pessoa</p>
         </div>
-        <nav class="wa-rail">
+        <nav class="wa-rail" id="waRail">
             <div class="wa-rail-top">
                 <button type="button" id="waRailArchived" class="wa-rail-btn" title="Arquivadas" onclick="window.toggleArchivedSection()"><i class="bi bi-archive"></i></button>
                 <button type="button" id="waRailCommunity" class="wa-rail-btn wa-rail-community" title="Comunidade" onclick="window.openCommunityInChat()"><i class="bi bi-flower1"></i></button>

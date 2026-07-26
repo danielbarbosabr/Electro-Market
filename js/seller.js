@@ -120,7 +120,10 @@ window.renderOrderManagement = async function(type = 'buyer') {
     if (grid) { grid.classList.remove('order-view-active'); grid.innerHTML = ''; grid.style.display = 'none'; }
 
     currentOrderViewType = type;
-    if (waView) waView.classList.remove('d-none');
+    if (waView) {
+        waView.classList.remove('d-none');
+        waView.classList.add('wa-order-mode');
+    }
     document.body.classList.add('wa-locked');
     window.closeWaChat(); // fecha qualquer conversa aberta ao trocar de aba (Compras/Vendas/Solicitações)
 
