@@ -2272,11 +2272,15 @@ function updateUI() {
     window.updateCartBadge();
 }
 
+// Containers que podem exibir a lista de notificações: o dropdown (desktop)
+// e/ou a tela cheia estilo "Criar Anúncio" (mobile). Ambos usam o mesmo
+// seletor para reaproveitar a mesma renderização sem duplicar código.
+const NOTIF_LIST_SELECTOR = '#notificacoesList, #notificacoesListPage';
+
 async function loadNotifications() {
     const user = getSavedUser();
-    const container = document.getElementById('notificacoesList');
-    const badge = document.getElementById('notifBadgeDesktop');
-    
+    const containers = document.querySelectorAll(NOTIF_LIST_SELECTOR);
+
     let displayNotifs = notificationsCache;
 
     try {
@@ -2291,49 +2295,72 @@ async function loadNotifications() {
         }
     } catch (e) { console.error("Erro ao carregar do banco, usando cache local:", e); }
 
-    if (container) {
+    if (containers.length) {
         const notifs = displayNotifs;
-            if (notifs.length === 0) {
-                container.innerHTML = '<div class="notif-empty"><i class="bi bi-bell-slash"></i><span>Nenhuma notificação</span></div>';
-            } else {
-                const icons = {
-                    success: { icon: 'bi-check-lg', bg: '#28a745' },
-                    error:   { icon: 'bi-x', bg: '#dc3545' },
-                    info:    { icon: 'bi-info', bg: '#3483fa' },
-                    warning: { icon: 'bi-exclamation', bg: '#e67e22' }
-                };
+        let html;
+        if (notifs.length === 0) {
+            html = '<div class="notif-empty"><i class="bi bi-bell-slash"></i><span>Nenhuma notificação</span></div>';
+        } else {
+            const icons = {
+                success: { icon: 'bi-check-lg', bg: '#28a745' },
+                error:   { icon: 'bi-x', bg: '#dc3545' },
+                info:    { icon: 'bi-info', bg: '#3483fa' },
+                warning: { icon: 'bi-exclamation', bg: '#e67e22' }
+            };
 
-                container.innerHTML = notifs.map((n, idx) => {
-                    const ico = icons[n.type] || icons.info;
-                    const lines = (n.message || '').split('\n');
-                    const title = lines[0] || '';
-                    const desc = lines.slice(1).join(' ') || '';
-                    const isUnread = !n.read;
-                    return `
-                    <div class="notif-item${isUnread ? ' notif-item-unread' : ''}" style="animation-delay:${idx * 0.03}s">
-                        <div class="notif-item-icon" style="background:${ico.bg};color:#fff">
-                            <i class="bi ${ico.icon}" style="color:#fff"></i>
-                        </div>
-                        <div class="notif-item-content">
-                            <div class="notif-item-title">${title || 'Notificação'}</div>
-                            ${desc ? `<div class="notif-item-desc">${desc}</div>` : ''}
-                            <div class="notif-item-time">${n.created_at ? new Date(n.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
-                        </div>
-                        <button type="button" class="notif-item-close" onclick="event.stopPropagation();window.deleteSingleNotif(${idx})" title="Remover">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>`;
-                }).join('');
-            }
+            html = notifs.map((n, idx) => {
+                const ico = icons[n.type] || icons.info;
+                const lines = (n.message || '').split('\n');
+                const title = lines[0] || '';
+                const desc = lines.slice(1).join(' ') || '';
+                const isUnread = !n.read;
+                return `
+                <div class="notif-item${isUnread ? ' notif-item-unread' : ''}" style="animation-delay:${idx * 0.03}s">
+                    <div class="notif-item-icon" style="background:${ico.bg};color:#fff">
+                        <i class="bi ${ico.icon}" style="color:#fff"></i>
+                    </div>
+                    <div class="notif-item-content">
+                        <div class="notif-item-title">${title || 'Notificação'}</div>
+                        ${desc ? `<div class="notif-item-desc">${desc}</div>` : ''}
+                        <div class="notif-item-time">${n.created_at ? new Date(n.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
+                    </div>
+                    <button type="button" class="notif-item-close" onclick="event.stopPropagation();window.deleteSingleNotif(${idx})" title="Remover">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>`;
+            }).join('');
+        }
+        containers.forEach(container => { container.innerHTML = html; });
     }
-    
+
+    updateNotifBadges();
+}
+
+/** Marca todas as notificações como lidas no banco/local e atualiza badges (usado ao abrir o dropdown ou a tela de notificações) */
+async function markNotificationsAsRead() {
+    const user = getSavedUser();
+    if (!user || !notificationsCache.length) return;
+    const unread = notificationsCache.filter(n => !n.read);
+    if (unread.length) {
+        try {
+            await supabaseFetch(`notifications?user_id=eq.${user.id}&read=eq.false`, { method: 'PATCH', body: JSON.stringify({ read: true }) });
+        } catch (e) {}
+    }
+    notificationsCache.forEach(n => n.read = true);
+    localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
     updateNotifBadges();
 }
 
 /**
- * Abre/fecha o dropdown de notificações
+ * Abre as notificações: em telas mobile abre como uma página cheia (mesmo
+ * padrão visual da tela "Criar Anúncio"); em telas maiores abre o dropdown.
  */
 window.showNotifications = async function() {
+    if (window.innerWidth <= 767) {
+        window.showNotificationsPage();
+        return;
+    }
+
     const dropdown = document.getElementById('notifDropdown');
     if (!dropdown) return;
     const isOpen = dropdown.classList.contains('notif-open');
@@ -2357,23 +2384,73 @@ window.showNotifications = async function() {
     }
     dropdown.classList.add('notif-open');
     await loadNotifications();
-    const user = getSavedUser();
-    if (user && notificationsCache.length) {
-        const unread = notificationsCache.filter(n => !n.read);
-        if (unread.length) {
-            try {
-                await supabaseFetch(`notifications?user_id=eq.${user.id}&read=eq.false`, { method: 'PATCH', body: JSON.stringify({ read: true }) });
-            } catch(e) {}
-        }
-        notificationsCache.forEach(n => n.read = true);
-        localStorage.setItem('electroNotifs', JSON.stringify(notificationsCache));
-        updateNotifBadges();
-    }
+    await markNotificationsAsRead();
 };
 
 window.closeNotifications = function() {
     const dropdown = document.getElementById('notifDropdown');
     if (dropdown) dropdown.classList.remove('notif-open');
+};
+
+/**
+ * Tela de notificações em tela cheia (mobile), reaproveitando exatamente a
+ * mesma estrutura/CSS da tela "Criar Anúncio" (.detail-page/.create-ad-wrap/
+ * .create-ad-section) para manter a mesma identidade visual sem duplicar CSS.
+ */
+window.showNotificationsPage = async function() {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+
+    if (!grid.classList.contains('product-detail-active') && !grid.classList.contains('profile-page-active') && !grid.classList.contains('seller-profile-active') && !grid.classList.contains('create-ad-active') && !grid.classList.contains('offer-page-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    grid.className = 'create-ad-active';
+    grid.style.display = 'block';
+
+    grid.innerHTML = `
+    <div class="detail-page">
+        <button type="button" class="detail-back-btn" onclick="window.closeProductDetail()">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+
+        <div class="create-ad-wrap">
+            <div class="create-ad-header">
+                <div>
+                    <h4>Notificações</h4>
+                    <p class="text-muted small mb-0">Acompanhe suas atualizações mais recentes</p>
+                </div>
+            </div>
+
+            <div class="create-ad-section">
+                <div class="create-ad-section-title">
+                    <i class="bi bi-bell-fill"></i>
+                    <span>Suas notificações</span>
+                    <button type="button" class="notif-dropdown-btn notif-dropdown-btn-danger ms-auto" onclick="window.deleteAllNotifs()" title="Apagar todas">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
+                <div class="create-ad-section-body p-0">
+                    <div id="notificacoesListPage" class="notif-page-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    await loadNotifications();
+    await markNotificationsAsRead();
 };
 
         // Fecha o dropdown ao clicar fora
@@ -2511,6 +2588,46 @@ function updateNotifBadges() {
     if (mobileBadge) { mobileBadge.textContent = unread; mobileBadge.classList.toggle('d-none', unread === 0); }
 }
 
+/** Marca todas as mensagens não lidas de todas as conversas (diretas e em grupo) do
+ *  usuário como vistas — usado pela opção "Marcar todas como lidas" do menu de 3 pontinhos. */
+window.markAllChatsAsRead = async function() {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    try {
+        const allChats = await supabaseFetch('chats?select=id,messages,participants,order_id');
+        const myChats = (allChats || []).filter(c => {
+            if (c.order_id && (c.order_id.startsWith('community_post_') || c.order_id.startsWith('community_follow_'))) return false;
+            if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return false;
+            if (c.messages && c.messages[0]?.type === 'ticket_meta') return false;
+            return true;
+        });
+
+        const patches = [];
+        myChats.forEach(chat => {
+            let changed = false;
+            (chat.messages || []).forEach(msg => {
+                if (msg.senderId && String(msg.senderId) !== String(user.id) && !msg.visto) {
+                    msg.visto = true;
+                    changed = true;
+                }
+            });
+            if (changed) {
+                patches.push(supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) }));
+            }
+        });
+
+        if (!patches.length) { showToast('Nenhuma conversa não lida.', 'info'); return; }
+
+        await Promise.all(patches);
+        showToast('Todas as conversas marcadas como lidas!', 'success');
+        window.updateChatBadge?.();
+        window.renderDirectChats?.({ skipBoot: true });
+    } catch (e) {
+        console.error('Erro ao marcar todas como lidas:', e);
+        showToast('Erro ao marcar como lidas.', 'error');
+    }
+};
+
 window.updateChatBadge = async function() {
     try {
         const user = getSavedUser();
@@ -2518,6 +2635,7 @@ window.updateChatBadge = async function() {
         const allChats = await supabaseFetch('chats?select=messages,participants,order_id');
         let totalUnread = 0;
         (allChats || []).forEach(c => {
+            if (c.order_id && (c.order_id.startsWith('community_post_') || c.order_id.startsWith('community_follow_'))) return;
             if (!c.participants || !c.participants.some(p => String(p) === String(user.id))) return;
             if (c.messages && c.messages[0]?.type === 'ticket_meta') return;
             const un = c.messages?.filter(m => m.senderId && String(m.senderId) !== String(user.id) && !m.visto).length || 0;
@@ -2589,12 +2707,14 @@ window.showChat = async function(orderId) {
 
     let partnerAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName || 'User')}&background=random&size=40`;
     let partnerDotClass = '';
+    let partnerPhone = '';
     try {
         if (otherId) {
-            const partnerData = await supabaseFetch(`users?select=avatar,last_seen&id=eq.${otherId}&limit=1`);
+            const partnerData = await supabaseFetch(`users?select=avatar,last_seen,telefone&id=eq.${otherId}&limit=1`);
             const realAvatar = normalizeImageUrl(safeParseImages(partnerData?.[0]?.avatar)[0]);
             if (realAvatar) partnerAvatar = realAvatar;
             partnerDotClass = isRecentlyOnline(partnerData?.[0]?.last_seen) ? 'online' : 'offline';
+            partnerPhone = partnerData?.[0]?.telefone || '';
         }
     } catch (e) {}
 
@@ -2627,6 +2747,7 @@ window.showChat = async function(orderId) {
         onBack: 'window.closeWaChat()',
         onClose: 'window.closeWaChat()',
         onViewProfile: 'window.viewChatPartnerProfile()',
+        onCall: otherId ? `window.callChatContact('${partnerPhone}', '${(otherName || '').replace(/'/g, "\\'")}')` : '',
         onCancelOrder: `window.chatCancelOrder('${orderId}')`,
         onToggleAttachPanel: 'window.toggleChatAttachPanel()',
         onConfirmAttach: `window.confirmChatAttach()`,
@@ -3048,6 +3169,19 @@ window.confirmChatAttach = async function() {
     else await window.sendChatFile(url);
     input.value = '';
     (window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel'))?.classList.add('d-none');
+};
+
+/** Liga para o telefone cadastrado da outra pessoa da conversa (usado pelo
+ *  botão de ligação no cabeçalho do chat, tanto em conversas diretas quanto
+ *  em conversas de pedido). Reaproveitado por todos os chats, sem duplicar
+ *  a lógica de discagem em cada tela. */
+window.callChatContact = function(phone, name) {
+    const clean = String(phone || '').replace(/\D/g, '');
+    if (!clean) {
+        showToast(`${name ? name + ' não tem' : 'Usuário não tem'} um telefone cadastrado.`, 'info');
+        return;
+    }
+    window.location.href = `tel:${clean}`;
 };
 
 window.openImageFull = function(src) {
@@ -5112,11 +5246,21 @@ window.startVoiceInput = function(inputId) {
  * @param {boolean} [opts.enableGrouping=false] – agrupa msgs seguidas do mesmo remetente
  * @param {Array} [opts.allMessages] – array completo de mensagens (pra agrupamento)
  */
+// Monta o atributo onclick para abrir a foto do usuário em tela cheia
+// (reaproveita window.openImageFull, já usado pelas imagens do chat).
+function avatarClickAttr(src) {
+    return src ? ` onclick="window.openImageFull('${String(src).replace(/'/g, "\\'")}')" style="cursor:pointer;"` : '';
+}
+
 window.renderMsgBubble = function(msg, index, opts = {}) {
     const {
         userId, myAvatar, partnerAvatar,
         supportAvatar = 'https://ui-avatars.com/api/?name=Suporte&background=ffc107&color=1c1c1c&size=40',
         resolveSenderName,
+        // Em grupos/comunidade cada mensagem pode ter um remetente diferente;
+        // essa função (opcional) resolve o avatar real de cada um. Se não for
+        // passada ou não achar nada, cai no partnerAvatar (comportamento antigo).
+        resolveSenderAvatar,
         actions = { reply:'startReply', copy:'copyMessageText', edit:'startEdit', delete:'deleteMessage' },
         useDropdown = true, enableGrouping = false, allMessages = []
     } = opts;
@@ -5145,7 +5289,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
     const isMe = msg.senderId === userId;
     const isStaff = !!msg.isStaff;
     const senderLabel = msg.senderName || (resolveSenderName?.(msg) ?? '') || (isStaff ? 'Suporte' : 'Usuário');
-    const avatarForThem = isStaff ? supportAvatar : (partnerAvatar || '');
+    const avatarForThem = isStaff ? supportAvatar : (msg.senderAvatar || resolveSenderAvatar?.(msg) || partnerAvatar || '');
     const prevMsg = enableGrouping && allMessages[index - 1];
     const nextMsg = enableGrouping && allMessages[index + 1];
     const isGrouped = prevMsg && prevMsg.senderId === msg.senderId && prevMsg.type !== 'system' && !!prevMsg.isStaff === isStaff;
@@ -5161,12 +5305,12 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
     if (msg.deleted) {
         return `
         <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}" data-msg-index="${index}">
-            ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer"${avatarClickAttr(avatarForThem)} onerror="this.onerror=null;this.style.display='none'">` : ''}
             ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
             <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'} msg-deleted ${bubblePosition}">
                 <i class="bi bi-slash-circle me-1"></i><em>Mensagem apagada</em>
             </div>
-            ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer"${avatarClickAttr(myAvatar)} onerror="this.onerror=null;this.style.display='none'">` : ''}
             ${isMe && !showAvatar ? '<div class="msg-avatar-spacer"></div>' : ''}
         </div>`;
     }
@@ -5237,7 +5381,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
 
     return `
     <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}" data-msg-index="${index}">
-        ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+        ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer"${avatarClickAttr(avatarForThem)} onerror="this.onerror=null;this.style.display='none'">` : ''}
         ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
         <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''} ${bubblePosition}" style="margin-bottom:${reaction ? '10px' : '0'}">
             <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
@@ -5265,7 +5409,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             </div>
             ${reactionBadgeHtml}
         </div>
-            ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+            ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer"${avatarClickAttr(myAvatar)} onerror="this.onerror=null;this.style.display='none'">` : ''}
             ${isMe && !showAvatar ? '<div class="msg-avatar-spacer"></div>' : ''}
         </div>`;
 };
@@ -5604,6 +5748,7 @@ window.renderChatContainer = function(opts) {
         onClose = '',
         onDelete = '',
         onToggleParticipants = '',
+        onCall = '',
         onToggleAttachPanel = '',
         onConfirmAttach = '',
         onSendLocation = '',
@@ -5635,7 +5780,12 @@ window.renderChatContainer = function(opts) {
         extraHeaderHtml = '',
         extraBeforeMessages = '',
         extraBeforeInput = '',
-        headerSubtitle = ''
+        headerSubtitle = '',
+        isGroupChat = false,
+        onAddMember = '',
+        onLeaveGroup = '',
+        onClearChat = '',
+        isDirectChat = false
     } = opts;
 
     const bothReviewed = order?.buyer_reviewed && order?.seller_reviewed;
@@ -5653,7 +5803,7 @@ window.renderChatContainer = function(opts) {
         : '';
 
     const participantsBtnHtml = onToggleParticipants
-        ? `<button type="button" class="chat-header-close" onclick="${onToggleParticipants}" title="Participantes"><i class="bi bi-people-fill"></i></button>`
+        ? `<button type="button" class="chat-header-close" onclick="${isGroupChat && chatId ? `window.openEditGroupModal('${chatId}')` : onToggleParticipants}" title="${isGroupChat ? 'Dados do grupo' : 'Participantes'}"><i class="bi bi-people-fill"></i></button>`
         : '';
 
     const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
@@ -5662,6 +5812,24 @@ window.renderChatContainer = function(opts) {
     const isArchived = !!directMeta?.archived;
 
     const dropdownItems = [];
+    if (isGroupChat) {
+        if (chatId) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openEditGroupModal('${chatId}')"><i class="bi bi-info-circle me-2"></i>Dados do grupo</a></li>`);
+        if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi ${isMuted ? 'bi-bell-fill' : 'bi-bell-slash'} me-2"></i>${isMuted ? 'Reativar notificações' : 'Silenciar notificações'}</a></li>`);
+        if (onPin) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onPin}"><i class="bi ${isPinned ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${isPinned ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}</a></li>`);
+        dropdownItems.push(`<li><hr class="dropdown-divider my-1"></li>`);
+        if (onClose) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClose}"><i class="bi bi-x-circle me-2"></i>Fechar conversa</a></li>`);
+        if (onClearChat) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClearChat}"><i class="bi bi-eraser me-2"></i>Limpar conversa</a></li>`);
+        if (onLeaveGroup) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onLeaveGroup}"><i class="bi bi-box-arrow-right me-2"></i>Sair do grupo</a></li>`);
+    } else if (isDirectChat) {
+    if (onViewProfile) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onViewProfile}"><i class="bi bi-info-circle me-2"></i>Dados do contato</a></li>`);
+    dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleChatSearch('${msgsId}')"><i class="bi bi-search me-2"></i>Pesquisar</a></li>`);
+    if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi ${isMuted ? 'bi-bell-fill' : 'bi-bell-slash'} me-2"></i>${isMuted ? 'Reativar notificações' : 'Silenciar notificações'}</a></li>`);
+    if (onPin) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onPin}"><i class="bi ${isPinned ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${isPinned ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}</a></li>`);
+    dropdownItems.push(`<li><hr class="dropdown-divider my-1"></li>`);
+    if (onClose) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClose}"><i class="bi bi-x-circle me-2"></i>Fechar conversa</a></li>`);
+    if (onBlock) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onBlock}"><i class="bi bi-slash-circle me-2"></i>Bloquear</a></li>`);
+    if (onClearChat) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClearChat}"><i class="bi bi-eraser me-2"></i>Limpar conversa</a></li>`);
+    } else {
     if (onViewProfile) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onViewProfile}"><i class="bi bi-person-circle me-2"></i>Ver perfil</a></li>`);
     if (!isClosed && onCancelOrder) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onCancelOrder}"><i class="bi bi-x-circle me-2"></i>Cancelar pedido</a></li>`);
     if (onPin) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onPin}"><i class="bi ${isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'} me-2"></i>${isPinned ? 'Desafixar conversa' : 'Fixar conversa'}</a></li>`);
@@ -5675,6 +5843,11 @@ window.renderChatContainer = function(opts) {
     if (onDeleteAccounts) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteAccounts}"><i class="bi bi-person-x-fill me-2"></i>Deletar contas</a></li>`);
     if (onDeleteRequester) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteRequester}"><i class="bi bi-person-x-fill me-2"></i>Deletar conta do solicitante</a></li>`);
     if (onDeleteOtherAccount) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onDeleteOtherAccount}"><i class="bi bi-person-x-fill me-2"></i>Deletar conta do outro participante</a></li>`);
+    }
+
+    const callBtnHtml = onCall
+        ? `<button type="button" class="chat-header-close" onclick="${onCall}" title="Ligar" style="margin-right:4px;"><i class="bi bi-telephone-fill"></i></button>`
+        : '';
 
     const searchBtnHtml = `<button type="button" class="chat-header-close" onclick="window.toggleChatSearch('${msgsId}')" title="Pesquisar na conversa" style="margin-right:4px;"><i class="bi bi-search"></i></button>`;
 
@@ -5703,7 +5876,7 @@ window.renderChatContainer = function(opts) {
     <div class="chat-header-pro">
         ${backBtnHtml}
         <div class="chat-header-avatar-wrap">
-            <img id="${msgsId}Avatar" src="${partnerAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}'">
+            <img id="${msgsId}Avatar" src="${partnerAvatar}" referrerpolicy="no-referrer" style="cursor:pointer;" onclick="window.openImageFull(this.src)" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName || 'User')}'">
             <span id="${msgsId}Dot" class="presence-dot"></span>
         </div>
         <div class="chat-header-info" style="min-width:0;flex:1;">
@@ -5716,6 +5889,7 @@ window.renderChatContainer = function(opts) {
             ${productSummaryHtml}
         </div>
         ${participantsBtnHtml}
+        ${callBtnHtml}
         ${searchBtnHtml}
         ${dropdownHtml}
         ${closeBtnHtml}
@@ -5819,12 +5993,22 @@ window.renderChatContainer = function(opts) {
  * Abre a tela de "Conversas" — lista de todos os usuários do sistema,
  * reutilizando o layout split-panel do whatsappOrdersView.
  */
+/** Marca no menu lateral (ícones da esquerda) qual seção está aberta agora,
+ *  deixando ela verde e tirando o destaque das demais. */
+window.setWaRailActive = function (key) {
+    const map = { conversas: 'waRailConversas', comunidade: 'waRailCommunity', arquivadas: 'waRailArchived', grupos: 'waRailGroups' };
+    document.querySelectorAll('.wa-rail-btn').forEach(btn => btn.classList.remove('active'));
+    const btn = document.getElementById(map[key]);
+    if (btn) btn.classList.add('active');
+};
+
 window.renderDirectChats = async function(opts = {}) {
     const skipBoot = !!opts?.skipBoot;
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
 
     window.exitWaOrdersView();
+    window.setWaRailActive('conversas');
 
     if (window.location.hash !== '#/chat/mensagem') {
         history.pushState(null, '', '#/chat/mensagem');
@@ -5943,6 +6127,41 @@ window.renderDirectChats = async function(opts = {}) {
 
         let html = '';
 
+        // "Arquivadas" fica no topo, sempre recolhida — só mostra a lista ao
+        // clicar no cabeçalho/ícone (igual ao WhatsApp).
+        if (archivedChats.length > 0) {
+            html += `<div class="wa-contact-section-header" style="cursor:pointer;user-select:none;" onclick="document.getElementById('archivedChatsList').classList.toggle('d-none');this.querySelector('.bi')?.classList.toggle('bi-chevron-down');this.querySelector('.bi')?.classList.toggle('bi-chevron-right');">
+                <span><i class="bi bi-chevron-right me-1" style="font-size:0.7rem;"></i><i class="bi bi-archive me-1"></i>Arquivadas</span>
+                <span class="small text-muted">${archivedChats.length}</span>
+            </div>`;
+            html += `<div id="archivedChatsList" class="d-none">`;
+            html += archivedChats.map(({ user: u, chat, lastMsg }) => {
+                const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=45`;
+                const online = isRecentlyOnline(u.last_seen);
+                const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
+                const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
+                const sentByMe = lastMsg && lastMsg.senderId && String(lastMsg.senderId) === String(user.id) && lastMsg.type !== 'system';
+                const tickHtml = sentByMe
+                    ? `<i class="bi ${lastMsg.visto ? 'bi-check-all is-read' : 'bi-check'} msg-tick"></i>`
+                    : '';
+
+                return `
+                <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')" style="opacity:0.65;">
+                    <div style="position:relative;flex-shrink:0;">
+                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">
+                    </div>
+                    <div class="wa-contact-textbox">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
+                            <small style="white-space:nowrap;">${lastTime}</small>
+                        </div>
+                        <div class="wa-contact-text">${tickHtml}${truncateText(lastText, 40)}</div>
+                    </div>
+                </div>`;
+            }).join('');
+            html += `</div>`;
+        }
+
         if (chatsWithMsgs.length > 0) {
             html += `<div class="wa-contact-section-header">Mensagens</div>`;
             html += chatsWithMsgs.map(({ user: u, chat, lastMsg }) => {
@@ -6004,39 +6223,6 @@ window.renderDirectChats = async function(opts = {}) {
                     ${unread ? `<span class="wa-contact-badge">${unread}</span>` : ''}
                 </div>`;
             }).join('');
-        }
-
-        if (archivedChats.length > 0) {
-            html += `<div class="wa-contact-section-header" style="cursor:pointer;user-select:none;" onclick="document.getElementById('archivedChatsList').classList.toggle('d-none');this.querySelector('.bi')?.classList.toggle('bi-chevron-down');this.querySelector('.bi')?.classList.toggle('bi-chevron-right');">
-                <span><i class="bi bi-chevron-down me-1" style="font-size:0.7rem;"></i>Arquivadas</span>
-                <span class="small text-muted">${archivedChats.length}</span>
-            </div>`;
-            html += `<div id="archivedChatsList">`;
-            html += archivedChats.map(({ user: u, chat, lastMsg }) => {
-                const avatar = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&size=45`;
-                const online = isRecentlyOnline(u.last_seen);
-                const lastText = lastMsg?.type === 'image' ? '📷 Imagem' : lastMsg?.type === 'video' ? '🎬 Vídeo' : lastMsg?.type === 'location' ? '📍 Localização' : lastMsg?.type === 'file' ? '📄 Arquivo' : (lastMsg?.text || 'Iniciar conversa');
-                const lastTime = lastMsg?.timestamp ? formatChatTime(lastMsg.timestamp) : '';
-                const sentByMe = lastMsg && lastMsg.senderId && String(lastMsg.senderId) === String(user.id) && lastMsg.type !== 'system';
-                const tickHtml = sentByMe
-                    ? `<i class="bi ${lastMsg.visto ? 'bi-check-all is-read' : 'bi-check'} msg-tick"></i>`
-                    : '';
-
-                return `
-                <div class="wa-contact" data-direct-chat-id="${chat.id}" data-contact-name="${(u.nome || '').toLowerCase()}" onclick="window.openDirectChat('${chat.id}')" style="opacity:0.65;">
-                    <div style="position:relative;flex-shrink:0;">
-                        <img src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'" style="width:50px;height:50px;border-radius:50%;object-fit:cover;">
-                    </div>
-                    <div class="wa-contact-textbox">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="wa-contact-name">${u.nome || 'Usuário'}</div>
-                            <small style="white-space:nowrap;">${lastTime}</small>
-                        </div>
-                        <div class="wa-contact-text">${tickHtml}${truncateText(lastText, 40)}</div>
-                    </div>
-                </div>`;
-            }).join('');
-            html += `</div>`;
         }
 
         if (usersWithoutChat.length > 0) {
@@ -6116,11 +6302,13 @@ window.updateWaEmptyState = function(type) {
 
 window.setWaSideProfile = function() {
     const img = document.getElementById('waSideMyAvatar');
+    const railImg = document.getElementById('waRailAvatar');
     const nameEl = document.getElementById('waSideMyName');
     const user = getSavedUser();
     if (!user) return;
     const avatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'User')}&background=random&size=64`;
     if (img) img.src = avatar;
+    if (railImg) railImg.src = avatar;
     if (nameEl) nameEl.textContent = user.nome || '';
 };
 
@@ -6156,12 +6344,19 @@ window.focusNewDirectChat = function() {
     document.getElementById('archivedChatsList')?.classList.add('d-none');
 };
 
-/** Item do menu (⋮): abre/rola até a seção de conversas arquivadas */
+/** Botão "Arquivadas" do menu lateral: mostra/esconde a lista de conversas arquivadas
+ *  e reflete isso no destaque verde do ícone. */
 window.toggleArchivedSection = function() {
     const list = document.getElementById('archivedChatsList');
     if (!list) { showToast('Nenhuma conversa arquivada.', 'info'); return; }
-    list.classList.remove('d-none');
-    list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const willShow = list.classList.contains('d-none');
+    list.classList.toggle('d-none', !willShow);
+    if (willShow) {
+        window.setWaRailActive('arquivadas');
+        list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        window.setWaRailActive('conversas');
+    }
 };
 
 /**
@@ -6420,26 +6615,12 @@ window.openNewGroupModal = async function () {
   const searchInput = document.getElementById('newGroupMemberSearch');
   const preview = document.getElementById('newGroupAvatarPreview');
   const placeholder = document.getElementById('newGroupAvatarPlaceholder');
+  const avatarLinkInput = document.getElementById('newGroupAvatarLink');
   if (nameInput) nameInput.value = '';
   if (searchInput) searchInput.value = '';
   if (preview) { preview.src = ''; preview.classList.add('d-none'); }
   if (placeholder) placeholder.style.display = '';
-
-  // Cor dos avatares
-  setTimeout(() => {
-    document.querySelectorAll('#groupAvatarColors div').forEach(el => {
-      el.style.border = '2px solid transparent';
-      el.onclick = function () {
-        document.querySelectorAll('#groupAvatarColors div').forEach(d => d.style.border = '2px solid transparent');
-        this.style.border = '2px solid #00A884';
-        _groupAvatarUrl = '';
-        const pv = document.getElementById('newGroupAvatarPreview');
-        const ph = document.getElementById('newGroupAvatarPlaceholder');
-        if (pv) { pv.classList.add('d-none'); }
-        if (ph) { ph.style.display = ''; }
-      };
-    });
-  }, 50);
+  if (avatarLinkInput) avatarLinkInput.value = '';
 
   // Mostra modal
   const modal = window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
@@ -6547,16 +6728,37 @@ window.uploadGroupAvatar = function (input) {
   const reader = new FileReader();
   reader.onload = function (e) {
     const preview = document.getElementById('newGroupAvatarPreview');
+    const placeholder = document.getElementById('newGroupAvatarPlaceholder');
     if (preview) {
       preview.src = e.target.result;
       preview.classList.remove('d-none');
     }
+    if (placeholder) placeholder.style.display = 'none';
     // Upload para Imgur
     _uploadToImgur(file).then(url => {
-      if (url) _groupAvatarUrl = url;
+      if (url) {
+        _groupAvatarUrl = url;
+        const linkInput = document.getElementById('newGroupAvatarLink');
+        if (linkInput) linkInput.value = url;
+      }
     }).catch(() => {});
   };
   reader.readAsDataURL(file);
+};
+
+/** Usa o link colado no campo "Link da foto" como avatar do grupo (mesmo padrão do perfil) */
+window.setGroupAvatarFromLink = function (url) {
+  url = (url || '').trim();
+  _groupAvatarUrl = url;
+  const preview = document.getElementById('newGroupAvatarPreview');
+  const placeholder = document.getElementById('newGroupAvatarPlaceholder');
+  if (url) {
+    if (preview) { preview.src = url; preview.classList.remove('d-none'); }
+    if (placeholder) placeholder.style.display = 'none';
+  } else {
+    if (preview) { preview.src = ''; preview.classList.add('d-none'); }
+    if (placeholder) placeholder.style.display = '';
+  }
 };
 
 async function _uploadToImgur(file) {
@@ -6609,9 +6811,8 @@ window.createGroupChat = async function () {
   if (!user) { showToast('Faça login!', 'warning'); return; }
 
   const nameInput = document.getElementById('newGroupNameInput');
-  const descInput = document.getElementById('newGroupDescInput');
   const groupName = nameInput?.value?.trim();
-  const groupDesc = descInput?.value?.trim() || '';
+  const groupDesc = '';
   const memberIds = Object.keys(_selectedMembers);
 
   if (!groupName) { showToast('Dê um nome para o grupo.', 'warning'); return; }
@@ -6694,7 +6895,6 @@ window.openGroupInfo = async function (chatId) {
     const isAdmin = isGroupAdmin(chat, user.id);
     const creatorId = getGroupCreator(chat);
     const groupName = meta?.groupName || chat.seller_name || 'Grupo';
-    const groupDesc = getGroupDescription(chat);
     const groupAvatar = getGroupAvatar(chat);
     const createdAt = meta?.groupCreatedAt
       ? new Date(meta.groupCreatedAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -6765,11 +6965,6 @@ window.openGroupInfo = async function (chatId) {
             ${isAdmin ? `
             <button class="btn btn-sm btn-outline-secondary mt-1" onclick="window.groupEditName('${chatId}')" style="font-size:0.75rem;">
               <i class="bi bi-pencil me-1"></i>Editar nome
-            </button>` : ''}
-            ${groupDesc ? `<p id="groupInfoDesc" class="text-muted small mt-1 mb-0">${groupDesc}</p>` : ''}
-            ${isAdmin ? `
-            <button class="btn btn-sm btn-outline-secondary mt-1" onclick="window.groupEditDescription('${chatId}')" style="font-size:0.75rem;">
-              <i class="bi bi-pencil me-1"></i>${groupDesc ? 'Editar descrição' : 'Adicionar descrição'}
             </button>` : ''}
             <div class="wa-gi-meta mt-2">
               <small class="text-muted">Grupo criado em ${createdAt}</small>
@@ -6884,6 +7079,224 @@ window.closeGroupInfo = function () {
 };
 
 // ---------------------------------------------------------------
+// 4.5 EDIÇÃO DE DADOS DO GRUPO EM MODAL (nome + foto + descrição)
+//     Substitui a abertura do painel lateral (openGroupInfo) por um
+//     modal no mesmo estilo do modal de criação de grupo.
+// ---------------------------------------------------------------
+let _editGroupAvatarUrl = '';
+let _editGroupChatId = null;
+let _editGroupIsAdmin = false;
+let _editGroupCreatorId = null;
+let _editGroupSelectedMembers = {};   // { userId: true } - estado atual da seleção (participantes atuais + adicionados)
+let _editGroupOriginalParticipants = []; // ids que já estavam no grupo ao abrir o modal
+let _editGroupAllUsersCache = [];     // todos os usuários do sistema (para busca/seleção)
+
+/** Abre o modal de edição de dados do grupo */
+window.openEditGroupModal = async function (chatId) {
+  const user = getSavedUser();
+  if (!user || !chatId) return;
+
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat || !isGroupChat(chat)) return;
+
+    const meta = getGroupMeta(chat);
+    const groupName = meta?.groupName || chat.seller_name || 'Grupo';
+    const groupAvatar = meta?.groupAvatar || chat.group_avatar || '';
+
+    _editGroupChatId = chatId;
+    _editGroupAvatarUrl = groupAvatar;
+    _editGroupIsAdmin = isGroupAdmin(chat, user.id);
+    _editGroupCreatorId = getGroupCreator(chat);
+    _editGroupOriginalParticipants = (chat.participants || []).map(String);
+    _editGroupSelectedMembers = {};
+    _editGroupOriginalParticipants.forEach(id => { _editGroupSelectedMembers[id] = true; });
+
+    const preview = document.getElementById('editGroupAvatarPreview');
+    const linkInput = document.getElementById('editGroupAvatarLink');
+    const nameInput = document.getElementById('editGroupNameInput');
+    if (preview) preview.src = groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&size=80&bold=true`;
+    if (linkInput) linkInput.value = groupAvatar;
+    if (nameInput) nameInput.value = groupName;
+
+    const searchInput = document.getElementById('editGroupMemberSearch');
+    if (searchInput) searchInput.value = '';
+
+    const modalEl = document.getElementById('editGroupModal');
+    const modal = window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+    modal?.show();
+
+    const listEl = document.getElementById('editGroupParticipantsList');
+    if (listEl) listEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-success"></div></div>';
+
+    const allUsers = await supabaseFetch('users?select=id,nome,avatar&order=nome.asc');
+    _editGroupAllUsersCache = allUsers || [];
+    _renderEditGroupMemberList();
+  } catch (e) {
+    console.error('Erro ao carregar dados do grupo:', e);
+    showToast('Erro ao carregar dados do grupo.', 'error');
+  }
+};
+
+/** Renderiza a lista de pessoas do modal de edição (mesmo estilo do modal de criar grupo).
+ *  Quem já está no grupo aparece pré-selecionado; para adicionar, basta selecionar mais. */
+function _renderEditGroupMemberList(query) {
+  const listEl = document.getElementById('editGroupParticipantsList');
+  const countEl = document.getElementById('editGroupParticipantsCount');
+  if (!listEl) return;
+
+  const user = getSavedUser();
+  const q = (query || '').trim().toLowerCase();
+  const users = _editGroupAllUsersCache.filter(u => !q || (u.nome || '').toLowerCase().includes(q));
+
+  if (!users.length) {
+    listEl.innerHTML = '<div class="text-center py-4 text-muted small">Ninguém encontrado.</div>';
+  } else {
+    listEl.innerHTML = users.map(u => {
+      const id = String(u.id);
+      const checked = !!_editGroupSelectedMembers[id];
+      const isMe = String(user?.id) === id;
+      const isCreator = _editGroupCreatorId && String(_editGroupCreatorId) === id;
+      // Você mesmo não pode se remover por aqui (use "Sair do grupo"), e só admin mexe na lista.
+      const locked = isMe || !_editGroupIsAdmin;
+      return `
+      <div class="ca-cat-list-item${checked ? ' ca-cat-list-item-selected' : ''}" style="${locked ? 'cursor:default;opacity:' + (isMe ? '1' : '0.85') + ';' : ''}" ${locked ? '' : `onclick="window.toggleEditGroupMember('${id}')"`}>
+        <div class="d-flex align-items-center gap-2">
+          <div style="width:8px;height:8px;border-radius:50%;background:#00A884;flex-shrink:0;${checked ? '' : 'display:none;'}"></div>
+          ${u.nome || 'Usuário'}${isMe ? ' <span class="text-muted small">(você)</span>' : ''}${isCreator ? ' <i class="bi bi-star-fill text-warning" title="Criador" style="font-size:0.7rem;"></i>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const count = Object.keys(_editGroupSelectedMembers).length;
+  if (countEl) countEl.textContent = `${count} participante${count !== 1 ? 's' : ''} selecionado${count !== 1 ? 's' : ''}`;
+}
+
+/** Filtro de busca na lista de pessoas do modal de edição */
+window.filterEditGroupMembers = function (query) {
+  _renderEditGroupMemberList(query);
+};
+
+/** Alterna seleção de uma pessoa no modal de edição (adiciona/remove do grupo ao salvar) */
+window.toggleEditGroupMember = function (userId) {
+  if (!_editGroupIsAdmin) { showToast('Só administradores podem alterar os participantes.', 'warning'); return; }
+  const id = String(userId);
+  if (_editGroupSelectedMembers[id]) {
+    delete _editGroupSelectedMembers[id];
+  } else {
+    _editGroupSelectedMembers[id] = true;
+  }
+  const searchInput = document.getElementById('editGroupMemberSearch');
+  _renderEditGroupMemberList(searchInput?.value || '');
+};
+
+/** Upload de nova foto do grupo dentro do modal de edição */
+window.uploadEditGroupModalAvatar = function (input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const preview = document.getElementById('editGroupAvatarPreview');
+    if (preview) preview.src = e.target.result;
+    _uploadToImgur(file).then(url => {
+      if (url) {
+        _editGroupAvatarUrl = url;
+        const linkInput = document.getElementById('editGroupAvatarLink');
+        if (linkInput) linkInput.value = url;
+        if (preview) preview.src = url;
+      }
+    }).catch(() => {});
+  };
+  reader.readAsDataURL(file);
+};
+
+/** Usa o link colado no campo "Link da foto" como avatar do grupo */
+window.setEditGroupModalAvatarFromLink = function (url) {
+  url = (url || '').trim();
+  _editGroupAvatarUrl = url;
+  const preview = document.getElementById('editGroupAvatarPreview');
+  if (preview && url) preview.src = url;
+};
+
+/** Salva nome/foto/descrição do grupo a partir do modal de edição */
+window.saveEditGroupModal = async function () {
+  const chatId = _editGroupChatId;
+  if (!chatId) return;
+
+  const nameInput = document.getElementById('editGroupNameInput');
+  const newName = (nameInput?.value || '').trim();
+  if (!newName) { showToast('Dê um nome para o grupo.', 'warning'); return; }
+
+  try {
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) { showToast('Erro ao carregar grupo.', 'error'); return; }
+
+    const meta = getGroupMeta(chat) || chat.messages[0];
+    const user = getSavedUser();
+    const nameChanged = meta.groupName !== newName;
+
+    meta.groupName = newName;
+    meta.groupAvatar = _editGroupAvatarUrl || '';
+
+    if (nameChanged) await addSystemMessage(chat, `${user.nome} alterou o nome do grupo para "${newName}"`, 'group_renamed');
+
+    // ---- Aplica mudanças de participantes feitas na lista de seleção ----
+    let participantsChanged = false;
+    if (_editGroupIsAdmin) {
+      const currentParticipants = (chat.participants || []).map(String);
+      const selectedIds = Object.keys(_editGroupSelectedMembers);
+      const toAdd = selectedIds.filter(id => !currentParticipants.includes(id));
+      const toRemove = _editGroupOriginalParticipants.filter(id => !_editGroupSelectedMembers[id]);
+
+      let participants = currentParticipants.slice();
+      toAdd.forEach(id => {
+        if (!participants.includes(id)) {
+          participants.push(id);
+          const nome = _editGroupAllUsersCache.find(u => String(u.id) === id)?.nome || 'Alguém';
+          chat.messages.push({ senderId: 'system', text: `${user.nome} adicionou ${nome}`, timestamp: new Date().toISOString(), type: 'system', systemType: 'member_added' });
+        }
+      });
+      toRemove.forEach(id => {
+        participants = participants.filter(p => String(p) !== id);
+        meta.groupAdmins = (meta.groupAdmins || []).filter(a => String(a) !== id);
+        const nome = _editGroupAllUsersCache.find(u => String(u.id) === id)?.nome || 'Um participante';
+        chat.messages.push({ senderId: 'system', text: `${nome} foi removido do grupo por ${user.nome}`, timestamp: new Date().toISOString(), type: 'system', systemType: 'member_removed' });
+      });
+      participantsChanged = toAdd.length > 0 || toRemove.length > 0;
+      chat.participants = participants;
+    }
+
+    const extraFields = { seller_name: newName };
+    if (participantsChanged) extraFields.participants = chat.participants;
+    await updateGroupMeta(chat, meta, extraFields);
+
+    showToast('Dados do grupo atualizados!', 'success');
+
+    // Atualiza o cabeçalho do chat aberto, se for o caso
+    const msgsId = `dmsgs_${chatId}`;
+    const headerAvatar = document.getElementById(`${msgsId}Avatar`);
+    if (headerAvatar) headerAvatar.src = _editGroupAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newName)}&background=00A884&color=fff&bold=true`;
+    const headerNameEl = headerAvatar?.closest('.chat-header-pro')?.querySelector('.chat-header-name');
+    if (headerNameEl) headerNameEl.textContent = newName;
+
+    const modalEl = document.getElementById('editGroupModal');
+    const modal = window.bootstrap ? bootstrap.Modal.getInstance(modalEl) : null;
+    modal?.hide();
+
+    window.renderDirectChats?.({ skipBoot: true });
+    if (window.currentChat === chatId) {
+      setTimeout(() => window.openDirectChat(chatId), 200);
+    }
+  } catch (e) {
+    console.error('Erro ao salvar dados do grupo:', e);
+    showToast('Erro ao salvar dados do grupo.', 'error');
+  }
+};
+
+// ---------------------------------------------------------------
 // 5. ADMINISTRAÇÃO DO GRUPO
 // ---------------------------------------------------------------
 
@@ -6973,29 +7386,6 @@ window.groupEditName = async function (chatId) {
       setTimeout(() => window.openDirectChat(chatId), 200);
     }
   } catch (e) { showToast('Erro ao alterar nome.', 'error'); }
-};
-
-/** Editar descrição do grupo */
-window.groupEditDescription = async function (chatId) {
-  try {
-    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
-    const chat = chatResult?.[0];
-    if (!chat) return;
-    const meta = getGroupMeta(chat);
-    if (!meta) return;
-    const current = meta.groupDescription || '';
-    const newDesc = prompt('Descrição do grupo:', current);
-    if (newDesc === null) return;
-    const user = getSavedUser();
-    meta.groupDescription = newDesc.trim();
-    const sysText = newDesc.trim()
-      ? `${user.nome} alterou a descrição do grupo`
-      : `${user.nome} removeu a descrição do grupo`;
-    await addSystemMessage(chat, sysText, 'description_changed');
-    await updateGroupMeta(chat, meta);
-    showToast('Descrição alterada.', 'success');
-    window.closeGroupInfo();
-  } catch (e) { showToast('Erro ao alterar descrição.', 'error'); }
 };
 
 /** Alternar configuração do grupo */
@@ -7440,7 +7830,7 @@ window._initGroupUI = function () {
               infoBtn.setAttribute('data-group-info-btn', '');
               infoBtn.innerHTML = '<i class="bi bi-info-circle"></i>';
               infoBtn.title = 'Informações do grupo';
-              infoBtn.onclick = async () => await window.openGroupInfo(chatId);
+              infoBtn.onclick = async () => await window.openEditGroupModal(chatId);
               actionsDiv.prepend(infoBtn);
             }
           }
@@ -7579,74 +7969,1008 @@ window.openAIChat = async function() {
     await window.startDirectChat(AI_USER_ID);
 };
 
-window.openGeneralChat = async function() {
+// ============================================
+// COMUNIDADE ElectroMarket — FEED ESTILO TWITTER
+// (antes era um grupo de chat estilo WhatsApp com todo mundo;
+//  agora é um feed de posts com curtidas, respostas e perfis,
+//  igual ao modelo de um Twitter clone: https://github.com/AnkitYande/TwitterCopy)
+// ============================================
+
+window._twPendingImage = null;
+window._twPostsCache = {};
+
+function twEscape(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function twTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Math.max(0, (Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return 'agora';
+    if (diff < 3600) return `${Math.floor(diff / 60)}min`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+    return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+function twAvatarUrl(u) {
+    return normalizeImageUrl(safeParseImages(u?.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u?.nome || 'User')}&background=1d9bf0&color=fff`;
+}
+
+// ------------------------------------------------------------------
+// Armazenamento da Comunidade — usa a tabela `chats` (a mesma dos
+// papos normais), em vez da `app_data`. Cada thread (post original +
+// respostas) vira UMA linha em `chats`, exatamente como um chat normal
+// tem um cabeçalho ("Fulano · N mensagens") e um array `messages`: o
+// post original é a messages[0] (id da mensagem = id da própria linha)
+// e cada resposta (direta ou aninhada) é adicionada ao mesmo array,
+// guardando `parentId` (o id da mensagem/post a que está respondendo)
+// para manter a árvore de respostas.
+//
+// `order_id` recebe um valor ÚNICO por linha (prefixo + id da própria
+// linha, ex.: "community_post_3f9a...") em vez de um texto fixo repetido
+// — assim nunca colide com um eventual índice único em `order_id` (o
+// mesmo motivo pelo qual chats diretos/grupos sempre usam order_id=null,
+// nunca um texto fixo repetido). O prefixo ainda deixa fácil filtrar
+// todas as linhas da Comunidade com "order_id=like.prefixo*", e como
+// nenhum pedido real vai ter esse prefixo, não há risco de confundir
+// com as conversas de pedido/diretas/grupos.
+//
+// "Seguir/deixar de seguir" também vira uma linha em `chats`, com o
+// mesmo esquema de prefixo, usando as colunas que já existem:
+// seller_id = quem é seguido, buyer_id = quem segue.
+// ------------------------------------------------------------------
+
+const TW_POST_PREFIX = 'community_post_';
+const TW_FOLLOW_PREFIX = 'community_follow_';
+
+/** Localiza a linha (thread) de `chats` que contém a mensagem/post com esse id
+ *  — seja porque é o post original (id da linha) ou uma resposta guardada
+ *  dentro do array `messages` dessa linha. */
+async function twFindThreadRow(msgId) {
+    if (!msgId) return null;
+    const rootRows = await supabaseFetch(`chats?id=eq.${msgId}&select=*&limit=1`);
+    if (rootRows?.[0]) return rootRows[0];
+    const needle = encodeURIComponent(JSON.stringify([{ id: String(msgId) }]));
+    const nestedRows = await supabaseFetch(`chats?id=like.${TW_POST_PREFIX}*&messages=cs.${needle}&select=*&limit=1`);
+    return nestedRows?.[0] || null;
+}
+
+/** Converte uma mensagem (post ou resposta) dentro de uma linha `chats` de
+ *  volta pro formato de "post" já usado pelo resto do código da Comunidade. */
+function twMapPostRow(row, msgId) {
+    if (!row) return null;
+    const messages = Array.isArray(row.messages) ? row.messages : [];
+    const msg = messages.find(m => String(m.id) === String(msgId)) || messages[0];
+    if (!msg) return null;
+    const repliesCount = messages.filter(m => m.parentId != null && String(m.parentId) === String(msg.id)).length;
+    return {
+        id: msg.id,
+        author_id: msg.senderId,
+        content: msg.text || '',
+        image: msg.image || null,
+        parent_id: msg.parentId ?? null,
+        likes: Array.isArray(msg.likes) ? msg.likes : [],
+        reposts: Array.isArray(msg.reposts) ? msg.reposts : [],
+        replies_count: repliesCount,
+        created_at: msg.createdAt || row.created_at,
+        _threadId: row.id
+    };
+}
+
+/** Formata contagens grandes no estilo Threads (ex.: 1200 -> "1,2 mil") */
+function twFormatCount(n) {
+    n = Number(n) || 0;
+    if (n < 1000) return String(n);
+    if (n < 100000) {
+        const v = (n / 1000).toFixed(1).replace('.', ',').replace(',0', '');
+        return `${v} mil`;
+    }
+    return `${Math.round(n / 1000)} mil`;
+}
+
+/** Busca posts/respostas na Comunidade.
+ *  params: { authorId, parentId: undefined|null|'not-null'|<id>, orderDir: 'asc'|'desc', limit, offset } */
+async function twPostsQuery(params = {}) {
+    const { authorId, parentId, orderDir = 'desc', limit, offset } = params;
+
+    // Respostas diretas de um post específico (thread já conhecida).
+    if (parentId !== undefined && parentId !== null && parentId !== 'not-null') {
+        const row = await twFindThreadRow(parentId);
+        if (!row) return [];
+        const messages = Array.isArray(row.messages) ? row.messages : [];
+        const result = messages
+            .filter(m => m.parentId != null && String(m.parentId) === String(parentId))
+            .map(m => twMapPostRow(row, m.id))
+            .filter(Boolean);
+        result.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        if (orderDir === 'desc') result.reverse();
+        return result;
+    }
+
+    // Posts originais (raiz de cada thread) — cada um é a própria linha de `chats`.
+    if (parentId === null) {
+        let query = `chats?id=like.${TW_POST_PREFIX}*&select=*`;
+        if (authorId) query += `&seller_id=eq.${authorId}`;
+        query += `&order=created_at.${orderDir}`;
+        if (limit) query += `&limit=${limit}`;
+        if (offset) query += `&offset=${offset}`;
+        const rows = await supabaseFetch(query);
+        return (rows || []).map(row => twMapPostRow(row, row.messages?.[0]?.id)).filter(Boolean);
+    }
+
+    // Todas as respostas (de qualquer profundidade) de um autor, entre todas as threads.
+    if (parentId === 'not-null' && authorId) {
+        const needle = encodeURIComponent(JSON.stringify([{ senderId: String(authorId) }]));
+        const rows = await supabaseFetch(`chats?id=like.${TW_POST_PREFIX}*&messages=cs.${needle}&select=*`);
+        const result = [];
+        (rows || []).forEach(row => {
+            const messages = Array.isArray(row.messages) ? row.messages : [];
+            messages
+                .filter(m => m.parentId != null && String(m.senderId) === String(authorId))
+                .forEach(m => { const p = twMapPostRow(row, m.id); if (p) result.push(p); });
+        });
+        result.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        if (orderDir === 'desc') result.reverse();
+        return result;
+    }
+
+    return [];
+}
+
+async function twPostsGet(id) {
+    if (!id) return null;
+    const row = await twFindThreadRow(id);
+    if (!row) return null;
+    return twMapPostRow(row, id);
+}
+
+async function twPostCreate({ author_id, content, image, parent_id }) {
+    const now = new Date().toISOString();
+    const authorName = (await twFetchAuthors([author_id]))[String(author_id)]?.nome || '';
+
+    if (!parent_id) {
+        // Novo post original — cria uma nova thread (linha em `chats`).
+        // O id da própria linha leva o prefixo (em vez do order_id, que tem
+        // FK pra `orders` e não aceita um valor inventado); order_id fica
+        // null, igual ao chat direto/grupo.
+        const id = TW_POST_PREFIX + crypto.randomUUID();
+        const newChat = {
+            id,
+            order_id: null,
+            seller_id: author_id,
+            seller_name: authorName,
+            buyer_id: author_id,
+            buyer_name: authorName,
+            participants: [String(author_id)],
+            messages: [{
+                id, parentId: null, senderId: author_id, senderName: authorName,
+                text: content || '', image: image || null, likes: [], reposts: [], createdAt: now
+            }],
+            closed: false,
+            created_at: now
+        };
+        await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
+        return id;
+    }
+
+    // Resposta — entra no array `messages` da thread já existente.
+    const row = await twFindThreadRow(parent_id);
+    if (!row) throw new Error('Post original não encontrado.');
+    const msgId = crypto.randomUUID();
+    const messages = (Array.isArray(row.messages) ? row.messages : []).concat([{
+        id: msgId, parentId: parent_id, senderId: author_id, senderName: authorName,
+        text: content || '', image: image || null, likes: [], reposts: [], createdAt: now
+    }]);
+    const participants = Array.from(new Set([...(row.participants || []).map(String), String(author_id)]));
+    await supabaseFetch(`chats?id=eq.${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ messages, participants })
+    });
+    return msgId;
+}
+
+/** Atualiza campos de um post/resposta (ex.: likes) preservando o resto da mensagem. */
+async function twPostPatch(id, patchFields) {
+    const row = await twFindThreadRow(id);
+    if (!row) return null;
+    const messages = (Array.isArray(row.messages) ? row.messages : []).map(m => {
+        if (String(m.id) !== String(id)) return m;
+        const updated = { ...m };
+        Object.keys(patchFields || {}).forEach(k => {
+            if (k === 'replies_count') return; // derivado a partir do array, não precisa guardar
+            updated[k] = patchFields[k];
+        });
+        return updated;
+    });
+    await supabaseFetch(`chats?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ messages }) });
+    return twMapPostRow({ ...row, messages }, id);
+}
+
+/** Exclui um post/resposta. Se for o post original, apaga a thread inteira
+ *  (linha em `chats`); se for uma resposta, remove só ela (e quem responder
+ *  a ela, em cascata) do array `messages`, mantendo o resto da thread. */
+async function twPostDelete(id) {
+    const row = await twFindThreadRow(id);
+    if (!row) return;
+    const messages = Array.isArray(row.messages) ? row.messages : [];
+    const isRoot = messages[0] && String(messages[0].id) === String(id);
+    if (isRoot) {
+        await supabaseFetch(`chats?id=eq.${row.id}`, { method: 'DELETE' });
+        return;
+    }
+    const idsToRemove = new Set([String(id)]);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        messages.forEach(m => {
+            if (m.parentId != null && idsToRemove.has(String(m.parentId)) && !idsToRemove.has(String(m.id))) {
+                idsToRemove.add(String(m.id));
+                changed = true;
+            }
+        });
+    }
+    const remaining = messages.filter(m => !idsToRemove.has(String(m.id)));
+    await supabaseFetch(`chats?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify({ messages: remaining }) });
+}
+
+async function twFollowExists(followerId, followedId) {
+    const rows = await supabaseFetch(`chats?id=like.${TW_FOLLOW_PREFIX}*&buyer_id=eq.${followerId}&seller_id=eq.${followedId}&select=id&limit=1`);
+    return rows?.[0]?.id || null;
+}
+
+async function twFollowersOf(userId) {
+    const rows = await supabaseFetch(`chats?id=like.${TW_FOLLOW_PREFIX}*&seller_id=eq.${userId}&select=buyer_id`);
+    return (rows || []).map(r => r.buyer_id).filter(Boolean);
+}
+
+async function twFollowingOf(userId) {
+    const rows = await supabaseFetch(`chats?id=like.${TW_FOLLOW_PREFIX}*&buyer_id=eq.${userId}&select=seller_id`);
+    return (rows || []).map(r => r.seller_id).filter(Boolean);
+}
+
+async function twFollowCreate(followerId, followedId) {
+    const now = new Date().toISOString();
+    const id = TW_FOLLOW_PREFIX + crypto.randomUUID();
+    await supabaseFetch('chats', {
+        method: 'POST',
+        body: JSON.stringify({
+            id,
+            order_id: null,
+            seller_id: followedId,
+            buyer_id: followerId,
+            seller_name: '',
+            buyer_name: '',
+            participants: [String(followerId), String(followedId)],
+            messages: [{ type: 'follow', senderId: followerId, text: 'seguiu', timestamp: now }],
+            closed: false,
+            created_at: now
+        })
+    });
+}
+
+async function twFollowDelete(rowId) {
+    await supabaseFetch(`chats?id=eq.${rowId}`, { method: 'DELETE' });
+}
+
+/** Monta o pequeno cartão "respondendo a" (quote do post pai), exibido no topo
+ *  das respostas — igual ao jeito que o Threads mostra o post original acima
+ *  do comentário quando a resposta aparece fora da própria thread (ex.: no
+ *  perfil do usuário, aba Respostas). */
+function renderQuotedContext(parentPost, parentAuthor) {
+    if (!parentPost) return '';
+    const name = twEscape(parentAuthor?.nome || 'Usuário removido');
+    const avatar = twAvatarUrl(parentAuthor);
+    const text = parentPost.content
+        ? twEscape(parentPost.content).slice(0, 200)
+        : (parentPost.image ? '📷 Imagem' : '');
+    return `<div class="tw-quoted-context" onclick="event.stopPropagation();window.openCommunityThread('${parentPost.id}')">
+        <img class="tw-avatar-xs" src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'">
+        <span class="tw-quoted-name">${name}</span>
+        <span class="tw-quoted-time">${twTimeAgo(parentPost.created_at)}</span>
+        <div class="tw-quoted-text">${text}</div>
+    </div>`;
+}
+
+/** Ponto de entrada — abre a Comunidade como feed estilo Twitter (posts, curtidas,
+ *  respostas e perfis com seguidores), reaproveitando a área principal de conteúdo
+ *  (#productsGrid) do jeito que showTermsPage/showCreateAdPage já fazem. */
+window.openCommunityFeed = async function(skipSaveState) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
 
-    const GENERAL_CHAT_NAME = 'Comunidade ElectroMarket';
-    const LEGACY_NAMES = ['Chat Geral', GENERAL_CHAT_NAME];
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
 
-    showToast(`Abrindo ${GENERAL_CHAT_NAME}...`, 'info', 1500);
+    if (!skipSaveState && !grid.classList.contains('community-active') &&
+        !grid.classList.contains('create-ad-active') && !grid.classList.contains('product-detail-active') &&
+        !grid.classList.contains('offer-page-active')) {
+        window._preDetailState = {
+            html: grid.innerHTML,
+            gridClass: grid.className,
+            gridDisplay: grid.style.display,
+            title: document.getElementById('gridTitle')?.textContent || '',
+            heroHidden: document.getElementById('heroSection')?.classList.contains('d-none') ?? true
+        };
+    }
 
+    window.exitWaOrdersView?.();
+    if (typeof hideAdminTopNavTabs === 'function') hideAdminTopNavTabs();
+
+    const hero = document.getElementById('heroSection');
+    if (hero) hero.classList.add('d-none');
+    const gridTitleEl = document.getElementById('gridTitle');
+    if (gridTitleEl) gridTitleEl.textContent = '';
+    document.getElementById('storefrontBanner')?.replaceChildren();
+
+    if (window.location.hash) history.pushState(null, '', window.location.pathname + window.location.search);
+
+    grid.className = 'offer-page-active community-active';
+    grid.style.display = 'block';
+    grid.innerHTML = renderCommunityFeedShell(user);
+
+    await window.loadCommunityPosts();
+};
+
+function renderCommunityFeedShell(user) {
+    const avatar = twAvatarUrl(user);
+    return `
+    <div class="detail-page">
+        <div class="tw-feed-wrap">
+            <div class="tw-feed-header">
+                <button type="button" class="detail-back-btn" style="margin:0;" onclick="window.closeProductDetail()">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </button>
+                <div>
+                    <h4>Comunidade</h4>
+                    <p>Veja o que a galera do ElectroMarket está postando</p>
+                </div>
+            </div>
+
+            <div class="tw-composer">
+                <img class="tw-avatar" src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'">
+                <div class="tw-composer-body">
+                    <textarea id="twComposerText" class="tw-composer-textarea" placeholder="O que está rolando?" rows="2" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
+                    <div id="twComposerPreviewWrap"></div>
+                    <div class="tw-composer-toolbar">
+                        <div>
+                            <label class="tw-icon-btn" title="Adicionar imagem" style="cursor:pointer;">
+                                <i class="bi bi-image"></i>
+                                <input type="file" accept="image/*" class="d-none" onchange="window.communityPickImage(this)">
+                            </label>
+                        </div>
+                        <button type="button" class="tw-post-btn" id="twPostBtn" onclick="window.submitCommunityPost()">Postar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="communityPostsList">${renderCommunitySkeleton()}</div>
+        </div>
+    </div>`;
+}
+
+function renderCommunitySkeleton() {
+    let h = '';
+    for (let i = 0; i < 3; i++) {
+        h += `<div class="tw-skeleton"><div class="tw-skel-avatar"></div><div class="tw-skel-body"><div class="tw-skel-line" style="width:30%;"></div><div class="tw-skel-line" style="width:80%;"></div><div class="tw-skel-line" style="width:50%;"></div></div></div>`;
+    }
+    return h;
+}
+
+window.communityPickImage = function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const wrap = document.getElementById('twComposerPreviewWrap');
+    if (!wrap) return;
+    wrap.innerHTML = `<div class="tw-composer-preview"><img src="${URL.createObjectURL(file)}"><button type="button" class="tw-remove-img" onclick="window.communityRemoveImage()"><i class="bi bi-x-lg"></i></button></div>`;
+    window._twPendingImage = 'uploading';
+    _uploadToImgur(file).then(url => {
+        window._twPendingImage = url || null;
+        if (!url) { showToast('Falha ao enviar imagem.', 'error'); wrap.innerHTML = ''; }
+    });
+};
+
+window.communityRemoveImage = function() {
+    window._twPendingImage = null;
+    const wrap = document.getElementById('twComposerPreviewWrap');
+    if (wrap) wrap.innerHTML = '';
+};
+
+window.submitCommunityPost = async function() {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    const textEl = document.getElementById('twComposerText');
+    const content = (textEl?.value || '').trim();
+    if (!content && !window._twPendingImage) { showToast('Escreva algo ou adicione uma imagem.', 'warning'); return; }
+    if (window._twPendingImage === 'uploading') { showToast('Aguarde a imagem terminar de enviar...', 'info'); return; }
+
+    const btn = document.getElementById('twPostBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Postando...'; }
     try {
-        const allUsers = await supabaseFetch('users?select=id,nome&order=nome.asc');
-        const allIds = allUsers.map(u => String(u.id)).filter(id => String(id) !== AI_USER_ID);
+        await twPostCreate({ author_id: user.id, content, image: window._twPendingImage || null, parent_id: null });
+        if (textEl) { textEl.value = ''; textEl.style.height = 'auto'; }
+        window.communityRemoveImage();
+        showToast('Postado!', 'success');
+        await window.loadCommunityPosts();
+    } catch (e) {
+        console.error('Erro ao postar:', e);
+        showToast(`Erro ao postar: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Postar'; }
+    }
+};
 
-        const nameFilter = LEGACY_NAMES.map(n => `"${n}"`).join(',');
-        const existing = await supabaseFetch(`chats?order_id=is.null&seller_name=in.(${nameFilter})&select=*`);
+async function twFetchAuthors(ids) {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean).map(String)));
+    if (!uniqueIds.length) return {};
+    const idFilter = uniqueIds.map(id => `"${id}"`).join(',');
+    try {
+        const users = await supabaseFetch(`users?select=id,nome,avatar&id=in.(${idFilter})`);
+        const byId = {};
+        (users || []).forEach(u => { byId[String(u.id)] = u; });
+        return byId;
+    } catch (e) { return {}; }
+}
 
-        let chatId;
+window.loadCommunityPosts = async function() {
+    const list = document.getElementById('communityPostsList');
+    if (!list) return;
+    try {
+        const posts = await twPostsQuery({ parentId: null, orderDir: 'desc', limit: 100 });
+        window._twPostsCache = {};
+        (posts || []).forEach(p => { window._twPostsCache[p.id] = p; });
 
-        if (existing && existing.length > 0) {
-            const chat = existing[0];
-            chatId = chat.id;
-            const current = (chat.participants || []).map(String);
-            const merged = Array.from(new Set([...current, ...allIds]));
-            const needsRename = chat.seller_name !== GENERAL_CHAT_NAME || chat.buyer_name !== GENERAL_CHAT_NAME;
-            if (merged.length !== current.length || needsRename) {
-                await supabaseFetch(`chats?id=eq.${chatId}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        participants: merged,
-                        ...(needsRename ? { seller_name: GENERAL_CHAT_NAME, buyer_name: GENERAL_CHAT_NAME } : {})
-                    })
-                });
-            }
-        } else {
-            chatId = crypto.randomUUID();
-            const newChat = {
-                id: chatId,
-                order_id: null,
-                buyer_id: user.id,
-                seller_id: user.id,
-                buyer_name: GENERAL_CHAT_NAME,
-                seller_name: GENERAL_CHAT_NAME,
-                participants: allIds,
-                messages: [
-                    { type: 'direct_chat_meta', createdBy: user.id, createdByName: user.nome },
-                    { senderId: 'system', text: `${GENERAL_CHAT_NAME} criada — todos os usuários cadastrados participam por aqui.`, timestamp: new Date().toISOString(), type: 'system' }
-                ]
-            };
-            await supabaseFetch('chats', { method: 'POST', body: JSON.stringify(newChat) });
+        if (!posts || !posts.length) {
+            list.innerHTML = `<div class="tw-empty-feed"><i class="bi bi-people"></i>Ainda não tem nenhum post por aqui.<br>Seja o primeiro a postar!</div>`;
+            return;
         }
 
-        await window.openDirectChat(chatId);
+        const authors = await twFetchAuthors(posts.map(p => p.author_id));
+        const me = getSavedUser();
+        list.innerHTML = posts.map(p => renderCommunityPostCard(p, authors[String(p.author_id)], me)).join('');
     } catch (e) {
-        console.error(`Erro ao abrir a ${GENERAL_CHAT_NAME}:`, e);
-        const detail = e?.message || e?.hint || e?.details || '';
-        showToast(detail ? `Erro ao abrir: ${detail}` : 'Erro ao abrir.', 'error');
+        console.error('Erro ao carregar posts:', e);
+        list.innerHTML = `<div class="tw-empty-feed"><i class="bi bi-exclamation-triangle"></i>Erro ao carregar a Comunidade.<br><small>${twEscape(e?.message || '')}</small></div>`;
+    }
+};
+
+function renderCommunityPostCard(post, author, me, parentCtxHtml) {
+    const name = twEscape(author?.nome || 'Usuário removido');
+    const avatar = twAvatarUrl(author);
+    const likes = Array.isArray(post.likes) ? post.likes : [];
+    const liked = me && likes.some(id => String(id) === String(me.id));
+    const isMine = me && String(post.author_id) === String(me.id);
+    const imgHtml = post.image ? `<img class="tw-post-img" src="${post.image}" referrerpolicy="no-referrer" onclick="window.openImageFull?.('${String(post.image).replace(/'/g, "\\'")}')">` : '';
+    const postId = post.id;
+    const repliesCount = post.replies_count || 0;
+    const likesCount = likes.length;
+    const reposts = Array.isArray(post.reposts) ? post.reposts : [];
+    const reposted = me && reposts.some(id => String(id) === String(me.id));
+    const repostsCount = reposts.length;
+    return `
+    <div class="tw-post" data-post-id="${postId}">
+        <div class="tw-post-avatar-col">
+            <img class="tw-post-avatar" src="${avatar}" referrerpolicy="no-referrer" onclick="window.openCommunityProfile('${post.author_id}')" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'">
+            ${repliesCount > 0 ? '<div class="tw-thread-line"></div>' : ''}
+        </div>
+        <div class="tw-post-content">
+            <div class="tw-post-header">
+                <span class="tw-post-name" onclick="window.openCommunityProfile('${post.author_id}')">${name}</span>
+                <span class="tw-post-time">${twTimeAgo(post.created_at)}</span>
+                <div class="tw-post-menu-wrap">
+                    <button type="button" class="tw-post-menu-btn" onclick="event.stopPropagation();this.nextElementSibling.classList.toggle('d-none')" title="Mais">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <div class="tw-post-dropdown d-none">
+                        ${isMine ? `<button type="button" class="tw-dropdown-item" onclick="event.stopPropagation();window.startEditCommunityPost('${postId}')"><i class="bi bi-pencil me-2"></i>Editar</button>` : ''}
+                        ${isMine ? `<button type="button" class="tw-dropdown-item text-danger" onclick="event.stopPropagation();window.deleteCommunityPost('${postId}')"><i class="bi bi-trash3 me-2"></i>Excluir</button>` : ''}
+                        <button type="button" class="tw-dropdown-item" onclick="event.stopPropagation();window.shareCommunityPost('${postId}')"><i class="bi bi-share me-2"></i>Compartilhar</button>
+                    </div>
+                </div>
+            </div>
+            ${post.content ? `<div class="tw-post-text">${twEscape(post.content)}</div>` : ''}
+            ${imgHtml}
+            ${parentCtxHtml || ''}
+            <div class="tw-post-actions">
+                <button type="button" class="tw-action-btn ${liked ? 'tw-like-active' : ''}" onclick="window.toggleCommunityLike('${postId}', this)" title="Curtir">
+                    <i class="bi ${liked ? 'bi-heart-fill' : 'bi-heart'}"></i>${likesCount > 0 ? `<span class="action-count" onclick="event.stopPropagation();window.showCommunityPostActivity('${postId}')">${twFormatCount(likesCount)}</span>` : ''}
+                </button>
+                <button type="button" class="tw-action-btn" onclick="window.openCommunityThread('${postId}')" title="Comentar">
+                    <i class="bi bi-chat"></i>${repliesCount > 0 ? `<span class="action-count">${twFormatCount(repliesCount)}</span>` : ''}
+                </button>
+                <button type="button" class="tw-action-btn ${reposted ? 'tw-repost-active' : ''}" onclick="window.toggleCommunityRepost('${postId}', this)" title="Repostar">
+                    <i class="bi bi-arrow-repeat"></i>${repostsCount > 0 ? `<span class="action-count">${twFormatCount(repostsCount)}</span>` : ''}
+                </button>
+                <button type="button" class="tw-action-btn" onclick="window.shareCommunityPost('${postId}')" title="Compartilhar">
+                    <i class="bi bi-send"></i>
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+/** Abre a edição inline de um post/resposta da Comunidade (só o autor vê a opção).
+ *  Troca o texto exibido por um textarea + botões Salvar/Cancelar, sem precisar
+ *  recarregar a lista — funciona tanto no feed quanto dentro de uma thread. */
+window.startEditCommunityPost = function(postId) {
+    const card = document.querySelector(`.tw-post[data-post-id="${postId}"]`);
+    if (!card) return;
+    if (card.querySelector('.tw-post-edit-wrap')) return; // já está editando
+    card.querySelector('.tw-post-dropdown')?.classList.add('d-none');
+
+    const textEl = card.querySelector('.tw-post-text');
+    const currentText = textEl ? textEl.textContent : '';
+    if (textEl) textEl.classList.add('d-none');
+
+    const editWrap = document.createElement('div');
+    editWrap.className = 'tw-post-edit-wrap';
+    editWrap.innerHTML = `
+        <textarea class="tw-composer-textarea tw-post-edit-textarea" rows="2" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
+        <div class="tw-post-edit-actions">
+            <button type="button" class="tw-edit-cancel-btn" onclick="event.stopPropagation();window.cancelCommunityPostEdit('${postId}')">Cancelar</button>
+            <button type="button" class="tw-post-btn" onclick="event.stopPropagation();window.saveCommunityPostEdit('${postId}')">Salvar</button>
+        </div>`;
+    (textEl || card.querySelector('.tw-post-header')).insertAdjacentElement('afterend', editWrap);
+
+    const textarea = editWrap.querySelector('textarea');
+    textarea.value = currentText;
+    textarea.style.height = 'auto';
+    textarea.style.height = (textarea.scrollHeight) + 'px';
+    textarea.focus();
+};
+
+/** Cancela a edição em andamento e volta a mostrar o texto original. */
+window.cancelCommunityPostEdit = function(postId) {
+    const card = document.querySelector(`.tw-post[data-post-id="${postId}"]`);
+    if (!card) return;
+    card.querySelector('.tw-post-edit-wrap')?.remove();
+    card.querySelector('.tw-post-text')?.classList.remove('d-none');
+};
+
+/** Salva a edição de um post/resposta da Comunidade. */
+window.saveCommunityPostEdit = async function(postId) {
+    const card = document.querySelector(`.tw-post[data-post-id="${postId}"]`);
+    if (!card) return;
+    const editWrap = card.querySelector('.tw-post-edit-wrap');
+    const textarea = editWrap?.querySelector('textarea');
+    const newText = (textarea?.value || '').trim();
+    if (!newText) { showToast('A mensagem não pode ficar vazia.', 'warning'); return; }
+
+    const saveBtn = editWrap?.querySelector('.tw-post-btn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Salvando...'; }
+    try {
+        await twPostPatch(postId, { text: newText });
+        editWrap?.remove();
+        let textEl = card.querySelector('.tw-post-text');
+        if (textEl) {
+            textEl.textContent = newText;
+            textEl.classList.remove('d-none');
+        } else {
+            const newEl = document.createElement('div');
+            newEl.className = 'tw-post-text';
+            newEl.textContent = newText;
+            card.querySelector('.tw-post-header').insertAdjacentElement('afterend', newEl);
+        }
+        if (window._twPostsCache?.[postId]) window._twPostsCache[postId].content = newText;
+        showToast('Mensagem atualizada!', 'success');
+    } catch (e) {
+        console.error('Erro ao editar post:', e);
+        showToast(`Erro ao editar: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Salvar'; }
+    }
+};
+
+window.toggleCommunityLike = async function(postId, btnEl) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    try {
+        const post = await twPostsGet(postId);
+        if (!post) return;
+        let likes = Array.isArray(post.likes) ? post.likes.map(String) : [];
+        const uid = String(user.id);
+        const alreadyLiked = likes.includes(uid);
+        likes = alreadyLiked ? likes.filter(id => id !== uid) : [...likes, uid];
+
+        await twPostPatch(postId, { likes });
+
+        if (btnEl) {
+            btnEl.classList.toggle('tw-like-active', !alreadyLiked);
+            const icon = btnEl.querySelector('i');
+            if (icon) icon.className = `bi ${!alreadyLiked ? 'bi-heart-fill' : 'bi-heart'}`;
+            const span = btnEl.querySelector('span');
+            if (span) span.textContent = likes.length;
+        }
+        if (window._twPostsCache[postId]) window._twPostsCache[postId].likes = likes;
+    } catch (e) {
+        console.error('Erro ao curtir:', e);
+        showToast(`Erro ao curtir: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+    }
+};
+
+/** Reposta/desfaz repost de um post da Comunidade */
+window.toggleCommunityRepost = async function(postId, btnEl) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    try {
+        const post = await twPostsGet(postId);
+        if (!post) return;
+        let reposts = Array.isArray(post.reposts) ? post.reposts.map(String) : [];
+        const uid = String(user.id);
+        const alreadyReposted = reposts.includes(uid);
+        reposts = alreadyReposted ? reposts.filter(id => id !== uid) : [...reposts, uid];
+
+        await twPostPatch(postId, { reposts });
+
+        if (btnEl) {
+            btnEl.classList.toggle('tw-repost-active', !alreadyReposted);
+            let span = btnEl.querySelector('.action-count');
+            if (reposts.length > 0) {
+                if (!span) {
+                    span = document.createElement('span');
+                    span.className = 'action-count';
+                    btnEl.appendChild(span);
+                }
+                span.textContent = twFormatCount(reposts.length);
+            } else if (span) {
+                span.remove();
+            }
+        }
+        if (window._twPostsCache?.[postId]) window._twPostsCache[postId].reposts = reposts;
+        showToast(alreadyReposted ? 'Repost desfeito.' : 'Repostado!', 'success');
+    } catch (e) {
+        console.error('Erro ao repostar:', e);
+        showToast(`Erro ao repostar: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+    }
+};
+
+/** Exclui um post da Comunidade (apenas o autor pode excluir) */
+window.deleteCommunityPost = async function(postId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    if (!confirm('Tem certeza que deseja excluir este post?')) return;
+    try {
+        const post = await twPostsGet(postId);
+        if (!post) { showToast('Post não encontrado.', 'error'); return; }
+        if (String(post.author_id) !== String(user.id)) { showToast('Você só pode excluir seus próprios posts.', 'error'); return; }
+        await twPostDelete(postId);
+        showToast('Post excluído.', 'success');
+        // Recarrega o feed
+        const container = window._chatActiveElements?.container;
+        if (container) await renderCommunityFeedInChat(container, false);
+    } catch (e) {
+        console.error('Erro ao excluir post:', e);
+        showToast(`Erro ao excluir post: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+    }
+};
+
+/** Compartilha um post copiando o link para a área de transferência */
+window.shareCommunityPost = function(postId) {
+    const url = `${window.location.origin}${window.location.pathname}?post=${postId}`;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Link copiado!', 'success');
+    }).catch(() => {
+        showToast('Erro ao copiar link.', 'error');
+    });
+};
+
+/** Mostra quem curtiu um post (modal simples) */
+window.showCommunityPostActivity = async function(postId) {
+    try {
+        const post = await twPostsGet(postId);
+        if (!post || !Array.isArray(post.likes) || !post.likes.length) { showToast('Nenhuma curtida ainda.', 'info'); return; }
+        const users = await twFetchAuthors(post.likes);
+        const list = post.likes.map(id => {
+            const u = users[String(id)];
+            const name = u?.nome || 'Usuário';
+            const avatarUrl = twAvatarUrl(u);
+            return `<div class="tw-activity-user"><img src="${avatarUrl}" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'"><span>${twEscape(name)}</span></div>`;
+        }).join('');
+        showToast(`<div class="tw-activity-modal"><strong style="display:block;margin-bottom:8px;">Curtidas</strong>${list}</div>`);
+    } catch (e) {
+        console.error('Erro ao carregar atividade:', e);
+    }
+};
+
+/** Abre a thread de um post: post original + composer de resposta + lista de respostas */
+window.openCommunityThread = async function(postId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+
+    // A Comunidade pode estar aberta de dois jeitos: na página dedicada
+    // (#productsGrid) ou dentro do painel de Conversas (communityChatMsgs).
+    // Detecta onde estamos pra montar a resposta no lugar certo — senão o
+    // "Comentar" clicado dentro do chat ficava escrevendo num container
+    // escondido (#productsGrid) e parecia que não fazia nada.
+    const inChat = window.currentChat === 'community';
+    const grid = inChat ? document.getElementById('communityChatMsgs') : document.getElementById('productsGrid');
+    if (!grid) return;
+
+    if (!inChat) {
+        grid.className = 'offer-page-active community-active';
+        grid.style.display = 'block';
+    }
+    const backAction = inChat ? `window.renderCommunityFeedInChat(document.getElementById('communityChatMsgs'), false)` : `window.openCommunityFeed(true)`;
+    grid.innerHTML = `
+    <div class="detail-page">
+        <div class="tw-feed-wrap">
+            <div class="tw-feed-header">
+                <button type="button" class="tw-icon-btn" style="margin:0;" title="Voltar" onclick="${backAction}">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <div><h4>Post</h4></div>
+            </div>
+            <div id="twThreadContent">${renderCommunitySkeleton()}</div>
+        </div>
+    </div>`;
+
+    try {
+        const post = await twPostsGet(postId);
+        if (!post) { document.getElementById('twThreadContent').innerHTML = `<div class="tw-empty-feed"><i class="bi bi-emoji-frown"></i>Post não encontrado.</div>`; return; }
+
+        const replies = await twPostsQuery({ parentId: postId, orderDir: 'asc' });
+        const authorIds = [post.author_id, ...(replies || []).map(r => r.author_id)];
+        const authors = await twFetchAuthors(authorIds);
+        const me = getSavedUser();
+
+        const originalHtml = renderCommunityPostCard(post, authors[String(post.author_id)], me).replace('class="tw-post"', 'class="tw-post tw-thread-original"');
+
+        // Guarda o estado da thread pra dar pra reordenar as respostas sem recarregar tudo.
+        window._twThread = { postId, replies: replies || [], authors, sort: 'relevantes' };
+
+        const sortRowHtml = `
+        <div class="tw-thread-sort-row">
+            <div class="tw-post-menu-wrap">
+                <button type="button" class="tw-thread-sort-btn" onclick="event.stopPropagation();this.nextElementSibling.classList.toggle('d-none')">
+                    <i class="bi bi-arrow-down-up"></i> <span id="twThreadSortLabel">Mais relevantes</span> <i class="bi bi-chevron-down" style="font-size:11px;"></i>
+                </button>
+                <div class="tw-post-dropdown d-none">
+                    <button type="button" class="tw-dropdown-item" onclick="event.stopPropagation();window.communitySortReplies('relevantes')">Mais relevantes</button>
+                    <button type="button" class="tw-dropdown-item" onclick="event.stopPropagation();window.communitySortReplies('recentes')">Mais recentes</button>
+                </div>
+            </div>
+            <span class="tw-thread-activity-link" onclick="window.showCommunityPostActivity('${postId}')">Ver atividade <i class="bi bi-chevron-right" style="font-size:11px;"></i></span>
+        </div>`;
+
+        const replyComposerHtml = `
+        <div class="tw-composer tw-reply-composer">
+            <img class="tw-avatar" src="${twAvatarUrl(me)}" referrerpolicy="no-referrer">
+            <div class="tw-composer-body">
+                <textarea id="twReplyText" class="tw-composer-textarea" placeholder="Postar sua resposta" rows="2" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
+                <div id="twReplyPreview" class="tw-composer-preview d-none"></div>
+                <div class="tw-composer-toolbar">
+                    <div>
+                        <label class="tw-icon-btn" title="Adicionar imagem" style="cursor:pointer;">
+                            <i class="bi bi-image"></i>
+                            <input type="file" accept="image/*" class="d-none" onchange="window.communityPickReplyImage(this)">
+                        </label>
+                    </div>
+                    <button type="button" class="tw-post-btn" onclick="window.submitCommunityReply('${postId}')">Responder</button>
+                </div>
+            </div>
+        </div>`;
+
+        document.getElementById('twThreadContent').innerHTML = originalHtml + sortRowHtml + replyComposerHtml + `<div id="twRepliesList"></div>`;
+        window._renderThreadReplies();
+    } catch (e) {
+        console.error('Erro ao abrir post:', e);
+        document.getElementById('twThreadContent').innerHTML = `<div class="tw-empty-feed"><i class="bi bi-exclamation-triangle"></i>Erro ao carregar o post.</div>`;
+    }
+};
+
+/** Renderiza a lista de respostas da thread aberta, respeitando a ordenação escolhida */
+window._renderThreadReplies = function() {
+    const state = window._twThread;
+    const listEl = document.getElementById('twRepliesList');
+    if (!state || !listEl) return;
+    const me = getSavedUser();
+    let replies = [...state.replies];
+    if (state.sort === 'relevantes') {
+        replies.sort((a, b) => ((b.likes?.length || 0) + (b.reposts?.length || 0)) - ((a.likes?.length || 0) + (a.reposts?.length || 0)));
+    } else {
+        replies.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    listEl.innerHTML = replies.length
+        ? `<div class="tw-reply-list">${replies.map(r => renderCommunityPostCard(r, state.authors[String(r.author_id)], me)).join('')}</div>`
+        : `<div class="tw-empty-feed"><i class="bi bi-chat"></i>Nenhuma resposta ainda. Seja o primeiro!</div>`;
+};
+
+/** Troca a ordenação das respostas (Mais relevantes / Mais recentes) */
+window.communitySortReplies = function(sort) {
+    if (!window._twThread) return;
+    window._twThread.sort = sort;
+    const label = document.getElementById('twThreadSortLabel');
+    if (label) label.textContent = sort === 'relevantes' ? 'Mais relevantes' : 'Mais recentes';
+    document.querySelectorAll('.tw-thread-sort-row .tw-post-dropdown').forEach(el => el.classList.add('d-none'));
+    window._renderThreadReplies();
+};
+
+/** Seleciona/remove a imagem anexada à resposta da thread */
+window.communityPickReplyImage = function(input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const wrap = document.getElementById('twReplyPreview');
+    if (!wrap) return;
+    wrap.classList.remove('d-none');
+    wrap.innerHTML = `<div class="tw-composer-preview"><img src="${URL.createObjectURL(file)}"><button type="button" class="tw-remove-img" onclick="window.communityRemoveReplyImage()"><i class="bi bi-x-lg"></i></button></div>`;
+    window._twReplyPendingImage = 'uploading';
+    _uploadToImgur(file).then(url => {
+        window._twReplyPendingImage = url || null;
+        if (!url) { showToast('Falha ao enviar imagem.', 'error'); wrap.innerHTML = ''; wrap.classList.add('d-none'); }
+    });
+};
+
+window.communityRemoveReplyImage = function() {
+    window._twReplyPendingImage = null;
+    const wrap = document.getElementById('twReplyPreview');
+    if (wrap) { wrap.innerHTML = ''; wrap.classList.add('d-none'); }
+};
+
+window.submitCommunityReply = async function(parentId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    const textEl = document.getElementById('twReplyText');
+    const content = (textEl?.value || '').trim();
+    if (!content && !window._twReplyPendingImage) { showToast('Escreva algo ou adicione uma imagem.', 'warning'); return; }
+    if (window._twReplyPendingImage === 'uploading') { showToast('Aguarde a imagem terminar de enviar...', 'info'); return; }
+    try {
+        await twPostCreate({ author_id: user.id, content, image: window._twReplyPendingImage || null, parent_id: parentId });
+        window._twReplyPendingImage = null;
+        showToast('Resposta enviada!', 'success');
+        await window.openCommunityThread(parentId);
+    } catch (e) {
+        console.error('Erro ao responder:', e);
+        showToast(`Erro ao enviar resposta: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+    }
+};
+
+/** Perfil de um usuário dentro da Comunidade: posts, seguidores/seguindo, seguir/deixar de seguir */
+window.openCommunityProfile = async function(userId) {
+    const me = getSavedUser();
+    if (!me) { showToast('Faça login!', 'warning'); return; }
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+
+    grid.className = 'offer-page-active community-active';
+    grid.style.display = 'block';
+    grid.innerHTML = `
+    <div class="detail-page">
+        <div class="tw-feed-wrap">
+            <div class="tw-feed-header">
+                <button type="button" class="detail-back-btn" style="margin:0;" onclick="window.openCommunityFeed(true)">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </button>
+                <div><h4>Perfil</h4></div>
+            </div>
+            <div id="twProfileContent">${renderCommunitySkeleton()}</div>
+        </div>
+    </div>`;
+
+    try {
+        const userResult = await supabaseFetch(`users?select=id,nome,avatar,created_at&id=eq.${userId}&limit=1`);
+        const profileUser = userResult?.[0];
+        if (!profileUser) { document.getElementById('twProfileContent').innerHTML = `<div class="tw-empty-feed"><i class="bi bi-emoji-frown"></i>Usuário não encontrado.</div>`; return; }
+
+        const [posts, replies, followerIds, followingIds] = await Promise.all([
+            twPostsQuery({ authorId: userId, parentId: null, orderDir: 'desc' }),
+            twPostsQuery({ authorId: userId, parentId: 'not-null', orderDir: 'desc' }),
+            twFollowersOf(userId),
+            twFollowingOf(userId)
+        ]);
+
+        const isMe = String(userId) === String(me.id);
+        const iFollow = !isMe && followerIds.some(id => String(id) === String(me.id));
+        const memberSince = profileUser.created_at ? new Date(profileUser.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—';
+        const avatar = twAvatarUrl(profileUser);
+
+        const followBtnHtml = isMe ? '' : `
+            <button type="button" class="tw-follow-btn ${iFollow ? 'following' : ''}" id="twFollowBtn" onclick="window.toggleCommunityFollow('${userId}')">
+                ${iFollow ? 'Seguindo' : 'Seguir'}
+            </button>`;
+
+        const profileHeaderHtml = `
+        <div class="tw-profile-card">
+            <div class="tw-profile-cover"></div>
+            <div class="tw-profile-info">
+                <div class="d-flex justify-content-between align-items-end">
+                    <img class="tw-avatar-lg" src="${avatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'">
+                    <div style="padding-bottom:4px;">${followBtnHtml}</div>
+                </div>
+                <h5 class="fw-bold mt-2 mb-0">${twEscape(profileUser.nome || 'Usuário')}</h5>
+                <p class="text-muted small mb-0"><i class="bi bi-calendar3 me-1"></i>Na comunidade desde ${memberSince}</p>
+                <div class="tw-profile-stats">
+                    <span><strong>${posts?.length || 0}</strong> posts</span>
+                    <span><strong id="twFollowingCount">${followingIds.length}</strong> seguindo</span>
+                    <span><strong id="twFollowersCount">${followerIds.length}</strong> seguidores</span>
+                </div>
+            </div>
+        </div>`;
+
+        const authors = await twFetchAuthors([userId]);
+        const postsHtml = (posts && posts.length)
+            ? posts.map(p => renderCommunityPostCard(p, authors[String(userId)], me)).join('')
+            : `<div class="tw-empty-feed"><i class="bi bi-chat-square-text"></i>Nenhum post ainda.</div>`;
+
+        // Respostas (comentários) do usuário — volta a aparecer no topo do perfil,
+        // cada uma com o post original citado acima das curtidas, igual ao Threads.
+        let repliesHtml = `<div class="tw-empty-feed"><i class="bi bi-chat"></i>Nenhuma resposta ainda.</div>`;
+        if (replies && replies.length) {
+            const parentIds = [...new Set(replies.map(r => r.parent_id).filter(Boolean))];
+            const parentPosts = {};
+            await Promise.all(parentIds.map(async pid => { parentPosts[pid] = await twPostsGet(pid); }));
+            const parentAuthorIds = Object.values(parentPosts).filter(Boolean).map(p => p.author_id);
+            const parentAuthors = await twFetchAuthors(parentAuthorIds);
+            repliesHtml = replies.map(r => {
+                const parent = parentPosts[r.parent_id];
+                const parentAuthor = parent ? parentAuthors[String(parent.author_id)] : null;
+                return renderCommunityPostCard(r, authors[String(userId)], me, renderQuotedContext(parent, parentAuthor));
+            }).join('');
+        }
+
+        const tabsHtml = `
+        <div class="tw-profile-tabs">
+            <button type="button" class="tw-profile-tab active" onclick="window.switchCommunityProfileTab(this,'posts')">Posts</button>
+            <button type="button" class="tw-profile-tab" onclick="window.switchCommunityProfileTab(this,'replies')">Respostas${replies?.length ? ` (${replies.length})` : ''}</button>
+        </div>
+        <div id="twProfileTabPosts">${postsHtml}</div>
+        <div id="twProfileTabReplies" class="d-none">${repliesHtml}</div>`;
+
+        document.getElementById('twProfileContent').innerHTML = profileHeaderHtml + tabsHtml;
+    } catch (e) {
+        console.error('Erro ao carregar perfil:', e);
+        document.getElementById('twProfileContent').innerHTML = `<div class="tw-empty-feed"><i class="bi bi-exclamation-triangle"></i>Erro ao carregar o perfil.</div>`;
+    }
+};
+
+/** Alterna entre as abas "Posts" e "Respostas" no perfil da Comunidade. */
+window.switchCommunityProfileTab = function(btnEl, tab) {
+    document.querySelectorAll('.tw-profile-tab').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+    document.getElementById('twProfileTabPosts')?.classList.toggle('d-none', tab !== 'posts');
+    document.getElementById('twProfileTabReplies')?.classList.toggle('d-none', tab !== 'replies');
+};
+
+window.toggleCommunityFollow = async function(userId) {
+    const me = getSavedUser();
+    if (!me) { showToast('Faça login!', 'warning'); return; }
+    const btn = document.getElementById('twFollowBtn');
+    const countEl = document.getElementById('twFollowersCount');
+    try {
+        const existingId = await twFollowExists(me.id, userId);
+        const isFollowing = !!existingId;
+        if (isFollowing) {
+            await twFollowDelete(existingId);
+        } else {
+            await twFollowCreate(me.id, userId);
+        }
+        if (btn) {
+            btn.classList.toggle('following', !isFollowing);
+            btn.textContent = !isFollowing ? 'Seguindo' : 'Seguir';
+        }
+        if (countEl) {
+            const current = parseInt(countEl.textContent, 10) || 0;
+            countEl.textContent = isFollowing ? Math.max(0, current - 1) : current + 1;
+        }
+    } catch (e) {
+        console.error('Erro ao seguir/deixar de seguir:', e);
+        showToast(`Erro ao atualizar: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
     }
 };
 
 /** Mostra/esconde (e monta, na primeira vez) o painel com a lista de participantes
  *  de um grupo, integrado ao próprio chat — sem precisar abrir modal. */
-window.toggleDirectChatParticipants = async function(chatId) {
+window.toggleDirectChatParticipants = async function(chatId, forceReload) {
     const panel = document.getElementById(`dparticipants_${chatId}`);
     if (!panel) return;
 
-    const willShow = panel.classList.contains('d-none');
-    panel.classList.toggle('d-none');
-    if (!willShow) return;
+    if (forceReload) {
+        panel.classList.remove('d-none');
+    } else {
+        const willShow = panel.classList.contains('d-none');
+        panel.classList.toggle('d-none');
+        if (!willShow) return;
+    }
 
     panel.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div></div>';
 
@@ -7668,6 +8992,17 @@ window.toggleDirectChatParticipants = async function(chatId) {
         const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
         const creatorId = directMeta?.createdBy ? String(directMeta.createdBy) : null;
         const me = getSavedUser();
+        const isAdmin = !!(directMeta?.groupAdmins || []).map(String).includes(String(me?.id));
+
+        const groupName = directMeta?.groupName || chat.seller_name || 'Grupo';
+        const groupAvatar = directMeta?.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&bold=true`;
+
+        const groupHeaderHtml = `
+        <div class="chat-group-info-header" id="dGroupInfoView_${chatId}">
+            <img src="${groupAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&bold=true'">
+            <div class="chat-group-info-name">${groupName}</div>
+            ${isAdmin ? `<button type="button" class="profile-link-icon" style="width:30px;height:30px;" title="Editar dados do grupo" onclick="window.startEditGroupInfo('${chatId}')"><i class="bi bi-pencil-fill" style="font-size:0.75rem;"></i></button>` : ''}
+        </div>`;
 
         const rows = participantIds.map(id => {
             const u = usersById[id];
@@ -7681,7 +9016,7 @@ window.toggleDirectChatParticipants = async function(chatId) {
             const tipoLabel = tipo === 'ADMIN' ? 'Administrador' : (tipo === 'VENDEDOR' ? 'Vendedor' : 'Cliente');
 
             return `<div class="chat-participant-row">
-                <img src="${avatarUrl}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=random&color=fff'">
+                <img src="${avatarUrl}" referrerpolicy="no-referrer" style="cursor:pointer;" onclick="window.openImageFull('${avatarUrl.replace(/'/g, "\\'")}')" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}&background=random&color=fff'">
                 <div class="chat-participant-info">
                     <strong>${nome}${isMe ? ' (você)' : ''}</strong>
                     <small>${tipoLabel}</small>
@@ -7689,10 +9024,113 @@ window.toggleDirectChatParticipants = async function(chatId) {
             </div>`;
         }).join('');
 
-        panel.innerHTML = `<div class="small fw-bold mb-1" style="color:#667781;"><i class="bi bi-people-fill me-1"></i>${participantIds.length} participantes</div>${rows}`;
+        panel.innerHTML = `${groupHeaderHtml}<div class="small fw-bold mb-1 mt-2" style="color:#667781;"><i class="bi bi-people-fill me-1"></i>${participantIds.length} participantes</div>${rows}`;
+        panel.dataset.groupName = groupName;
+        panel.dataset.groupAvatar = groupAvatar;
     } catch (e) {
         console.error('Erro ao carregar participantes:', e);
         panel.innerHTML = '<div class="small text-danger px-1">Erro ao carregar participantes.</div>';
+    }
+};
+
+/** Troca o cabeçalho do painel "Dados do grupo" para o modo de edição
+ *  (nome + foto), permitindo alterar de verdade as informações do grupo. */
+window._groupEditAvatarUrls = window._groupEditAvatarUrls || {};
+window.startEditGroupInfo = function(chatId) {
+    const panel = document.getElementById(`dparticipants_${chatId}`);
+    const view = document.getElementById(`dGroupInfoView_${chatId}`);
+    if (!panel || !view) return;
+
+    const currentName = panel.dataset.groupName || '';
+    const currentAvatar = panel.dataset.groupAvatar || '';
+    window._groupEditAvatarUrls[chatId] = currentAvatar;
+
+    view.outerHTML = `
+    <div class="chat-group-info-header chat-group-info-edit" id="dGroupInfoView_${chatId}">
+        <div class="text-center mb-2">
+            <div class="position-relative d-inline-block">
+                <img id="dGroupEditAvatarPreview_${chatId}" src="${currentAvatar}" class="rounded-circle border" style="width:64px;height:64px;object-fit:cover;border:3px solid #00A884;" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(currentName)}&background=00A884&color=fff&bold=true'">
+                <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:22px;height:22px;cursor:pointer;border:2px solid #fff;">
+                    <i class="bi bi-plus text-white" style="font-size:0.7rem;"></i>
+                    <input type="file" accept="image/*" hidden onchange="window.uploadEditGroupAvatar(this, '${chatId}')">
+                </label>
+            </div>
+        </div>
+        <div class="profile-link-inline mb-2">
+            <button type="button" class="profile-link-icon" onclick="window.abrirUploadExterno()" title="Subir no Imgur">
+                <i class="bi bi-box-arrow-up-right"></i>
+            </button>
+            <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                <i class="bi bi-cloud-upload"></i>
+                <input type="file" accept="image/*" hidden onchange="window.uploadEditGroupAvatar(this, '${chatId}')">
+            </label>
+            <div class="ml-field flex-grow-1 mb-0">
+                <input type="url" id="dGroupEditAvatarLink_${chatId}" placeholder=" " value="${currentAvatar.replace(/"/g, '&quot;')}" oninput="window._groupEditAvatarUrls['${chatId}']=this.value; document.getElementById('dGroupEditAvatarPreview_${chatId}').src=this.value;">
+                <label for="dGroupEditAvatarLink_${chatId}">Link da foto (opcional)</label>
+            </div>
+        </div>
+        <div class="ml-field mb-2">
+            <input type="text" id="dGroupEditNameInput_${chatId}" placeholder=" " maxlength="60" value="${currentName.replace(/"/g, '&quot;')}">
+            <label for="dGroupEditNameInput_${chatId}">Nome do grupo</label>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="ml-btn ml-btn-primary flex-grow-1" onclick="window.saveEditGroupInfo('${chatId}')"><i class="bi bi-check2 me-1"></i>Salvar</button>
+            <button type="button" class="ml-btn ml-btn-outline flex-grow-1" onclick="window.toggleDirectChatParticipants('${chatId}', true)"><i class="bi bi-x-lg me-1"></i>Cancelar</button>
+        </div>
+    </div>`;
+};
+
+/** Upload de nova foto do grupo direto no modo de edição do painel "Dados do grupo". */
+window.uploadEditGroupAvatar = function(input, chatId) {
+    const file = input?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById(`dGroupEditAvatarPreview_${chatId}`);
+        if (preview) preview.src = e.target.result;
+        _uploadToImgur(file).then(url => {
+            if (url) {
+                window._groupEditAvatarUrls[chatId] = url;
+                const linkInput = document.getElementById(`dGroupEditAvatarLink_${chatId}`);
+                if (linkInput) linkInput.value = url;
+                if (preview) preview.src = url;
+            }
+        }).catch(() => {});
+    };
+    reader.readAsDataURL(file);
+};
+
+/** Salva de verdade o nome/foto do grupo (PATCH no chat) e atualiza cabeçalho, painel e lista lateral. */
+window.saveEditGroupInfo = async function(chatId) {
+    const nameInput = document.getElementById(`dGroupEditNameInput_${chatId}`);
+    const newName = (nameInput?.value || '').trim();
+    if (!newName) { showToast('Dê um nome para o grupo.', 'warning'); return; }
+    const newAvatar = window._groupEditAvatarUrls[chatId] || '';
+
+    try {
+        const chatData = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatData?.[0];
+        if (!chat || chat.messages?.[0]?.type !== 'direct_chat_meta') { showToast('Erro ao carregar grupo.', 'error'); return; }
+
+        chat.messages[0].groupName = newName;
+        chat.messages[0].groupAvatar = newAvatar;
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages, seller_name: newName }) });
+
+        showToast('Dados do grupo atualizados!', 'success');
+
+        // Atualiza o cabeçalho da conversa aberta (avatar + nome)
+        const msgsId = `dmsgs_${chatId}`;
+        const headerAvatar = document.getElementById(`${msgsId}Avatar`);
+        if (headerAvatar) headerAvatar.src = newAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(newName)}&background=00A884&color=fff&bold=true`;
+        const headerNameEl = headerAvatar?.closest('.chat-header-pro')?.querySelector('.chat-header-name');
+        if (headerNameEl) headerNameEl.textContent = newName;
+
+        // Recarrega o painel (volta pro modo de visualização) e a lista lateral
+        await window.toggleDirectChatParticipants(chatId, true);
+        window.renderDirectChats?.({ skipBoot: true });
+    } catch (e) {
+        console.error('Erro ao salvar dados do grupo:', e);
+        showToast('Erro ao salvar dados do grupo.', 'error');
     }
 };
 
@@ -7742,7 +9180,13 @@ window.openDirectChat = async function(chatId) {
             }
         }
 
+        // Comunidade: configura header
+        if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
+            otherName = 'Comunidade ElectroMarket';
+            otherAvatar = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        }
         const msgsId = `dmsgs_${chatId}`;
+        const isCommunity = chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket';
         const inputId = `dinput_${chatId}`;
         const previewId = `dpreview_${chatId}`;
         const attachId = `dattachPanel_${chatId}`;
@@ -7751,53 +9195,56 @@ window.openDirectChat = async function(chatId) {
 
         const partnerDotClass = isGroup ? '' : (isRecentlyOnline(otherLastSeen) ? 'online' : 'offline');
 
-        const html = window.renderChatContainer({
-            chatId,
-            chat,
-            partner: { name: otherName, avatar: otherAvatar },
-            msgsId,
-            inputId,
-            previewId,
-            attachPanelId: attachId,
-            attachLinkId,
-            participantsId: `dparticipants_${chatId}`,
-            statusBarId,
-            onToggleParticipants: isGroup ? `window.toggleDirectChatParticipants('${chatId}')` : '',
-            onSend: 'window.sendDirectChatMessage(event)',
-            onTyping: `window.notifyDirectChatTyping('${chatId}')`,
-            onBack: 'window.closeDirectChat()',
-            onClose: 'window.closeDirectChat()',
-            onViewProfile: isGroup ? '' : `window.viewDirectChatPartnerProfile('${otherId}')`,
-            onPin: `window.pinDirectChat('${chatId}')`,
-            onMute: `window.muteDirectChat('${chatId}')`,
-            onArchive: `window.archiveDirectChat('${chatId}')`,
-            onBlock: isGroup ? '' : `window.blockDirectChatUser('${otherId}')`,
-            onToggleAttachPanel: 'window.toggleChatAttachPanel()',
-            onConfirmAttach: 'window.confirmDirectChatAttach()',
-            onSendLocation: 'window.sendDirectChatLocation',
-        onSendFile: 'window.sendDirectChatImageFile',
-        showBackBtn: true,
-        showCloseBtn: false,
-            showDeleteBtn: true,
-            onDelete: `window.deleteDirectChat('${chatId}')`,
-            showProductSummary: false,
-            showAttach: true,
-            headerSubtitle: isGroup ? `${chat.participants.length} participantes` : '',
-            statusInfo: isGroup
-                ? { class: 'secondary mb-0 py-1', text: `<div style="font-size:0.75rem;color:#667781;"><i class="bi bi-people-fill me-1"></i>Grupo com ${chat.participants.length} participantes</div>` }
-                : (String(otherId) === AI_USER_ID
-                ? { class: 'secondary mb-0 py-1', text: '<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;"><span><i class="bi bi-search me-1"></i>Busca na Web</span><span><i class="bi bi-globe2 me-1"></i>DuckDuckGo</span></div>' }
-                : { class: 'secondary mb-0 py-1', text: `<div class="d-flex justify-content-center align-items-center gap-3" style="font-size:0.75rem;color:#667781;">${otherEmail ? `<span><i class="bi bi-envelope-fill me-1" style="font-size:0.65rem;"></i>${otherEmail}</span>` : ''}${otherPhone ? `<span><i class="bi bi-telephone-fill me-1" style="font-size:0.65rem;"></i>${otherPhone}</span>` : ''}</div>` })
-        });
+            const html = window.renderChatContainer({
+                chatId,
+                chat,
+                partner: { name: otherName, avatar: otherAvatar },
+                msgsId,
+                inputId,
+                previewId,
+                attachPanelId: attachId,
+                attachLinkId,
+                participantsId: `dparticipants_${chatId}`,
+                statusBarId,
+                onToggleParticipants: isGroup ? `window.toggleDirectChatParticipants('${chatId}')` : '',
+                onCall: (!isGroup && otherId && String(otherId) !== AI_USER_ID) ? `window.callChatContact('${otherPhone}', '${(otherName || '').replace(/\'/g, "\\\\\'")}')` : '',
+                onSend: 'window.sendDirectChatMessage(event)',
+                onTyping: `window.notifyDirectChatTyping('${chatId}')`,
+                onBack: 'window.closeDirectChat()',
+                onClose: 'window.closeDirectChat()',
+                onViewProfile: isGroup ? '' : `window.viewDirectChatPartnerProfile('${otherId}')`,
+                onPin: `window.pinDirectChat('${chatId}')`,
+                onMute: `window.muteDirectChat('${chatId}')`,
+                onArchive: `window.archiveDirectChat('${chatId}')`,
+                onBlock: isGroup ? '' : `window.blockDirectChatUser('${otherId}')`,
+                onToggleAttachPanel: 'window.toggleChatAttachPanel()',
+                onConfirmAttach: 'window.confirmDirectChatAttach()',
+                onSendLocation: 'window.sendDirectChatLocation',
+                onSendFile: 'window.sendDirectChatImageFile',
+                showBackBtn: true,
+                showCloseBtn: false,
+                showDeleteBtn: true,
+                onDelete: `window.deleteDirectChat('${chatId}')`,
+                showProductSummary: false,
+                showAttach: true,
+                headerSubtitle: '',
+                statusInfo: null,
+                isGroupChat: isGroup,
+                isDirectChat: true,
+                onAddMember: isGroup ? `window.groupAddMembers('${chatId}')` : '',
+                onLeaveGroup: isGroup ? `window.groupLeave('${chatId}')` : '',
+                onClearChat: `window.clearDirectChat('${chatId}')`,
+            });
 
         const panel = document.getElementById('waChatActive');
         if (panel) {
             panel.innerHTML = html;
-            panel.classList.remove('d-none');
+            panel.classList.remove('d-none', 'tw-chat-community');
             panel.classList.add('d-flex');
 
-            // Comunidade: troca avatar para ícone de pessoas
+            // Comunidade: remove header, troca avatar e substitui input por composer
             if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
+                panel.classList.add('tw-chat-community');
                 const avatarWrap = panel.querySelector('.chat-header-avatar-wrap');
                 if (avatarWrap) {
                     const img = avatarWrap.querySelector('img');
@@ -7809,6 +9256,31 @@ window.openDirectChat = async function(chatId) {
                         icon.innerHTML = '<i class="bi bi-people-fill"></i>';
                         avatarWrap.insertBefore(icon, avatarWrap.firstChild);
                     }
+                }
+                // Substitui input bar pelo composer estilo Threads
+                const inputBar = panel.querySelector('.chat-input-bar');
+                if (inputBar) {
+                    const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'User')}&background=1d9bf0&color=fff`;
+                    inputBar.innerHTML = `
+                        <div class="tw-composer tw-composer-inline">
+                            <img class="tw-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'">
+                            <div class="tw-composer-body">
+                                <textarea id="dcomposer_${chatId}" class="tw-composer-textarea" placeholder="O que está rolando?" rows="1" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
+                                <div id="dcomposerPreview_${chatId}" class="tw-composer-preview d-none"></div>
+                                <div class="tw-composer-toolbar">
+                                    <div>
+                                        <button type="button" class="tw-icon-btn" title="Voltar para Conversas" onclick="window.closeCommunityChat()">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                        <label class="tw-icon-btn" title="Adicionar imagem" style="cursor:pointer;">
+                                            <i class="bi bi-image"></i>
+                                            <input type="file" accept="image/*" class="d-none" onchange="window.communityPickImageFromChat('${chatId}', this)">
+                                        </label>
+                                    </div>
+                                    <button type="button" class="tw-post-btn" onclick="window.submitCommunityPostFromChat('${chatId}')">Postar</button>
+                                </div>
+                            </div>
+                        </div>`;
                 }
             }
         }
@@ -7840,6 +9312,232 @@ window.openDirectChat = async function(chatId) {
     }
 };
 
+/** Abre a Comunidade dentro do painel de chat (ao lado, na tela de Conversas),
+ *  igual a uma conversa normal — só que sem depender de nenhuma linha da
+ *  tabela `chats` (essa dependência foi removida: antes a função procurava um
+ *  grupo chamado "Comunidade ElectroMarket" que nunca era criado em lugar
+ *  nenhum do código, e por isso o link sempre falhava com "Comunidade não
+ *  encontrada"). O cabeçalho/rodapé são montados com renderChatContainer
+ *  (mesmo usado pelas conversas diretas) e o conteúdo é o feed estilo
+ *  Threads já existente, alimentado pela tabela `chats`. */
+window.openCommunityInChat = async function() {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    window.setWaRailActive('comunidade');
+
+    if (window.location.hash !== '#/chat/comunidade') {
+        history.pushState(null, '', '#/chat/comunidade');
+    }
+    window.currentChat = 'community';
+    window.lastChatSignature = null;
+    stopDirectChatPolling();
+    stopDirectTypingWatcher();
+
+    const chatId = 'community';
+    const msgsId = 'communityChatMsgs';
+
+    const html = window.renderChatContainer({
+        chatId,
+        chat: {},
+        partner: { name: 'Comunidade', avatar: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' },
+        msgsId,
+        inputId: `dinput_${chatId}`,
+        previewId: `dpreview_${chatId}`,
+        attachPanelId: `dattachPanel_${chatId}`,
+        attachLinkId: `dattachLink_${chatId}`,
+        statusBarId: `dstatusBar_${chatId}`,
+        onBack: 'window.closeCommunityChat()',
+        onClose: 'window.closeCommunityChat()',
+        showBackBtn: true,
+        showCloseBtn: true,
+        showAttach: false,
+        showProductSummary: false,
+        headerSubtitle: 'Feed da comunidade'
+    });
+
+    const panel = document.getElementById('waChatActive');
+    if (!panel) return;
+    panel.innerHTML = html;
+    panel.classList.remove('d-none');
+    panel.classList.add('d-flex', 'tw-chat-community');
+
+    // Ícone de comunidade no lugar do avatar (igual ao grupo antigo)
+    const avatarWrap = panel.querySelector('.chat-header-avatar-wrap');
+    if (avatarWrap) {
+        const img = avatarWrap.querySelector('img');
+        if (img) img.style.display = 'none';
+        let icon = avatarWrap.querySelector('.wa-header-group-icon');
+        if (!icon) {
+            icon = document.createElement('div');
+            icon.className = 'wa-header-group-icon';
+            icon.innerHTML = '<i class="bi bi-people-fill"></i>';
+            avatarWrap.insertBefore(icon, avatarWrap.firstChild);
+        }
+    }
+    const infoLine = document.getElementById(`${msgsId}InfoLine`);
+    if (infoLine) infoLine.textContent = 'Feed da comunidade';
+    panel.querySelector('.chat-header-pro .dropdown')?.remove();
+
+    // Substitui a barra de mensagem normal pelo composer estilo Threads
+    const inputBar = panel.querySelector('.chat-input-bar');
+    if (inputBar) {
+        const myAvatar = normalizeImageUrl(safeParseImages(user.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nome || 'User')}&background=1d9bf0&color=fff`;
+        inputBar.innerHTML = `
+            <div class="tw-composer tw-composer-inline">
+                <img class="tw-avatar" src="${myAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&background=1d9bf0&color=fff'">
+                <div class="tw-composer-body">
+                    <textarea id="dcomposer_${chatId}" class="tw-composer-textarea" placeholder="O que está rolando?" rows="1" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
+                    <div id="dcomposerPreview_${chatId}" class="tw-composer-preview d-none"></div>
+                    <div class="tw-composer-toolbar">
+                        <div>
+                            <button type="button" class="tw-icon-btn" title="Voltar para Conversas" onclick="window.closeCommunityChat()">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            <label class="tw-icon-btn" title="Adicionar imagem" style="cursor:pointer;">
+                                <i class="bi bi-image"></i>
+                                <input type="file" accept="image/*" class="d-none" onchange="window.communityPickImageFromChat('${chatId}', this)">
+                            </label>
+                        </div>
+                        <button type="button" class="tw-post-btn" onclick="window.submitCommunityPostFromChat('${chatId}')">Postar</button>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    // A Comunidade já ocupa o painel inteiro por padrão — não faz sentido
+    // oferecer a opção de "tela cheia" aqui (o botão fica escondido).
+    // OBS: não mexe na classe wa-fullscreen do body — a tela "Conversas"
+    // já conta com ela sempre ativa pra esconder a navbar do site; remover
+    // aqui só fazia a navbar reaparecer por cima da Comunidade.
+    document.getElementById('waSideFullscreenBtn')?.classList.add('d-none');
+
+    document.getElementById('waEmptyState')?.classList.add('d-none');
+    document.getElementById('whatsappOrdersView')?.classList.add('wa-chat-open');
+    document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
+
+    window._chatActiveElements = {
+        input: null,
+        container: document.getElementById(msgsId),
+        statusBar: document.getElementById(`dstatusBar_${chatId}`),
+        attachPanel: null,
+        preview: null
+    };
+
+    const container = document.getElementById(msgsId);
+    if (container) await renderCommunityFeedInChat(container, false);
+};
+
+/** Fecha a Comunidade e volta pro estado normal da tela de Conversas. */
+window.closeCommunityChat = function() {
+    window.closeDirectChat();
+    document.getElementById('waSideFullscreenBtn')?.classList.add('d-none');
+    // Não remove wa-fullscreen aqui: a tela "Conversas" pra onde estamos
+    // voltando também depende dela pra manter a navbar do site escondida.
+    // Removê-la fazia a navbar reaparecer ao sair da Comunidade.
+};
+
+/** Renderiza feed de posts da Comunidade dentro do chat com paginação */
+let _twFeedOffset = 0;
+const _TW_FEED_LIMIT = 20;
+
+async function renderCommunityFeedInChat(container, silent) {
+    _twFeedOffset = 0;
+    await loadMorePosts(container, silent, true);
+}
+
+async function loadMorePosts(container, silent, reset = false) {
+    try {
+        const posts = await twPostsQuery({ parentId: null, orderDir: 'desc', limit: _TW_FEED_LIMIT, offset: _twFeedOffset });
+        if (!posts || !posts.length) {
+            if (reset) {
+                container.innerHTML = '<div class="tw-chat-feed"><div class="tw-empty-feed"><i class="bi bi-people"></i>Nenhum post ainda.<br><small>Seja o primeiro a postar!</small></div></div>';
+            }
+            return;
+        }
+        const authorIds = [...new Set((posts || []).map(p => p.author_id).filter(Boolean))];
+        const authors = authorIds.length ? await twFetchAuthors(authorIds) : {};
+        const user = getSavedUser();
+
+        const feedHtml = (posts || []).map(p => renderCommunityPostCard(p, authors[String(p.author_id)], user)).join('');
+        const more = posts.length >= _TW_FEED_LIMIT;
+
+        if (reset) {
+            container.innerHTML = `<div class="tw-chat-feed">${feedHtml}</div>`;
+        } else {
+            container.querySelector('.tw-chat-feed')?.insertAdjacentHTML('beforeend', feedHtml);
+        }
+
+        if (more) {
+            _twFeedOffset += _TW_FEED_LIMIT;
+            const loadMoreId = 'twLoadMore';
+            const existing = document.getElementById(loadMoreId);
+            if (existing) existing.remove();
+            const btn = document.createElement('button');
+            btn.id = loadMoreId;
+            btn.className = 'tw-load-more';
+            btn.textContent = 'Carregar mais';
+            btn.onclick = async () => {
+                btn.textContent = 'Carregando...';
+                btn.disabled = true;
+                await loadMorePosts(container, true, false);
+                btn.remove();
+            };
+            container.querySelector('.tw-chat-feed')?.appendChild(btn);
+        }
+
+        if (!silent && reset) container.scrollTop = 0;
+    } catch (e) {
+        console.error('Erro ao carregar feed da Comunidade:', e);
+        if (reset) container.innerHTML = '<div class="text-center py-4 text-danger">Erro ao carregar Comunidade.</div>';
+    }
+}
+
+window.communityPickImageFromChat = function(chatId, input) {
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    const wrap = document.getElementById(`dcomposerPreview_${chatId}`);
+    if (!wrap) return;
+    wrap.classList.remove('d-none');
+    wrap.innerHTML = `<div class="tw-composer-preview"><img src="${URL.createObjectURL(file)}"><button type="button" class="tw-remove-img" onclick="window.communityRemoveImageFromChat('${chatId}')"><i class="bi bi-x-lg"></i></button></div>`;
+    window._twPendingImage = 'uploading';
+    _uploadToImgur(file).then(url => {
+        window._twPendingImage = url || null;
+        if (!url) { showToast('Falha ao enviar imagem.', 'error'); wrap.innerHTML = ''; wrap.classList.add('d-none'); }
+    });
+};
+
+window.communityRemoveImageFromChat = function(chatId) {
+    window._twPendingImage = null;
+    const wrap = document.getElementById(`dcomposerPreview_${chatId}`);
+    if (wrap) { wrap.innerHTML = ''; wrap.classList.add('d-none'); }
+};
+
+window.submitCommunityPostFromChat = async function(chatId) {
+    const user = getSavedUser();
+    if (!user) { showToast('Faça login!', 'warning'); return; }
+    const textEl = document.getElementById(`dcomposer_${chatId}`);
+    const content = (textEl?.value || '').trim();
+    if (!content && !window._twPendingImage) { showToast('Escreva algo ou adicione uma imagem.', 'warning'); return; }
+    if (window._twPendingImage === 'uploading') { showToast('Aguarde a imagem terminar de enviar...', 'info'); return; }
+
+    const btn = textEl?.closest('.tw-composer')?.querySelector('.tw-post-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Postando...'; }
+    try {
+        await twPostCreate({ author_id: user.id, content, image: window._twPendingImage || null, parent_id: null });
+        if (textEl) { textEl.value = ''; textEl.style.height = 'auto'; }
+        window.communityRemoveImageFromChat(chatId);
+        showToast('Postado!', 'success');
+        const container = window._chatActiveElements?.container;
+        if (container) await renderCommunityFeedInChat(container, false);
+    } catch (e) {
+        console.error('Erro ao postar (chat):', e);
+        showToast(`Erro ao postar: ${e?.message || e?.details || 'tente novamente.'}`, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Postar'; }
+    }
+};
+
 window.closeDirectChat = function() {
     stopDirectChatPolling();
     stopDirectTypingWatcher();
@@ -7847,7 +9545,11 @@ window.closeDirectChat = function() {
     window.lastChatSignature = null;
     window._chatActiveElements = null;
     const panel = document.getElementById('waChatActive');
-    if (panel) { panel.innerHTML = ''; panel.classList.add('d-none'); panel.classList.remove('d-flex'); }
+    if (panel) {
+        panel.innerHTML = '';
+        panel.classList.add('d-none');
+        panel.classList.remove('d-flex', 'tw-chat-community');
+    }
     document.getElementById('waEmptyState')?.classList.remove('d-none');
     document.getElementById('whatsappOrdersView')?.classList.remove('wa-chat-open');
     document.querySelectorAll('#waContactList .wa-contact').forEach(el => el.classList.remove('active-chat'));
@@ -7917,18 +9619,24 @@ window.notifyDirectChatTyping = async function(chatId) {
 async function loadDirectChatMessages(chatId, silent = false) {
     const container = window._chatActiveElements?.container;
     if (!container) return;
-    if (!silent) {
-        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div><p class="small mt-2">Carregando mensagens...</p></div>';
-    }
-    try {
-        const user = getSavedUser();
-        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
-        const chat = chatResult?.[0];
-        if (!chat?.messages) {
-            if (!silent) container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
-            return;
-        }
+    const user = getSavedUser();
+    if (!user) return;
+    const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+    const chat = chatResult?.[0];
+    if (!chat) return;
 
+    // Comunidade: renderiza feed de posts em vez de mensagens
+    if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
+        await renderCommunityFeedInChat(container, silent);
+        return;
+    }
+
+    if (!chat?.messages) {
+        if (!silent) container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma mensagem ainda.</div>';
+        return;
+    }
+
+    try {
         window.__setupReactionHooks(chat,
             (c) => supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: c.messages }) }),
             () => loadDirectChatMessages(chatId, true)
@@ -7951,8 +9659,26 @@ async function loadDirectChatMessages(chatId, silent = false) {
         let partnerAvatarSrc = chatIsGroup
             ? (chat.messages?.[0]?.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.messages?.[0]?.groupName || chat.seller_name || 'Grupo')}&background=00A884&color=fff&size=40&bold=true`)
             : `https://ui-avatars.com/api/?name=User&background=random&size=40`;
+        let resolveSenderAvatar = null;
         try {
-            if (otherId) {
+            if (chatIsGroup) {
+                // Em grupos/comunidade cada mensagem pode ser de uma pessoa diferente:
+                // busca (com cache) a foto real de cada remetente pra abrir corretamente.
+                window._groupAvatarCache = window._groupAvatarCache || {};
+                const avatarMap = window._groupAvatarCache[chatId] || (window._groupAvatarCache[chatId] = {});
+                const missingIds = [...new Set(chat.messages
+                    .map(m => m.senderId)
+                    .filter(id => id && id !== 'system' && id !== AI_USER_ID && !avatarMap[id]))];
+                if (missingIds.length) {
+                    const idFilter = missingIds.map(id => `"${id}"`).join(',');
+                    const users = await supabaseFetch(`users?select=id,nome,avatar&id=in.(${idFilter})`);
+                    (users || []).forEach(u => {
+                        avatarMap[u.id] = normalizeImageUrl(safeParseImages(u.avatar)[0]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || 'User')}&background=random&color=fff&size=40`;
+                    });
+                }
+                avatarMap[AI_USER_ID] = 'https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3';
+                resolveSenderAvatar = (msg) => avatarMap[msg.senderId] || null;
+            } else if (otherId) {
                 if (String(otherId) === AI_USER_ID) {
                     partnerAvatarSrc = 'https://tse1.mm.bing.net/th/id/OIP.RWeIgcAIhZe99xrj3sLLQAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3';
                 } else {
@@ -7967,6 +9693,7 @@ async function loadDirectChatMessages(chatId, silent = false) {
             return window.renderMsgBubble(msg, index, {
                 userId: user.id, myAvatar, partnerAvatar: partnerAvatarSrc, supportAvatar: partnerAvatarSrc,
                 resolveSenderName: () => msg.senderName || '',
+                resolveSenderAvatar,
                 actions: { reply: 'startReply', copy: 'copyMessageText', edit: 'startEdit', delete: 'deleteMessage', star: 'toggleStarMessage' },
                 useDropdown: true, enableGrouping: true, allMessages: chat.messages
             });
@@ -7990,6 +9717,7 @@ window.sendDirectChatMessage = async function(event) {
     const text = input?.value?.trim();
     const user = getSavedUser();
     if ((!text && window.editingMessageIndex === null) || !user || !window.currentChat) return;
+
     try {
         const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
         const chat = chatResult?.[0];
@@ -8282,6 +10010,38 @@ window.deleteDirectChat = async function(chatId) {
         window.renderDirectChats({ skipBoot: true });
     } catch (e) {
         showToast('Erro ao apagar conversa.', 'error');
+    }
+};
+
+/** Apaga todas as mensagens da conversa (mantém o grupo/contato na lista, só limpa o histórico).
+ *  IMPORTANTE: isso NUNCA apaga a conversa em si (nunca faz DELETE na tabela `chats`) —
+ *  só faz um PATCH no campo `messages`, preservando sempre a mensagem de metadados
+ *  (nome/foto/config do grupo) quando ela existir, pra não perder essas configurações. */
+window.clearDirectChat = async function(chatId) {
+    if (!chatId) return;
+    if (!confirm('Limpar todas as mensagens desta conversa?\nO contato/grupo continua na sua lista, só o histórico de mensagens é apagado.\nEssa ação não pode ser desfeita.')) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+
+        // Mantém a mensagem de metadados (nome/foto/config do grupo ou config do contato), se houver.
+        const firstMsg = chat.messages?.[0];
+        const isMeta = firstMsg && (firstMsg.type === 'direct_chat_meta' || firstMsg.groupType === 'group');
+        const keepMeta = isMeta ? [firstMsg] : [];
+
+        // Só atualiza `messages` — nunca apaga a linha da conversa nem mexe em `participants`.
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: keepMeta }) });
+
+        showToast('Mensagens apagadas. A conversa continua na sua lista.', 'info');
+        await window.loadDirectChatMessages?.(chatId);
+        // Atualiza só a prévia dessa conversa na lista lateral, sem recarregar tudo.
+        const rowEl = document.querySelector(`.wa-contact[data-direct-chat-id="${chatId}"] .wa-contact-text`);
+        if (rowEl) { rowEl.textContent = 'Iniciar conversa'; rowEl.style.removeProperty('font-weight'); }
+        document.querySelector(`.wa-contact[data-direct-chat-id="${chatId}"] .wa-contact-badge`)?.remove();
+    } catch (e) {
+        console.error('Erro ao limpar conversa:', e);
+        showToast('Erro ao limpar conversa.', 'error');
     }
 };
 

@@ -1059,26 +1059,38 @@
             <div class="wa-boot-bar"><span></span></div>
             <p class="wa-boot-subtitle"><i class="bi bi-lock-fill me-1"></i>Suas mensagens ficam só entre você e a outra pessoa</p>
         </div>
+        <nav class="wa-rail">
+            <div class="wa-rail-top">
+                <button type="button" id="waRailArchived" class="wa-rail-btn" title="Arquivadas" onclick="window.toggleArchivedSection()"><i class="bi bi-archive"></i></button>
+                <button type="button" id="waRailCommunity" class="wa-rail-btn wa-rail-community" title="Comunidade" onclick="window.openCommunityInChat()"><i class="bi bi-flower1"></i></button>
+                <button type="button" id="waRailConversas" class="wa-rail-btn active" title="Conversas" onclick="window.renderDirectChats()"><i class="bi bi-chat-dots-fill"></i></button>
+                <button type="button" id="waRailGroups" class="wa-rail-btn" title="Grupos" onclick="window.openNewGroupModal()"><i class="bi bi-people-fill"></i></button>
+            </div>
+            <div class="wa-rail-bottom">
+                <img id="waRailAvatar" class="wa-rail-avatar" src="" alt="Você" referrerpolicy="no-referrer" title="Meu perfil" onclick="window.showProfileEdit()" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=64'">
+            </div>
+        </nav>
         <section class="wa-side">
             <div class="wa-side__header">
-                <div class="wa-side__me" id="waSideMe" onclick="window.showProfileEdit()" title="Meu perfil">
-                    <img id="waSideMyAvatar" src="" alt="Você" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=64'">
-                </div>
                 <div class="wa-side__title-block">
                     <h6 id="waSideTitle" class="mb-0">Conversas</h6>
-                    <span id="waSideMyName" class="wa-side__me-name"></span>
                 </div>
                 <div class="d-flex align-items-center gap-1 ms-auto" id="waSideHeaderActions">
                     <button type="button" class="ml-auth-close d-none" id="waSideFullscreenBtn" aria-label="Tela cheia" onclick="window.toggleWaChatFullscreen()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-arrows-fullscreen"></i></button>
                     <button type="button" class="ml-auth-close d-none" id="waSideCloseBtn" aria-label="Fechar" onclick="window.exitWaOrdersView()" style="position:static;border-radius:50%;width:34px;height:34px;font-size:0.9rem;"><i class="bi bi-x-lg"></i></button>
+                    <button type="button" class="chat-icon-btn wa-side-action-btn" title="Nova conversa" onclick="window.openNewConversationModal()"><i class="bi bi-plus-square"></i></button>
                     <div class="dropdown" id="waSideMenuWrap">
                         <button type="button" class="chat-icon-btn wa-side-action-btn" data-bs-toggle="dropdown" aria-label="Menu" title="Menu"><i class="bi bi-three-dots-vertical"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openNewGroupModal()"><i class="bi bi-people-fill me-2"></i>Novo grupo</a></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openNewConversationModal()"><i class="bi bi-chat-square-text me-2"></i>Nova conversa</a></li>
-                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openGeneralChat()"><i class="bi bi-people-fill me-2"></i>Comunidade</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.showStarredMessages()"><i class="bi bi-star me-2"></i>Mensagens favoritas</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.markAllChatsAsRead()"><i class="bi bi-envelope-open me-2"></i>Marcar todas como lidas</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openCommunityInChat()"><i class="bi bi-flower1 me-2"></i>Comunidade</a></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleTema()"><i class="bi bi-moon-stars me-2"></i>Alterar tema</a></li>
                             <li><hr class="dropdown-divider my-1"></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.goHome(); window.updateMobileNavActive('eletronicos');"><i class="bi bi-box-arrow-right me-2"></i>Sair das Conversas</a></li>
+                            <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.logout()"><i class="bi bi-power me-2"></i>Desconectar</a></li>
                         </ul>
                     </div>
                 </div>
@@ -1115,6 +1127,51 @@
 
                 <form id="newGroupForm">
                     <div class="modal-body pt-2">
+                        <!-- Informações do Grupo (só aparece no modo grupo) -->
+                        <div class="create-ad-section d-none" id="newGroupInfoSection">
+                            <div class="create-ad-section-title">
+                                <i class="bi bi-info-circle-fill"></i>
+                                <span>Informações do Grupo</span>
+                            </div>
+                            <div class="create-ad-section-body">
+                                <div class="text-center mb-3">
+                                    <div class="position-relative d-inline-block">
+                                        <img id="newGroupAvatarPreview" src="" class="d-none rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;">
+                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" style="width:70px;height:70px;border:3px dashed #ccc;" id="newGroupAvatarPlaceholder">
+                                            <i class="bi bi-camera" style="font-size:1.5rem;color:#999;"></i>
+                                        </div>
+                                        <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:26px;height:26px;cursor:pointer;border:2px solid #fff;">
+                                            <i class="bi bi-plus text-white" style="font-size:0.75rem;"></i>
+                                            <input type="file" accept="image/*" hidden onchange="window.uploadGroupAvatar(this)">
+                                        </label>
+                                    </div>
+                                    <div class="profile-link-inline mt-2">
+                                        <button type="button" class="profile-link-icon" onclick="window.abrirUploadExterno()" title="Subir no Imgur">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </button>
+                                        <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                            <i class="bi bi-cloud-upload"></i>
+                                            <input type="file" accept="image/*" hidden onchange="window.uploadGroupAvatar(this)">
+                                        </label>
+                                        <div class="ml-field flex-grow-1 mb-0">
+                                            <input type="url" id="newGroupAvatarLink" placeholder=" " oninput="window.setGroupAvatarFromLink(this.value)">
+                                            <label for="newGroupAvatarLink">Link da foto (opcional)</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="ml-field">
+                                        <input type="text" id="newGroupNameInput" placeholder=" " maxlength="60" required>
+                                        <label for="newGroupNameInput">Nome do grupo *</label>
+                                    </div>
+                                </div>
+
+                                <div class="create-ad-label">Participantes selecionados</div>
+                                <div id="newGroupSelectedSummary" class="d-flex align-items-center flex-wrap gap-1"></div>
+                            </div>
+                        </div>
+
                         <!-- Participantes -->
                         <div class="create-ad-section">
                             <div class="create-ad-section-title">
@@ -1134,61 +1191,90 @@
                             </div>
                         </div>
 
-                        <!-- Informações do Grupo (só aparece no modo grupo) -->
-                        <div class="create-ad-section d-none" id="newGroupInfoSection">
-                            <div class="create-ad-section-title">
-                                <i class="bi bi-info-circle-fill"></i>
-                                <span>Informações do Grupo</span>
-                            </div>
-                            <div class="create-ad-section-body">
-                                <div class="text-center mb-3">
-                                    <div class="position-relative d-inline-block">
-                                        <img id="newGroupAvatarPreview" src="" class="d-none rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;">
-                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" style="width:70px;height:70px;border:3px dashed #ccc;" id="newGroupAvatarPlaceholder">
-                                            <i class="bi bi-camera" style="font-size:1.5rem;color:#999;"></i>
-                                        </div>
-                                        <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:26px;height:26px;cursor:pointer;border:2px solid #fff;">
-                                            <i class="bi bi-plus text-white" style="font-size:0.75rem;"></i>
-                                            <input type="file" accept="image/*" hidden onchange="window.uploadGroupAvatar(this)">
-                                        </label>
-                                        <input type="hidden" id="newGroupAvatarInput">
-                                    </div>
-                                    <div class="mt-2 d-flex justify-content-center gap-1" id="groupAvatarColors">
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#FF5733;cursor:pointer;border:2px solid transparent;" data-color="FF5733"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#33FF57;cursor:pointer;border:2px solid transparent;" data-color="33FF57"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#3357FF;cursor:pointer;border:2px solid transparent;" data-color="3357FF"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#F333FF;cursor:pointer;border:2px solid transparent;" data-color="F333FF"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#FF33A8;cursor:pointer;border:2px solid transparent;" data-color="FF33A8"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#33FFF5;cursor:pointer;border:2px solid transparent;" data-color="33FFF5"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#FFD733;cursor:pointer;border:2px solid transparent;" data-color="FFD733"></div>
-                                        <div style="width:20px;height:20px;border-radius:50%;background:#A833FF;cursor:pointer;border:2px solid transparent;" data-color="A833FF"></div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <div class="ml-field">
-                                        <input type="text" id="newGroupNameInput" placeholder=" " maxlength="60" required>
-                                        <label for="newGroupNameInput">Nome do grupo *</label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="ml-field">
-                                        <textarea id="newGroupDescInput" placeholder=" " rows="2" maxlength="200"></textarea>
-                                        <label for="newGroupDescInput">Descrição (opcional)</label>
-                                    </div>
-                                </div>
-
-                                <div class="create-ad-label">Participantes selecionados</div>
-                                <div id="newGroupSelectedSummary" class="d-flex align-items-center flex-wrap gap-1"></div>
-                            </div>
-                        </div>
-
                         <div class="d-flex gap-2">
                             <button type="button" class="ml-btn ml-btn-primary flex-grow-1" id="newGroupCreateBtn" onclick="window.createGroupChat()"><i class="bi bi-check2 me-2"></i>Criar grupo</button>
                             <button type="button" class="ml-btn ml-btn-outline flex-grow-1" data-bs-dismiss="modal"><i class="bi bi-x-lg me-2"></i>Cancelar</button>
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Dados do Grupo (mesmo estilo do modal de criação de grupo) -->
+    <div class="modal fade" id="editGroupModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+                <div class="modal-header border-0 pb-0 justify-content-center position-relative">
+                    <div class="text-center">
+                        <h5 class="modal-title fw-bold" style="font-size:1.1rem;">Editar dados do grupo</h5>
+                        <p class="text-muted small mb-0">Atualize a foto, o nome e a descrição</p>
+                    </div>
+                    <button type="button" class="ml-auth-close" data-bs-dismiss="modal" aria-label="Fechar"><i class="bi bi-x-lg"></i></button>
+                </div>
+
+                <div class="modal-body pt-2">
+                    <div class="create-ad-section">
+                        <div class="create-ad-section-title">
+                            <i class="bi bi-info-circle-fill"></i>
+                            <span>Informações do Grupo</span>
+                        </div>
+                        <div class="create-ad-section-body">
+                            <div class="text-center mb-3">
+                                <div class="position-relative d-inline-block">
+                                    <img id="editGroupAvatarPreview" src="" class="rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;">
+                                    <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:26px;height:26px;cursor:pointer;border:2px solid #fff;">
+                                        <i class="bi bi-plus text-white" style="font-size:0.75rem;"></i>
+                                        <input type="file" accept="image/*" hidden onchange="window.uploadEditGroupModalAvatar(this)">
+                                    </label>
+                                </div>
+                                <div class="profile-link-inline mt-2">
+                                    <button type="button" class="profile-link-icon" onclick="window.abrirUploadExterno()" title="Subir no Imgur">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </button>
+                                    <label class="profile-link-icon profile-link-icon-ghost" style="cursor:pointer;" title="Escolher do PC">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <input type="file" accept="image/*" hidden onchange="window.uploadEditGroupModalAvatar(this)">
+                                    </label>
+                                    <div class="ml-field flex-grow-1 mb-0">
+                                        <input type="url" id="editGroupAvatarLink" placeholder=" " oninput="window.setEditGroupModalAvatarFromLink(this.value)">
+                                        <label for="editGroupAvatarLink">Link da foto (opcional)</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="ml-field">
+                                    <input type="text" id="editGroupNameInput" placeholder=" " maxlength="60" required>
+                                    <label for="editGroupNameInput">Nome do grupo *</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="create-ad-section">
+                        <div class="create-ad-section-title">
+                            <i class="bi bi-people-fill"></i>
+                            <span>Participantes</span>
+                        </div>
+                        <div class="create-ad-section-body">
+                            <div class="create-ad-label" id="editGroupSelectLabel">Selecione para adicionar ou remover</div>
+                            <div class="ml-field mb-2">
+                                <input type="text" id="editGroupMemberSearch" placeholder=" " autocomplete="off" oninput="window.filterEditGroupMembers(this.value)">
+                                <label for="editGroupMemberSearch">Buscar pessoa...</label>
+                            </div>
+                            <div id="editGroupParticipantsList" class="wa-group-member-list" style="max-height:220px;overflow-y:auto;">
+                                <div class="text-center py-4"><div class="spinner-border spinner-border-sm text-success"></div></div>
+                            </div>
+                            <p class="small text-muted mt-2 mb-0" id="editGroupParticipantsCount">Participantes</p>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="ml-btn ml-btn-primary flex-grow-1" id="editGroupSaveBtn" onclick="window.saveEditGroupModal()"><i class="bi bi-check2 me-2"></i>Salvar</button>
+                        <button type="button" class="ml-btn ml-btn-outline flex-grow-1" data-bs-dismiss="modal"><i class="bi bi-x-lg me-2"></i>Cancelar</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

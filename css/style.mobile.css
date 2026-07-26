@@ -29,6 +29,12 @@
         border-radius: 0;
         padding: 10px;
     }
+    .notif-page-list {
+        padding: 10px;
+    }
+    .notif-page-list .notif-item:last-child {
+        margin-bottom: 0;
+    }
     .ml-panel {
         grid-template-columns: 1fr !important;
         grid-template-areas:
@@ -223,7 +229,7 @@
     .ml-auth-close { border-radius: 0; top: 4px; right: 4px; }
 }
 @media (max-width: 768px) {
-    body.dark-theme .wa-side { background: #111b14; }
+    body.dark-theme .wa-side { background: #111b21; }
 }
 @media (max-width: 576px) {
     .admin-stats-row {
@@ -480,4 +486,17 @@
         font-size: 0.75rem;
         padding: 5px 12px;
     }
+}
+
+/* ---- Comunidade (Threads-clone) no mobile ---- */
+@media (max-width: 767px) {
+    .tw-feed-wrap { max-width: 100%; padding: 0 4px 24px; }
+    .tw-post { padding: 10px 0; }
+    .tw-post-avatar-col { width: 32px; min-width: 32px; }
+    .tw-post-avatar { width: 32px; height: 32px; }
+    .tw-post-name { font-size: 14px; }
+    .tw-post-text { font-size: 14px; }
+    .tw-composer { border-radius: 12px; padding: 12px; }
+    .tw-avatar-lg { width: 72px; height: 72px; }
+    .tw-profile-info { margin-top: -36px; }
 }

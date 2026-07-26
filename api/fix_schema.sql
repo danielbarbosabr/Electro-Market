@@ -1,58 +1,103 @@
 -- ============================================================
--- Correção de schema para o app funcionar (oferta, chamado, etc.)
--- Cole e execute no Supabase -> SQL Editor (uma única vez).
+-- ESQUEMA COMPLETO — ElectroMarket (gerado a partir do uso real)
+-- Execute no Supabase -> SQL Editor (uma única vez).
 -- ============================================================
 
--- ---------- ORDERS: garante TODAS as colunas que o front envia ----------
-alter table public.orders
-  add column if not exists offer_amount         numeric,
-  add column if not exists offer_original_price numeric,
-  add column if not exists quantity             integer     default 1,
-  add column if not exists realiza_entrega      boolean     default true,
-  add column if not exists agree_buyer          boolean     default false,
-  add column if not exists agree_seller         boolean     default false,
-  add column if not exists logistics_type       text,
-  add column if not exists logistics_method     text,
-  add column if not exists updated_at           timestamptz default now(),
-  add column if not exists buyer_reviewed       boolean     default false,
-  add column if not exists seller_reviewed      boolean     default false;
-
--- ---------- CHATS: garante colunas usadas pelo chamado ----------
-alter table public.chats
-  add column if not exists closed               boolean     default false;
-
--- ---------- CHATS: colunas para conversas em grupo ----------
-alter table public.chats
-  add column if not exists is_group             boolean     default false,
-  add column if not exists group_name           text,
-  add column if not exists group_avatar         text;
-
--- ---------- USERS: tabela usada no cadastro/login ----------
+-- ==================== USERS ====================
 create table if not exists public.users (
-  id              uuid primary key default gen_random_uuid(),
-  tipo            text,
-  nome            text,
-  cpf             text,
-  email           text,
-  telefone        text,
-  senha           text,
-  avatar          text,
-  cidade          text,
-  estado          text,
-  endereco        text,
-  vendedor_rating numeric     default 0,
-  rating_count    integer     default 0,
-  comprador_rating      numeric     default 0,
-  comprador_rating_count integer     default 0,
-  created_at      timestamptz  default now(),
-  updated_at      timestamptz  default now()
+  id                   uuid primary key default gen_random_uuid(),
+  tipo                 text,
+  nome                 text,
+  cpf                  text,
+  email                text,
+  telefone             text,
+  senha                text,
+  avatar               text,
+  cidade               text,
+  estado               text,
+  endereco             text,
+  cep                  text,
+  vendedor_rating      numeric     default 0,
+  rating_count         integer     default 0,
+  comprador_rating           numeric     default 0,
+  comprador_rating_count     integer     default 0,
+  last_seen            timestamptz,
+  created_at           timestamptz  default now(),
+  updated_at           timestamptz  default now()
 );
 
--- Garante colunas de avaliação de comprador (se a tabela users já existia antes)
+-- Garante colunas que podem ter sido adicionadas depois
 alter table public.users add column if not exists comprador_rating      numeric default 0;
 alter table public.users add column if not exists comprador_rating_count integer default 0;
+alter table public.users add column if not exists last_seen             timestamptz;
+alter table public.users add column if not exists cep                   text;
 
--- ---------- NOTIFICATIONS ----------
+-- ==================== PRODUCTS ====================
+create table if not exists public.products (
+  id               text primary key,
+  titulo           text,
+  descricao        text,
+  preco            numeric,
+  preco_original   numeric,
+  quantidade       integer,
+  categoria        text,
+  img              text,
+  loja             text,
+  vendedor_id      text,
+  cidade           text,
+  realizaentrega   boolean default true,
+  likes            integer default 0,
+  vendas           integer default 0,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now()
+);
+
+-- ==================== ORDERS ====================
+create table if not exists public.orders (
+  id                   text primary key,
+  seller_id            text,
+  seller_name          text,
+  buyer_id             text,
+  buyer_name           text,
+  product_id           text,
+  product_title        text,
+  product_img          text,
+  total                numeric,
+  quantity             integer     default 1,
+  status               text,
+  offer_amount         numeric,
+  offer_original_price numeric,
+  realiza_entrega      boolean     default true,
+  agree_buyer          boolean     default false,
+  agree_seller         boolean     default false,
+  logistics_type       text,
+  logistics_method     text,
+  buyer_reviewed       boolean     default false,
+  seller_reviewed      boolean     default false,
+  created_at           timestamptz default now(),
+  updated_at           timestamptz default now()
+);
+
+-- ==================== CHATS ====================
+create table if not exists public.chats (
+  id               text primary key,
+  order_id         text,
+  seller_id        text,
+  seller_name      text,
+  buyer_id         text,
+  buyer_name       text,
+  participants     jsonb default '[]'::jsonb,
+  messages         jsonb default '[]'::jsonb,
+  closed           boolean default false,
+  is_group         boolean default false,
+  group_name       text,
+  group_avatar     text,
+  logistics_agreed boolean default false,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now()
+);
+
+-- ==================== NOTIFICATIONS ====================
 create table if not exists public.notifications (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid,
@@ -62,38 +107,53 @@ create table if not exists public.notifications (
   created_at timestamptz default now()
 );
 
--- ---------- AVALIACOES ----------
+-- ==================== AVALIACOES ====================
 create table if not exists public.avaliacoes (
-  id               uuid primary key default gen_random_uuid(),
+  id               text primary key,
   order_id         text,
   product_id       text,
+  seller_id        text,
+  buyer_id         text,
+  buyer_name       text,
   tipo             text,
   avaliador_nome   text,
   avaliado_id      text,
   rating           numeric,
-  comment          text,
+  comentario       text,
+  images           jsonb default '[]'::jsonb,
+  videos           jsonb default '[]'::jsonb,
+  avaliador_avatar text default '',
   created_at       timestamptz default now()
 );
-alter table public.avaliacoes add column if not exists avaliado_id text;
-alter table public.avaliacoes add column if not exists images jsonb default '[]'::jsonb;
-alter table public.avaliacoes add column if not exists videos jsonb default '[]'::jsonb;
-alter table public.avaliacoes add column if not exists product_id text;
-alter table public.avaliacoes add column if not exists avaliador_avatar text default '';
--- Corrige tipos que são TEXT no app mas foram criados como UUID
-alter table public.avaliacoes alter column order_id type text using order_id::text;
-alter table public.avaliacoes alter column avaliado_id type text using avaliado_id::text;
 
--- ---------- ÍNDICES ----------
-create index if not exists idx_users_email        on public.users (email);
-create index if not exists idx_notifications_user on public.notifications (user_id);
+-- ==================== GROUP INVITES ====================
+create table if not exists public.group_invites (
+  id         text primary key,
+  group_id   text,
+  code       text,
+  created_by text,
+  created_at timestamptz default now(),
+  max_uses   integer default 0,
+  use_count  integer default 0,
+  revoked    boolean default false
+);
 
--- ---------- CONDIÇÃO DO PRODUTO (Novo/Usado/Recondicionado) ----------
--- A condição é guardada como um prefixo na própria descrição, ex: "[Novo] descrição...".
--- Produtos criados antes desse campo existir não têm esse prefixo, então o selo
--- de condição não aparece nos cards. Este UPDATE marca esses produtos antigos como
--- "Novo" por padrão (ajuste para 'Usado' antes de rodar, se preferir outro padrão).
--- Depois disso, qualquer vendedor pode editar o produto e corrigir a condição real.
-update public.products
-set descricao = '[Novo] ' || descricao
-where descricao is not null
-  and descricao !~ '^\[(Novo|Usado|Recondicionado)\]';
+-- ==================== GROUP JOIN REQUESTS ====================
+create table if not exists public.group_join_requests (
+  id         text primary key,
+  group_id   text,
+  user_id    text,
+  status     text,
+  created_at timestamptz default now()
+);
+
+-- ==================== ÍNDICES ====================
+create index if not exists idx_users_email             on public.users (email);
+create index if not exists idx_notifications_user      on public.notifications (user_id);
+create index if not exists idx_chats_order_id          on public.chats (order_id);
+create index if not exists idx_chats_seller_id         on public.chats (seller_id);
+create index if not exists idx_chats_buyer_id          on public.chats (buyer_id);
+create index if not exists idx_products_vendedor_id    on public.products (vendedor_id);
+create index if not exists idx_orders_seller_id        on public.orders (seller_id);
+create index if not exists idx_orders_buyer_id         on public.orders (buyer_id);
+create index if not exists idx_avaliacoes_avaliado_id  on public.avaliacoes (avaliado_id);
