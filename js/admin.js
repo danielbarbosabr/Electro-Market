@@ -298,12 +298,7 @@ window.renderAdminPanel = async function() {
                             `).join('')}
                         </div>
 
-                        <div class="admin-card mt-3" id="adminPendingCatsCard">
-                            <h6 class="admin-card-title"><i class="bi bi-hourglass-split me-2"></i>Categorias Pendentes <span class="admin-nav-count" id="pendingCatsCount">0</span></h6>
-                            <div id="adminPendingCatsList">
-                                <p class="text-muted small">Nenhuma sugestão pendente.</p>
-                            </div>
-                        </div>
+
                     </div>
 
                     <div class="admin-tab-panel" id="admin-support">
