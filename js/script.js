@@ -3575,6 +3575,13 @@ function bootstrapApp() {
         return;
     }
 
+    // Veio de "Trocar conta": abre a tela de login automaticamente pra
+    // escolher/entrar com outra conta.
+    if (sessionStorage.getItem('openLoginAfterReload')) {
+        sessionStorage.removeItem('openLoginAfterReload');
+        setTimeout(() => window.showAuthScreen('login'), 300);
+    }
+
     // Aplicar tema salvo
     if (localStorage.getItem('modoEscuro') === 'true') {
         document.body.classList.add('dark-theme');
@@ -4343,6 +4350,14 @@ window.showToast         = showToast;
 window.logout            = () => {
     localStorage.removeItem('electroUser');
     showToast('Sessão encerrada com sucesso', 'info', 2000);
+    setTimeout(() => location.reload(), 600);
+};
+
+/** Encerra a sessão atual e já abre a tela de login em seguida, pra entrar com outra conta */
+window.switchAccount = () => {
+    localStorage.removeItem('electroUser');
+    sessionStorage.setItem('openLoginAfterReload', '1');
+    showToast('Escolha a conta para entrar', 'info', 2000);
     setTimeout(() => location.reload(), 600);
 };
 

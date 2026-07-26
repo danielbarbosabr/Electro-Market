@@ -1036,6 +1036,9 @@
                     </div>
                 </div>
 
+                <a href="#" class="list-group-item list-group-item-action role-logged-in d-none" onclick="window.switchAccount(); window.closeMobileMenu();">
+                        <i class="bi bi-arrow-repeat"></i> <strong>Trocar conta</strong>
+                    </a>
                 <a href="#" class="list-group-item list-group-item-action role-logged-in d-none" onclick="logout(); window.closeMobileMenu();">
                         <i class="bi bi-box-arrow-right"></i> <strong>Sair da conta</strong>
                     </a>
@@ -1090,6 +1093,7 @@
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleTema()"><i class="bi bi-moon-stars me-2"></i>Alterar tema</a></li>
                             <li><hr class="dropdown-divider my-1"></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.goHome(); window.updateMobileNavActive('eletronicos');"><i class="bi bi-box-arrow-right me-2"></i>Sair das Conversas</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.switchAccount()"><i class="bi bi-arrow-repeat me-2"></i>Trocar conta</a></li>
                             <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="window.logout()"><i class="bi bi-power me-2"></i>Desconectar</a></li>
                         </ul>
                     </div>
