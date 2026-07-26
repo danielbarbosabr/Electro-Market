@@ -98,22 +98,28 @@ O sistema foi construído com foco em:
 
 ```
 electromarket/
-├── index.html              # Página principal (SPA)
-├── script.js               # Lógica principal do front-end (produtos, pedidos, chat, feed, carrinho...)
-├── admin.js                # Painel administrativo e chat de suporte
-├── style_mobile.css        # Estilos e ajustes responsivos para mobile
+├── index.html                 # Página principal (SPA)
+├── js/
+│   ├── script.js               # Lógica principal do front-end (produtos, pedidos, chat, feed, carrinho...)
+│   ├── admin.js                 # Painel administrativo e chat de suporte
+│   ├── seller.js                 # Funções exclusivas do vendedor
+│   ├── cliente.js                # Funções exclusivas do comprador
+│   └── config.local.js           # Fallback só para testes locais (fora do Git, veja .gitignore)
+├── css/
+│   ├── style.desktop.css        # Estilos para desktop
+│   └── style.mobile.css         # Estilos e ajustes responsivos para mobile
 ├── api/
-│   └── config.js           # Função serverless (Vercel) que expõe a config do Supabase via env vars
-├── config_local.js         # Fallback só para testes locais com Live Server (fora do Git)
-├── fix_schema_completo.sql # Schema completo do banco + limpeza automática de chats
-└── README.md               # Documentação do projeto
+│   ├── config.js                # Função serverless (Vercel) que expõe a config do Supabase via env vars
+│   └── schema.sql                # Schema completo do banco de dados
+├── .gitignore
+└── README.md                   # Documentação do projeto
 ```
 
 ---
 
 ## ⚙️ Configuração do Supabase
 
-O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um projeto no Supabase e execute o `fix_schema_completo.sql` uma única vez em **SQL Editor** — ele cria/ajusta todas as tabelas necessárias:
+O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um projeto no Supabase e execute o `api/schema.sql` uma única vez em **SQL Editor** — ele cria/ajusta todas as tabelas necessárias:
 
 - `users` — clientes e vendedores, avaliações, endereço
 - `products` — anúncios
@@ -123,7 +129,7 @@ O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um 
 - `avaliacoes` — avaliações entre comprador e vendedor
 - `group_invites` / `group_join_requests` — convites e solicitações de entrada em grupos
 
-O mesmo script também configura o trigger e o job do `pg_cron` que apagam automaticamente chats com 14+ dias sem atividade.
+> ⚠️ A limpeza automática de chats (trigger + job do `pg_cron`) não está incluída no `api/schema.sql` atual — se quiser esse recurso, rode também o script de limpeza (`chat_ttl_2_semanas.sql`) separadamente no SQL Editor.
 
 ### Credenciais (sem hardcode)
 
@@ -135,7 +141,7 @@ SUPABASE_KEY=SUA_CHAVE_ANON
 GOOGLE_CLIENT_ID=SEU_CLIENT_ID_GOOGLE
 ```
 
-Configure-as em **Vercel → Settings → Environment Variables**. Para testes locais sem a função serverless, use o `config_local.js` (mantido fora do Git via `.gitignore`).
+Configure-as em **Vercel → Settings → Environment Variables**. Para testes locais sem a função serverless, use o `js/config.local.js` (mantido fora do Git via `.gitignore`).
 
 ---
 
@@ -148,7 +154,7 @@ git clone https://github.com/seuusuario/electromarket.git
 cd electromarket
 ```
 
-2. Configure o `config_local.js` com suas próprias credenciais de teste (esse arquivo não vai para o GitHub).
+2. Configure o `js/config.local.js` com suas próprias credenciais de teste (esse arquivo não vai para o GitHub).
 
 3. Abra o `index.html` com a extensão **Live Server** do VS Code (ou qualquer servidor estático).
 

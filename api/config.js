@@ -1,9 +1,13 @@
 // Função serverless (Vercel) que devolve a config do Supabase. A chave
 // fica aqui no servidor (nunca no front-end) — o fetch do site só recebe
 // os valores via esta função.
+//
+// SUPABASE_URL, SUPABASE_KEY e GOOGLE_CLIENT_ID vêm das variáveis de
+// ambiente da Vercel (Settings -> Environment Variables). Nada disso
+// fica escrito no código, então pode subir pro GitHub sem problema.
 
-const SUPABASE_URL = 'https://pjisiqvaulgoikaitmaj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqaXNpcXZhdWxnb2lrYWl0bWFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNjI5ODAsImV4cCI6MjA5MjYzODk4MH0.vq69kmmYdr2aBePlxwVcO3QhUtbp5dtx-pZxRXgEkV8';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
 module.exports = (req, res) => {
