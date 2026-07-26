@@ -204,6 +204,24 @@ async function createPersistentNotification(message, type = 'info', userId = nul
     loadNotifications();
 }
 
+function requestNotificationPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') return;
+    if (Notification.permission === 'denied') return;
+    Notification.requestPermission();
+}
+
+function showBrowserNotification(title, body) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (document.hasFocus()) return;
+    try {
+        const n = new Notification(title, { body, icon: '/favicon-32x32.png', silent: true });
+        n.onclick = () => { window.focus(); n.close(); };
+        setTimeout(() => n.close(), 8000);
+    } catch (e) { console.error('Erro ao mostrar notificação:', e); }
+}
+
 /**
  * Busca a quantidade de pedidos pendentes de aprovação do vendedor
  * e sincroniza os badges (nav desktop, menu mobile e dock inferior).
@@ -2874,6 +2892,7 @@ async function loadChatMessages(orderId, silent = false) {
             container.scrollTop = container.scrollHeight;
         } else if (isNewIncoming) {
             showToast('Nova mensagem recebida.', 'info', 2000);
+            showBrowserNotification('Nova mensagem', order?.seller_name ? `Pedido #${orderId.slice(-6).toUpperCase()}` : 'Nova mensagem no pedido');
         }
         updateChatLogistics(order, user);
     } catch (e) {
@@ -4684,6 +4703,7 @@ async function handleGoogleOAuthCallback() {
             await supabaseFetch('users', { method: 'POST', body: JSON.stringify(newUser) });
             localStorage.setItem('electroUser', JSON.stringify(newUser));
         }
+        requestNotificationPermission();
 
         history.replaceState(null, '', window.location.pathname + window.location.search);
         updateUI();
@@ -5111,6 +5131,7 @@ document.addEventListener('submit', async (e) => {
             if (users?.length) {
                 localStorage.setItem('electroUser', JSON.stringify(users[0]));
                 window.hideAuthScreen();
+                requestNotificationPermission();
                 
                 await createPersistentNotification(`Novo acesso detectado em sua conta.`, 'info', users[0].id);
                 setTimeout(() => location.reload(), 400);
@@ -5833,7 +5854,7 @@ window.renderChatContainer = function(opts) {
     }
 
     const callBtnHtml = onCall
-        ? `<button type="button" class="chat-header-close" onclick="${onCall}" title="Ligar" style="margin-right:4px;"><i class="bi bi-telephone-fill"></i></button>`
+        ? `<button type="button" class="chat-header-close" onclick="${onCall}" title="Ligar" style="margin-right:4px;"><i class="bi bi-telephone-outbound"></i></button>`
         : '';
 
     const searchBtnHtml = `<button type="button" class="chat-header-close" onclick="window.toggleChatSearch('${msgsId}')" title="Pesquisar na conversa" style="margin-right:4px;"><i class="bi bi-search"></i></button>`;
@@ -5972,6 +5993,20 @@ window.renderChatContainer = function(opts) {
     </div>`;
 };
 
+// ---------------------------------------------------------------
+// Cache local de grupos que o usuário já saiu (evita grupos fantasmas)
+// ---------------------------------------------------------------
+function getLeftGroupIds() {
+    if (!getSavedUser()) return [];
+    try { return JSON.parse(localStorage.getItem(`leftGroups_${getSavedUser().id}`) || '[]'); }
+    catch { return []; }
+}
+function addLeftGroupLocally(chatId) {
+    const ids = getLeftGroupIds();
+    if (!ids.includes(chatId)) ids.push(chatId);
+    try { localStorage.setItem(`leftGroups_${getSavedUser().id}`, JSON.stringify(ids)); } catch {}
+}
+
 // ============================================
 // CHAT DIRETO (Conversas Livres — WhatsApp-like)
 // ============================================
@@ -6042,18 +6077,20 @@ window.renderDirectChats = async function(opts = {}) {
     const hideBootScreen = async () => {
         if (!bootScreen || skipBoot) return;
         const elapsed = Date.now() - bootStartedAt;
-        const remaining = Math.max(0, 650 - elapsed);
+        const remaining = Math.max(0, 1500 - elapsed);
         if (remaining) await new Promise(r => setTimeout(r, remaining));
         bootScreen.classList.add('wa-boot-fade-out');
-        setTimeout(() => bootScreen.classList.add('d-none'), 250);
+        setTimeout(() => bootScreen.classList.add('d-none'), 400);
     };
 
     try {
         const allUsers = await supabaseFetch(`users?select=id,nome,avatar,last_seen&order=nome.asc`);
         const directChats = await supabaseFetch(`chats?order_id=is.null&select=*`);
+        const leftIds = getLeftGroupIds();
         const myChats = directChats.filter(c =>
             c.participants && c.participants.some(p => String(p) === String(user.id)) &&
-            c.messages && c.messages[0]?.type !== 'ticket_meta'
+            c.messages && c.messages[0]?.type !== 'ticket_meta' &&
+            !leftIds.includes(c.id)
         );
 
         const contactMap = {};
@@ -7550,6 +7587,7 @@ window.groupLeave = async function (chatId) {
       meta.groupAdmins = (meta.groupAdmins || []).filter(a => String(a) !== String(user.id));
       chat.messages[0] = meta;
     }
+    addLeftGroupLocally(chatId);
     await addSystemMessage(chat, `${user.nome} saiu do grupo`, 'member_left');
     await supabaseFetch(`chats?id=eq.${chatId}`, {
       method: 'PATCH',
@@ -8252,7 +8290,7 @@ function renderCommunityPostCard(post, author, me, parentCtxHtml) {
                     <i class="bi ${liked ? 'bi-heart-fill' : 'bi-heart'}"></i>${likesCount > 0 ? `<span class="action-count" onclick="event.stopPropagation();window.showCommunityPostActivity('${postId}')">${twFormatCount(likesCount)}</span>` : ''}
                 </button>
                 <button type="button" class="tw-action-btn" onclick="window.openCommunityThread('${postId}')" title="Comentar">
-                    <i class="bi bi-chat"></i>${repliesCount > 0 ? `<span class="action-count">${twFormatCount(repliesCount)}</span>` : ''}
+                    <i class="bi bi-chat-left-text"></i>${repliesCount > 0 ? `<span class="action-count">${twFormatCount(repliesCount)}</span>` : ''}
                 </button>
                 <button type="button" class="tw-action-btn ${reposted ? 'tw-repost-active' : ''}" onclick="window.toggleCommunityRepost('${postId}', this)" title="Repostar">
                     <i class="bi bi-arrow-repeat"></i>${repostsCount > 0 ? `<span class="action-count">${twFormatCount(repostsCount)}</span>` : ''}
@@ -9478,6 +9516,7 @@ async function loadDirectChatMessages(chatId, silent = false) {
             container.scrollTop = container.scrollHeight;
         } else if (isNewIncoming) {
             showToast('Nova mensagem recebida.', 'info', 2000);
+            showBrowserNotification('Nova mensagem', chat.seller_name || 'Conversa direta');
         }
     } catch (e) {
         if (silent) return;

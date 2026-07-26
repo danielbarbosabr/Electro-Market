@@ -1057,7 +1057,7 @@
     <!-- ÁREA DE PEDIDOS ESTILO WHATSAPP WEB (Minhas Vendas / Compras / Solicitações) -->
     <div id="whatsappOrdersView" class="d-none wa-main">
         <div id="waBootScreen" class="wa-boot-screen d-none">
-            <div class="wa-boot-icon"><i class="bi bi-telephone"></i></div>
+            <div class="wa-boot-icon"><i class="bi bi-whatsapp"></i></div>
             <h5 class="wa-boot-title">Conversas</h5>
             <div class="wa-boot-bar"><span></span></div>
             <p class="wa-boot-subtitle"><i class="bi bi-lock-fill me-1"></i>Suas mensagens ficam só entre você e a outra pessoa</p>
@@ -1065,8 +1065,8 @@
         <nav class="wa-rail" id="waRail">
             <div class="wa-rail-top">
                 <button type="button" id="waRailArchived" class="wa-rail-btn" title="Arquivadas" onclick="window.toggleArchivedSection()"><i class="bi bi-archive"></i></button>
-                <button type="button" id="waRailCommunity" class="wa-rail-btn wa-rail-community" title="Comunidade" onclick="window.openCommunityInChat()"><i class="bi bi-flower1"></i></button>
-                <button type="button" id="waRailConversas" class="wa-rail-btn active" title="Conversas" onclick="window.renderDirectChats()"><i class="bi bi-chat-dots-fill"></i></button>
+                <button type="button" id="waRailCommunity" class="wa-rail-btn wa-rail-community" title="Comunidade" onclick="window.openCommunityInChat()"><i class="bi bi-threads"></i></button>
+                <button type="button" id="waRailConversas" class="wa-rail-btn active" title="Conversas" onclick="window.renderDirectChats()"><i class="bi bi-chat-left-text"></i></button>
                 <button type="button" id="waRailGroups" class="wa-rail-btn" title="Grupos" onclick="window.openNewGroupModal()"><i class="bi bi-people-fill"></i></button>
             </div>
             <div class="wa-rail-bottom">
@@ -1089,7 +1089,7 @@
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openNewConversationModal()"><i class="bi bi-chat-square-text me-2"></i>Nova conversa</a></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.showStarredMessages()"><i class="bi bi-star me-2"></i>Mensagens favoritas</a></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.markAllChatsAsRead()"><i class="bi bi-envelope-open me-2"></i>Marcar todas como lidas</a></li>
-                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openCommunityInChat()"><i class="bi bi-flower1 me-2"></i>Comunidade</a></li>
+                            <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openCommunityInChat()"><i class="bi bi-threads me-2"></i>Comunidade</a></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleTema()"><i class="bi bi-moon-stars me-2"></i>Alterar tema</a></li>
                             <li><hr class="dropdown-divider my-1"></li>
                             <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.goHome(); window.updateMobileNavActive('eletronicos');"><i class="bi bi-box-arrow-right me-2"></i>Sair das Conversas</a></li>
@@ -1599,6 +1599,9 @@
 
             <button type="submit" class="btn btn-ml-primary w-100 py-3 fw-bold">
                 <i class="bi bi-check-lg me-2"></i>SALVAR ALTERAÇÕES
+            </button>
+            <button type="button" class="ml-btn ml-btn-outline" style="width:100%;justify-content:center;margin-top:0.5rem" onclick="window.switchAccount()">
+                <i class="bi bi-arrow-repeat me-2"></i>TROCAR DE CONTA
             </button>
             <button type="button" class="ml-btn ml-btn-outline" style="width:100%;justify-content:center;margin-top:0.5rem" onclick="logout()">
                 <i class="bi bi-box-arrow-right me-2"></i>SAIR DA CONTA
