@@ -5,7 +5,7 @@
 <img src="https://api.iconify.design/bi/link-45deg.svg?color=%234FC3F7" width="16" height="16"> [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
 
 ![Status](https://img.shields.io/badge/status-alpha-green)
-![Versão](https://img.shields.io/badge/versão-2.0.0-blue)
+![Deployments](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/danielbarbosabr/Electro-Market/main/.github/badges/deployments.json)
 ![Licença](https://img.shields.io/badge/licença-MIT-yellow)
 
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
@@ -166,9 +166,9 @@ vercel dev
 
 | Nome | Função |
 |------|--------|
-| Daniel Barbosa de Lima | Desenvolvedor Full Stack |
-| Deep Seek | Documentação / Testes |
-| Claude | Design / UI/UX |
+| <img src="https://api.iconify.design/bi/person-fill.svg?color=%234FC3F7" width="18" height="18"> Daniel Barbosa de Lima | Desenvolvedor Full Stack |
+| <img src="https://cdn.simpleicons.org/deepseek" width="18" height="18"> Deep Seek | Documentação / Testes |
+| <img src="https://cdn.simpleicons.org/anthropic" width="18" height="18"> Claude | Design / UI/UX |
 
 ---
 
