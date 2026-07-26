@@ -550,7 +550,7 @@ Assunto: ${assunto}
 ElectroMarket - Plataforma de E-commerce
         `.trim();
 
-        const mailto = `mailto:dannybarbosadelimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] ' + assunto)}&body=${encodeURIComponent(body)}`;
+        const mailto = `mailto:dannybarbosalimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] ' + assunto)}&body=${encodeURIComponent(body)}`;
         window.location.href = mailto;
         showToast('E-mail de suporte aberto e disputa registrada!', 'success');
         loadChatMessages(orderId);

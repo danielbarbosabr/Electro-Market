@@ -120,12 +120,27 @@ window.renderAdminPanel = async function() {
 
     try {
         // Busca todos os usuários, produtos, pedidos e conversas para gestão total
-        const [users, products, orders, chats] = await Promise.all([
+        const [users, products, orders, chats, allRatings] = await Promise.all([
             supabaseFetch('users?select=*&order=nome.asc'),
             supabaseFetch('products?select=*&order=created_at.desc'),
             supabaseFetch('orders?select=*&order=created_at.desc'),
-            supabaseFetch('chats?select=*&order_id=not.is.null')
+            supabaseFetch('chats?select=*&order_id=not.is.null'),
+            supabaseFetch('avaliacoes?select=avaliado_id,rating')
         ]);
+        // Calcula média de avaliação por usuário
+        const ratingMap = {};
+        (allRatings || []).forEach(r => {
+            if (r.avaliado_id && !r.avaliado_id.startsWith('PROD_')) {
+                if (!ratingMap[r.avaliado_id]) ratingMap[r.avaliado_id] = [];
+                ratingMap[r.avaliado_id].push(r.rating || 0);
+            }
+        });
+        users.forEach(u => {
+            const rates = ratingMap[u.id];
+            if (rates && rates.length) {
+                u.avaliacao = rates.reduce((s, v) => s + v, 0) / rates.length;
+            }
+        });
         adminOrdersCache = orders;
         window._adminProductsCache = products;
         window._adminUsersCache = users;
@@ -2809,7 +2824,7 @@ Mensagem: ${message}
 ElectroMarket - Plataforma de E-commerce
     `.trim();
 
-    const mailtoLink = `mailto:dannybarbosadelimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] ' + assunto)}&body=${encodeURIComponent(body)}`;
+    const mailtoLink = `mailto:dannybarbosalimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] ' + assunto)}&body=${encodeURIComponent(body)}`;
 
     document.getElementById('supportRequestForm')?.reset();
     window._supportReqOrderId = null;
