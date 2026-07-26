@@ -1,200 +1,164 @@
-# <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> ElectroMarket
+# ElectroMarket
 
-**Marketplace de Eletrônicos – Projeto Acadêmico**
+**Marketplace de Eletrônicos**
 
-![Status](https://img.shields.io/badge/status-alpha-green)
-![Versão](https://img.shields.io/badge/versão-2.0.0-blue)
-![Licença](https://img.shields.io/badge/licença-MIT-yellow)
-
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
-![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)
-![Bootstrap](https://img.shields.io/badge/Bootstrap-7952B3?logo=bootstrap&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
+![Badge](https://img.shields.io/badge/status-em%20desenvolvimento-green)
+![Badge](https://img.shields.io/badge/versão-2.0.0-blue)
 
 ---
 
-## <img src="https://api.iconify.design/bi/info-circle-fill.svg?color=%234FC3F7" width="20" height="20"> Sobre o Projeto
+## Sobre o Projeto
 
-O **ElectroMarket** é uma plataforma web de compra e venda de produtos eletrônicos, desenvolvida como projeto integrador do curso de graduação. A aplicação simula um marketplace completo, permitindo que usuários se cadastrem como **clientes** ou **vendedores**, anunciem produtos, realizem pedidos, avaliem uns aos outros e negociem entregas através de um **chat em tempo real** — incluindo chats individuais, chats em grupo e um canal de suporte com a administração.
+O **ElectroMarket** é uma plataforma web de compra e venda de produtos eletrônicos. A aplicação funciona como um marketplace completo, permitindo cadastro de **clientes** e **vendedores**, anúncio de produtos, pedidos, chat entre as partes e painel administrativo.
 
-O sistema foi construído com foco em:
-- Arquitetura **serverless** (front-end + Backend as a Service)
-- Experiência de usuário rica com **animações interativas**
-- Design responsivo (mobile-first)
-- Gerenciamento real de estado via **Supabase**
-- Credenciais nunca expostas no código-fonte (config via variáveis de ambiente)
+O sistema foi construído com:
+- Arquitetura **serverless** (front-end estático + Supabase como BaaS)
+- Design responsivo (mobile-first) estilo Mercado Livre
+- Chat em tempo real com suporte a texto, imagens, arquivos e grupos
 
 ---
 
-## <img src="https://api.iconify.design/bi/rocket-takeoff-fill.svg?color=%234FC3F7" width="20" height="20"> Funcionalidades
+## Funcionalidades
 
-### <img src="https://api.iconify.design/bi/shield-lock-fill.svg?color=%234FC3F7" width="18" height="18"> Autenticação
-- Cadastro com validação de CPF (com busca automática de estado) e busca de endereço por **CEP (ViaCEP)**
-- Login com senha criptografada (hash) e login social via **Google OAuth**
-- Tela de autenticação interativa com o mascote **"Yeti"**, que reage aos campos (piscar, cobrir os olhos na senha, seguir o cursor)
-- Detecção de região do visitante (guest) para sugerir cidade/estado automaticamente
+### Autenticação
+- Cadastro com validação de CPF e busca de endereço por CEP (ViaCEP)
+- Login com senha ou Google
+- Tela interativa com mascote **Yeti** (SVG animado que reage aos campos)
+- Recuperação de senha via chamado de suporte
 
-### <img src="https://api.iconify.design/bi/shop.svg?color=%234FC3F7" width="18" height="18"> Marketplace
-- Listagem de produtos em grid responsivo (múltiplas colunas no desktop, 2 no mobile)
-- Filtros por preço, categoria, loja, cidade e estado do vendedor
-- Ordenação por menor/maior preço e mais vendidos
-- Busca com autocomplete e debounce
-- Detalhes do produto com galeria de imagens, condição do item e reputação do vendedor (avaliações em estrelas)
-- Upload de imagens via Imgur
+### Marketplace
+- Grid de produtos responsivo
+- Filtros por preço, categoria, loja, localização e forma de recebimento
+- Ordenação por destaque, recentes, mais curtidos, menor/maior preço
+- Detalhes do produto com galeria de imagens, reputação do vendedor e avaliações
+- Sistema de **ofertas** (comprador propõe valor diferente)
 
-### <img src="https://api.iconify.design/bi/cart-fill.svg?color=%234FC3F7" width="18" height="18"> Carrinho de Compras
-- Adicionar/remover itens, alterar quantidade
-- Finalização de compra que gera um **pedido** automático
+### Carrinho
+- Adicionar/remover itens com controle de quantidade e estoque
+- Finalização que gera pedido automático no banco
 
-### <img src="https://api.iconify.design/bi/box-seam-fill.svg?color=%234FC3F7" width="18" height="18"> Gestão de Pedidos
-- Cliente: acompanha status da compra (`Em Aprovação → Combinando entrega → Entregue`)
-- Vendedor: aceita/recusa pedidos, visualiza histórico de vendas e badge de pendências
-- Acordo mútuo de logística (retirada, entrega pelo vendedor ou apps externos como Uber Flash, 99 Entrega, Loggi)
-- Avaliação mútua (comprador ↔ vendedor) ao final do pedido, com nota, comentário, fotos e vídeos
+### Gestão de Pedidos
+- **Cliente**: acompanha status, solicita compra, confirma recebimento
+- **Vendedor**: aceita/recusa pedidos e ofertas, gerencia vendas
+- **Chat integrado** entre comprador e vendedor com área de logística
+- **Avaliações** bidirecionais (comprador avalia vendedor e vice-versa)
 
-### <img src="https://api.iconify.design/bi/chat-dots-fill.svg?color=%234FC3F7" width="18" height="18"> Chat em Tempo Real
-- Chat de pedido, chat direto (usuário-a-usuário) e **chats em grupo** (com admin de grupo, convites por código e pedidos de entrada)
-- Envio de mensagens de texto, imagens, arquivos e **localização**
-- Reações a mensagens, resposta citando mensagem anterior, indicador de "digitando..."
-- Marcação de mensagens como vistas, badge de não lidas
-- Links detectados automaticamente e clicáveis
-- Chats expiram automaticamente após **14 dias de inatividade** (limpeza agendada via `pg_cron`)
+### Chat
+- Mensagens de texto, imagem, arquivo e localização
+- Resposta, edição e exclusão de mensagens
+- Reações com emojis
+- Transcrição de voz para texto (Web Speech API)
+- **Conversas diretas** (sem pedido) entre usuários
+- **Grupos** com participantes, avatar, nome e convites por link
+- **Suporte**: chamados com categorias e atendimento por admin
 
-### <img src="https://api.iconify.design/bi/globe2.svg?color=%234FC3F7" width="18" height="18"> Feed da Comunidade
-- Mural estilo rede social entre usuários (posts, seguir/deixar de seguir outros usuários, contagem de seguidores)
+### Perfil
+- Edição de dados pessoais, avatar e banner da loja
+- Modo escuro persistente
+- Avatar armazena foto + banner no mesmo campo (JSON)
 
-### <img src="https://api.iconify.design/bi/tools.svg?color=%234FC3F7" width="18" height="18"> Painel Administrativo
-- Visão geral, gestão de conteúdo (usuários/produtos), categorias pendentes de aprovação
-- Chat de **suporte** dedicado entre usuário e administração, com o mesmo sistema de mensagens/anexos do chat comum
-- Sincronização e verificação do banco de dados
+### Admin
+- Painel com abas: Início, Conteúdo, Categorias, Suporte
+- Gerenciar usuários, produtos, pedidos e conversas
+- Gráficos (Chart.js) de usuários por tipo, chats abertos/encerrados, pedidos por status, publicações por mês
+- Simulação de papel (admin pode ver o site como Cliente ou Vendedor)
 
-### <img src="https://api.iconify.design/bi/person-circle.svg?color=%234FC3F7" width="18" height="18"> Perfil do Usuário
-- Edição de dados pessoais, avatar e endereço
-- Modo escuro (dark theme) persistente
-- Notificações persistentes (pedidos, mensagens, avaliações)
-- Indicador de "online há pouco tempo" (`last_seen`)
+### Comunidade
+- Posts e seguidores usando a própria tabela `chats` (sem tabela extra)
+- Posts: `order_id = 'community_post_<id>'`
+- Seguir: `order_id = 'community_follow_<id>'`
 
 ---
 
-## <img src="https://api.iconify.design/bi/cpu-fill.svg?color=%234FC3F7" width="20" height="20"> Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 | Camada | Tecnologia |
 |--------|------------|
-| **Front-end** | HTML5, CSS3, JavaScript (Vanilla, sem framework) |
-| **Estilização** | Bootstrap 5.3, Bootstrap Icons, CSS Custom Properties (variáveis) |
-| **Animações** | GSAP (TweenMax + MorphSVGPlugin) para o mascote Yeti |
-| **Backend / Banco** | [Supabase](https://supabase.com/) (PostgreSQL + API REST) |
-| **Tarefas agendadas** | `pg_cron` (limpeza automática de chats inativos) |
-| **Funções serverless** | Vercel (Node.js) — entrega a config do Supabase sem expor credenciais no front-end |
-| **APIs externas** | ViaCEP (endereço por CEP), Google OAuth (login social), Imgur (upload de imagens) |
-| **Hospedagem** | Vercel |
+| **Front-end** | HTML5, CSS3, JavaScript (Vanilla, ~10k linhas) |
+| **Estilização** | Bootstrap 5.3, Bootstrap Icons, CSS Custom Properties |
+| **Banco** | [Supabase](https://supabase.com/) (PostgreSQL + API REST) |
+| **Gráficos** | Chart.js 4.4 |
+| **APIs externas** | ViaCEP, IBGE (cidades), Nominatim/OpenStreetMap (geolocalização), ipapi.co (IP), Web Speech API |
+| **Hospedagem** | Vercel (função serverless em `api/config.js`) |
 
 ---
 
-## <img src="https://api.iconify.design/bi/folder2-open.svg?color=%234FC3F7" width="20" height="20"> Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
-electromarket/
-├── index.html                 # Página principal (SPA)
-├── js/
-│   ├── script.js               # Lógica principal do front-end (produtos, pedidos, chat, feed, carrinho...)
-│   ├── admin.js                 # Painel administrativo e chat de suporte
-│   ├── seller.js                 # Funções exclusivas do vendedor
-│   ├── cliente.js                # Funções exclusivas do comprador
-│   └── config.local.js           # Fallback só para testes locais (fora do Git, veja .gitignore)
+C2/
+├── index.html                # Página principal (SPA)
 ├── css/
-│   ├── style.desktop.css        # Estilos para desktop
-│   └── style.mobile.css         # Estilos e ajustes responsivos para mobile
+│   ├── style.desktop.css     # Estilos desktop
+│   └── style.mobile.css      # Estilos mobile
+├── js/
+│   ├── script.js             # Lógica principal (~10k linhas)
+│   ├── admin.js              # Painel administrativo
+│   ├── seller.js             # Funções do vendedor
+│   ├── cliente.js            # Funções do comprador
+│   └── config.local.js       # Credenciais de dev (gitignorado)
 ├── api/
-│   ├── config.js                # Função serverless (Vercel) que expõe a config do Supabase via env vars
-│   └── schema.sql                # Schema completo do banco de dados
-├── .gitignore
-└── README.md                   # Documentação do projeto
+│   ├── fix_schema.sql        # Schema completo do banco
+│   └── config.js             # Função serverless (credenciais)
+└── README.md
 ```
 
 ---
 
-## <img src="https://api.iconify.design/bi/gear-fill.svg?color=%234FC3F7" width="20" height="20"> Configuração do Supabase
+## Schema do Banco (Supabase/PostgreSQL)
 
-O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um projeto no Supabase e execute o `api/schema.sql` uma única vez em **SQL Editor** — ele cria/ajusta todas as tabelas necessárias:
+Execute `api/fix_schema.sql` no SQL Editor do Supabase. O schema completo contém 8 tabelas:
 
-- `users` — clientes e vendedores, avaliações, endereço
-- `products` — anúncios
-- `orders` — pedidos e status de logística
-- `chats` — mensagens, grupos, convites e pedidos de entrada em grupo
-- `notifications` — notificações do usuário
-- `avaliacoes` — avaliações entre comprador e vendedor
-- `group_invites` / `group_join_requests` — convites e solicitações de entrada em grupos
+| Tabela | Finalidade |
+|--------|------------|
+| `users` | Usuários (cliente, vendedor, admin) |
+| `products` | Anúncios de produtos |
+| `orders` | Pedidos e ofertas |
+| `chats` | Conversas (pedido, direto, grupo, suporte, comunidade) |
+| `notifications` | Notificações do sistema |
+| `avaliacoes` | Avaliações de vendedor, comprador e produto |
+| `group_invites` | Links de convite para grupos |
+| `group_join_requests` | Solicitações de entrada em grupos |
 
-O mesmo script também configura o trigger e o job do `pg_cron` que apagam automaticamente chats com 14+ dias sem atividade.
+### RLS (desenvolvimento)
 
-### Credenciais (sem hardcode)
+```sql
+ALTER TABLE public.users              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chats              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.avaliacoes         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_invites      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_join_requests ENABLE ROW LEVEL SECURITY;
 
-As credenciais **não ficam escritas no código**. Elas são lidas via variáveis de ambiente na função serverless `api/config.js`:
-
-```bash
-SUPABASE_URL=https://SEU_PROJETO.supabase.co
-SUPABASE_KEY=SUA_CHAVE_ANON
-GOOGLE_CLIENT_ID=SEU_CLIENT_ID_GOOGLE
-```
-
-Configure-as em **Vercel → Settings → Environment Variables**. Para testes locais sem a função serverless, use o `js/config.local.js` (mantido fora do Git via `.gitignore`).
-
----
-
-## <img src="https://api.iconify.design/bi/display.svg?color=%234FC3F7" width="20" height="20"> Como Executar Localmente
-
-1. Clone o repositório:
-
-```bash
-git clone https://github.com/seuusuario/electromarket.git
-cd electromarket
-```
-
-2. Configure o `js/config.local.js` com suas próprias credenciais de teste (esse arquivo não vai para o GitHub).
-
-3. Abra o `index.html` com a extensão **Live Server** do VS Code (ou qualquer servidor estático).
-
-4. Para simular o ambiente de produção (com a função serverless), use a CLI da Vercel:
-
-```bash
-vercel dev
+CREATE POLICY "all" ON public.users              FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.products           FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.orders             FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.chats              FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.notifications      FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.avaliacoes         FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.group_invites      FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "all" ON public.group_join_requests FOR ALL USING (true) WITH CHECK (true);
 ```
 
 ---
 
-## <img src="https://api.iconify.design/bi/globe.svg?color=%234FC3F7" width="20" height="20"> Demonstração Online
+## Como Executar Localmente
 
-O projeto está disponível em: [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
-
----
-
-## <img src="https://api.iconify.design/bi/people-fill.svg?color=%234FC3F7" width="20" height="20"> Equipe
-
-| Nome | Função |
-|------|--------|
-| Daniel Barbosa de Lima | Desenvolvedor Full Stack |
-| Deep Seek | Documentação / Testes |
-| Claude | Design / UI/UX |
+1. Abra o arquivo `index.html` no navegador ou use **Live Server** no VS Code.
+2. Execute `api/fix_schema.sql` no SQL Editor do Supabase.
+3. (Opcional) Execute `api/chat_ttl_2_semanas.sql` para limpeza automática de chats antigos.
+4. As credenciais do Supabase vêm da função serverless (`api/config.js`). Em dev local, o fallback `js/config.local.js` é usado automaticamente.
 
 ---
 
-## <img src="https://api.iconify.design/bi/file-earmark-text-fill.svg?color=%234FC3F7" width="20" height="20"> Licença
+## Demonstração Online
 
-Este projeto é parte de um trabalho acadêmico e está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
-
----
-
-## <img src="https://api.iconify.design/bi/heart-fill.svg?color=%234FC3F7" width="20" height="20"> Agradecimentos
-
-- [Supabase](https://supabase.com/) pelo backend gratuito
-- [GSAP](https://gsap.com/) pelas animações
-- [ViaCEP](https://viacep.com.br/) pela API de CEP
-- CodePen pelo SVG do Yeti original
+[https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
 
 ---
 
-Feito para a disciplina de Projeto Integrador
+## Licença
+
+Projeto acadêmico sob licença MIT.
