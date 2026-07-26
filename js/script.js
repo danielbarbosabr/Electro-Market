@@ -5811,9 +5811,10 @@ window.renderChatContainer = function(opts) {
     dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleChatSearch('${msgsId}')"><i class="bi bi-search me-2"></i>Pesquisar</a></li>`);
     if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi ${isMuted ? 'bi-bell-fill' : 'bi-bell-slash'} me-2"></i>${isMuted ? 'Reativar notificações' : 'Silenciar notificações'}</a></li>`);
     if (onPin) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onPin}"><i class="bi ${isPinned ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${isPinned ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}</a></li>`);
+    if (onArchive) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onArchive}"><i class="bi ${isArchived ? 'bi-archive-fill' : 'bi-archive'} me-2"></i>${isArchived ? 'Desarquivar conversa' : 'Arquivar conversa'}</a></li>`);
     dropdownItems.push(`<li><hr class="dropdown-divider my-1"></li>`);
     if (onClose) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClose}"><i class="bi bi-x-circle me-2"></i>Fechar conversa</a></li>`);
-    if (onBlock) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onBlock}"><i class="bi bi-slash-circle me-2"></i>Bloquear</a></li>`);
+    if (onBlock) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onBlock}"><i class="bi bi-slash-circle me-2"></i>Bloquear usuário</a></li>`);
     if (onClearChat) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClearChat}"><i class="bi bi-eraser me-2"></i>Limpar conversa</a></li>`);
     } else {
     if (onViewProfile) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onViewProfile}"><i class="bi bi-person-circle me-2"></i>Ver perfil</a></li>`);
