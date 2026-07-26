@@ -1,4 +1,6 @@
-# 🛒 ElectroMarket
+<img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" align="left" style="margin-right:8px">
+
+# ElectroMarket
 
 **Marketplace de Eletrônicos – Projeto Acadêmico**
 
@@ -16,7 +18,7 @@
 
 ---
 
-## 📋 Sobre o Projeto
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/info-circle-fill.svg" width="20" height="20"> Sobre o Projeto
 
 O **ElectroMarket** é uma plataforma web de compra e venda de produtos eletrônicos, desenvolvida como projeto integrador do curso de graduação. A aplicação simula um marketplace completo, permitindo que usuários se cadastrem como **clientes** ou **vendedores**, anunciem produtos, realizem pedidos, avaliem uns aos outros e negociem entregas através de um **chat em tempo real** — incluindo chats individuais, chats em grupo e um canal de suporte com a administração.
 
@@ -29,15 +31,15 @@ O sistema foi construído com foco em:
 
 ---
 
-## 🚀 Funcionalidades
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/rocket-takeoff-fill.svg" width="20" height="20"> Funcionalidades
 
-### 🔐 Autenticação
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/shield-lock-fill.svg" width="18" height="18"> Autenticação
 - Cadastro com validação de CPF (com busca automática de estado) e busca de endereço por **CEP (ViaCEP)**
 - Login com senha criptografada (hash) e login social via **Google OAuth**
 - Tela de autenticação interativa com o mascote **"Yeti"**, que reage aos campos (piscar, cobrir os olhos na senha, seguir o cursor)
 - Detecção de região do visitante (guest) para sugerir cidade/estado automaticamente
 
-### 🏪 Marketplace
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/shop.svg" width="18" height="18"> Marketplace
 - Listagem de produtos em grid responsivo (múltiplas colunas no desktop, 2 no mobile)
 - Filtros por preço, categoria, loja, cidade e estado do vendedor
 - Ordenação por menor/maior preço e mais vendidos
@@ -45,17 +47,17 @@ O sistema foi construído com foco em:
 - Detalhes do produto com galeria de imagens, condição do item e reputação do vendedor (avaliações em estrelas)
 - Upload de imagens via Imgur
 
-### 🛍️ Carrinho de Compras
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/cart-fill.svg" width="18" height="18"> Carrinho de Compras
 - Adicionar/remover itens, alterar quantidade
 - Finalização de compra que gera um **pedido** automático
 
-### 📦 Gestão de Pedidos
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/box-seam-fill.svg" width="18" height="18"> Gestão de Pedidos
 - Cliente: acompanha status da compra (`Em Aprovação → Combinando entrega → Entregue`)
 - Vendedor: aceita/recusa pedidos, visualiza histórico de vendas e badge de pendências
 - Acordo mútuo de logística (retirada, entrega pelo vendedor ou apps externos como Uber Flash, 99 Entrega, Loggi)
 - Avaliação mútua (comprador ↔ vendedor) ao final do pedido, com nota, comentário, fotos e vídeos
 
-### 💬 Chat em Tempo Real
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/chat-dots-fill.svg" width="18" height="18"> Chat em Tempo Real
 - Chat de pedido, chat direto (usuário-a-usuário) e **chats em grupo** (com admin de grupo, convites por código e pedidos de entrada)
 - Envio de mensagens de texto, imagens, arquivos e **localização**
 - Reações a mensagens, resposta citando mensagem anterior, indicador de "digitando..."
@@ -63,15 +65,15 @@ O sistema foi construído com foco em:
 - Links detectados automaticamente e clicáveis
 - Chats expiram automaticamente após **14 dias de inatividade** (limpeza agendada via `pg_cron`)
 
-### 🌐 Feed da Comunidade
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/globe2.svg" width="18" height="18"> Feed da Comunidade
 - Mural estilo rede social entre usuários (posts, seguir/deixar de seguir outros usuários, contagem de seguidores)
 
-### 🛠️ Painel Administrativo
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/tools.svg" width="18" height="18"> Painel Administrativo
 - Visão geral, gestão de conteúdo (usuários/produtos), categorias pendentes de aprovação
 - Chat de **suporte** dedicado entre usuário e administração, com o mesmo sistema de mensagens/anexos do chat comum
 - Sincronização e verificação do banco de dados
 
-### 👤 Perfil do Usuário
+### <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/person-circle.svg" width="18" height="18"> Perfil do Usuário
 - Edição de dados pessoais, avatar e endereço
 - Modo escuro (dark theme) persistente
 - Notificações persistentes (pedidos, mensagens, avaliações)
@@ -79,7 +81,7 @@ O sistema foi construído com foco em:
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/cpu-fill.svg" width="20" height="20"> Tecnologias Utilizadas
 
 | Camada | Tecnologia |
 |--------|------------|
@@ -94,7 +96,7 @@ O sistema foi construído com foco em:
 
 ---
 
-## 📁 Estrutura do Projeto
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/folder2-open.svg" width="20" height="20"> Estrutura do Projeto
 
 ```
 electromarket/
@@ -117,7 +119,7 @@ electromarket/
 
 ---
 
-## ⚙️ Configuração do Supabase
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/gear-fill.svg" width="20" height="20"> Configuração do Supabase
 
 O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um projeto no Supabase e execute o `api/schema.sql` uma única vez em **SQL Editor** — ele cria/ajusta todas as tabelas necessárias:
 
@@ -129,7 +131,7 @@ O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um 
 - `avaliacoes` — avaliações entre comprador e vendedor
 - `group_invites` / `group_join_requests` — convites e solicitações de entrada em grupos
 
-> ⚠️ A limpeza automática de chats (trigger + job do `pg_cron`) não está incluída no `api/schema.sql` atual — se quiser esse recurso, rode também o script de limpeza (`chat_ttl_2_semanas.sql`) separadamente no SQL Editor.
+O mesmo script também configura o trigger e o job do `pg_cron` que apagam automaticamente chats com 14+ dias sem atividade.
 
 ### Credenciais (sem hardcode)
 
@@ -145,7 +147,7 @@ Configure-as em **Vercel → Settings → Environment Variables**. Para testes l
 
 ---
 
-## 🖥️ Como Executar Localmente
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/display.svg" width="20" height="20"> Como Executar Localmente
 
 1. Clone o repositório:
 
@@ -166,29 +168,29 @@ vercel dev
 
 ---
 
-## 🌐 Demonstração Online
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/globe.svg" width="20" height="20"> Demonstração Online
 
 O projeto está disponível em: [https://eletromarket-pi.vercel.app/](https://eletromarket-pi.vercel.app/)
 
 ---
 
-## 👥 Equipe
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/people-fill.svg" width="20" height="20"> Equipe
 
 | Nome | Função |
 |------|--------|
 | Daniel Barbosa de Lima | Desenvolvedor Full Stack |
-| Colega 1 | Documentação / Testes |
-| Colega 2 | Design / UI/UX |
+| Deep Seek | Documentação / Testes |
+| Claude | Design / UI/UX |
 
 ---
 
-## 📄 Licença
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/file-earmark-text-fill.svg" width="20" height="20"> Licença
 
 Este projeto é parte de um trabalho acadêmico e está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
 
 ---
 
-## 🙏 Agradecimentos
+## <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/heart-fill.svg" width="20" height="20"> Agradecimentos
 
 - [Supabase](https://supabase.com/) pelo backend gratuito
 - [GSAP](https://gsap.com/) pelas animações
@@ -197,4 +199,4 @@ Este projeto é parte de um trabalho acadêmico e está sob a licença MIT. Veja
 
 ---
 
-Feito com 💚 para a disciplina de Projeto Integrador
+Feito para a disciplina de Projeto Integrador
