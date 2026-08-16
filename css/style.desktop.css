@@ -1,4 +1,4 @@
-﻿
+
 /* ============================================ */
 /* FEEDBACK VISUAL - CPF E CEP                  */
 /* ============================================ */
@@ -2386,6 +2386,7 @@ body.dark-theme .profile-links-screen.has-banner { background: transparent; }
     border-radius: 50%;
     flex-shrink: 0;
     position: relative;
+    overflow: hidden;
 }
 
 .presence-dot {
@@ -3559,6 +3560,89 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
     display: none;
 }
 
+/* -------- Threads (Comunidade) em tela inteira --------
+   Enquanto a Comunidade/Threads está aberta, escondemos a barra de ícones
+   (.wa-rail) e a lista lateral de contatos/conversas (.wa-side) — o
+   .wa-chat (flex-grow:1) passa a ocupar 100% da largura disponível,
+   sem deixar espaço vazio onde ficava a lateral. As conversas privadas
+   continuam usando o layout normal (.wa-side + .wa-chat lado a lado). */
+#whatsappOrdersView.wa-community-mode .wa-rail,
+#whatsappOrdersView.wa-community-mode .wa-side {
+    display: none;
+}
+#whatsappOrdersView.wa-community-mode .wa-chat {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+}
+
+/* -------- Barra lateral da Comunidade (estilo Facebook) --------
+   Só aparece enquanto a Comunidade está em tela inteira (.wa-community-mode).
+   Segue os mesmos tokens de cor claro/escuro do novo visual da Comunidade. */
+.tw-sidebar {
+    display: none;
+    width: 280px;
+    min-width: 280px;
+    flex-shrink: 0;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-light);
+    padding: 16px 8px;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+#whatsappOrdersView.wa-community-mode .tw-sidebar {
+    display: flex;
+}
+.tw-sidebar-top { display: flex; flex-direction: column; gap: 2px; }
+.tw-sidebar-logo {
+    color: var(--text-main);
+    font-size: 1.7rem;
+    padding: 10px 12px 18px;
+}
+.tw-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: background 0.15s ease;
+}
+.tw-sidebar-item i { font-size: 1.25rem; width: 22px; text-align: center; flex-shrink: 0; }
+.tw-sidebar-item:hover { background: var(--hover-bg); }
+.tw-sidebar-item.active { background: var(--fb-accent); font-weight: 600; color: var(--text-main); }
+.tw-sidebar-subitem { padding: 8px 14px 8px 22px; font-size: 0.85rem; color: var(--text-muted); }
+.tw-sidebar-subitem:hover { color: var(--text-main); }
+.tw-sidebar-feeds-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 12px 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.tw-sidebar-feeds-head a { color: var(--text-muted); text-decoration: none; font-size: 0.75rem; }
+.tw-sidebar-feeds-head a:hover { color: var(--text-main); text-decoration: underline; }
+.tw-sidebar-bottom { display: flex; flex-direction: column; }
+.tw-sidebar-bottom .dropdown-menu { min-width: 220px; }
+
+@media (max-width: 992px) {
+    .tw-sidebar { width: 76px; min-width: 76px; }
+    .tw-sidebar-item span, .tw-sidebar-feeds-head { display: none; }
+    .tw-sidebar-item { justify-content: center; padding: 12px; }
+    .tw-sidebar-item i { width: auto; }
+    .tw-sidebar-subitem { display: none; }
+}
+
 /* -------- Tela de "boot" da aba Conversas (estilo WhatsApp Web) -------- */
 .wa-boot-screen {
     position: absolute;
@@ -3904,6 +3988,24 @@ body.dark-theme .wa-boot-bar {
     justify-content: center;
     font-size: 0.55rem;
     border: 2px solid #fff;
+}
+
+/* -------- Avatar circular "à prova de vazamento" --------
+   Wrapper com tamanho fixo + overflow:hidden garante que a foto (do grupo
+   ou de usuário) nunca escape da área circular, mesmo que a imagem original
+   não seja quadrada — o object-fit:cover cuida do recorte/preenchimento e o
+   overflow:hidden do wrapper garante o corte final no formato circular. */
+.wa-avatar-circle {
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: block;
+}
+.wa-avatar-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .wa-header-group-icon {
@@ -7288,6 +7390,16 @@ body.dark-theme .notif-dropdown::after {
     transform: translateY(0) scale(1);
 }
 
+/* Em tela cheia (Comunidade/Chat) o header do site fica oculto; o dropdown
+   passa a abrir rente ao topo, junto ao sino dentro do chat. */
+body.wa-fullscreen .notif-dropdown {
+    top: 10px;
+}
+body.wa-fullscreen .notif-dropdown::before,
+body.wa-fullscreen .notif-dropdown::after {
+    top: -6px;
+}
+
 .notif-dropdown-header {
     display: flex;
     align-items: center;
@@ -8049,6 +8161,8 @@ body.dark-theme .create-ad-input:focus {
 .wa-gi-hero-avatar {
     position: relative;
     display: inline-block;
+    border-radius: 50%;
+    overflow: hidden;
 }
 .wa-gi-hero-avatar img {
     width: 96px;
@@ -8253,24 +8367,59 @@ body.dark-theme #newGroupModal .wa-group-member-row.selected {
 }
 
 /* ============================================ */
-/* COMUNIDADE ElectroMarket - THREADS-CLONE DESIGN */
+/* COMUNIDADE ElectroMarket - FACEBOOK-CLONE DESIGN */
 /* ============================================ */
 
-/* --- Fundo da pagina da Comunidade (mesma cor de fundo usada nos posts) --- */
+/* --- Tokens de cor estilo Facebook (claro/escuro), aplicados ao escopo da
+   Comunidade. Reassociamos as variáveis legadas (--text-main etc.) pra que
+   TODO o conjunto .tw-* existente herde automaticamente o novo visual. --- */
+.community-active,
+.tw-chat-community,
+#twSidebar,
+.tw-feed-wrap {
+    --fb-bg: #e9eef5;
+    --fb-card: #ffffff;
+    --fb-text: #050505;
+    --fb-muted: #65676b;
+    --fb-border: #d8dbe0;
+    --fb-hover: #f0f2f5;
+    --fb-primary: #2374e1;
+    --fb-accent: #f0f2f5;
+    --fb-danger: #e74c3c;
+    --text-main: var(--fb-text);
+    --text-muted: var(--fb-muted);
+    --border-light: var(--fb-border);
+    --hover-bg: var(--fb-hover);
+    --card-bg: var(--fb-card);
+}
+body.dark-theme .community-active,
+body.dark-theme .tw-chat-community,
+body.dark-theme #twSidebar,
+body.dark-theme .tw-feed-wrap {
+    --fb-bg: #17191c;
+    --fb-card: #24262a;
+    --fb-text: #f5f6f7;
+    --fb-muted: #b0b3b8;
+    --fb-border: #3a3d42;
+    --fb-hover: #3a3d42;
+    --fb-primary: #2374e1;
+    --fb-accent: #3a3d42;
+    --fb-danger: #f76965;
+}
+
+/* --- Fundo das páginas da Comunidade: cinza-azulado (claro) / quase preto (dark) --- */
 .community-active .detail-page,
 .tw-chat-community .detail-page,
 #communityChatMsgs .detail-page {
-    background: #ffffff !important;
-}
-body.dark-theme .community-active .detail-page,
-body.dark-theme .tw-chat-community .detail-page,
-body.dark-theme #communityChatMsgs .detail-page {
-    background: #000000 !important;
+    background: var(--fb-bg) !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 /* --- Layout --- */
 .tw-feed-wrap {
-    max-width: 620px;
+    max-width: 600px;
     margin: 0 auto;
     padding-bottom: 24px;
 }
@@ -8278,339 +8427,89 @@ body.dark-theme #communityChatMsgs .detail-page {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border-light);
+    padding: 4px 2px 14px;
     margin-bottom: 8px;
 }
 .tw-feed-header h4 {
     margin: 0;
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1.35rem;
     color: var(--text-main);
 }
-
-/* --- Post Card (Threads-inspired) --- */
-.tw-post {
-    display: flex;
-    gap: 8px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border-light);
-}
-.tw-post:first-child { padding-top: 0; }
-
-/* Avatar column */
-.tw-post-avatar-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 36px;
-    min-width: 36px;
-    flex-shrink: 0;
-}
-.tw-post-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
-    outline: 1px solid var(--border-light);
-    outline-offset: -0.5px;
-    cursor: pointer;
-    flex-shrink: 0;
-    background: var(--hover-bg);
-}
-.tw-thread-line {
-    width: 2px;
-    flex: 1;
-    background: #d8d8d8;
-    border-radius: 1px;
-    margin-top: 4px;
-    min-height: 18px;
-}
-body.dark-theme .tw-thread-line { background: #313639; }
-
-/* Content column */
-.tw-post-content {
-    flex: 1;
-    min-width: 0;
-}
-
-/* Header row */
-.tw-post-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-.tw-post-name {
-    font-weight: 600;
-    font-size: 15px;
-    color: var(--text-main);
-    cursor: pointer;
-    white-space: nowrap;
-    line-height: 1.2;
-}
-.tw-post-name:hover { text-decoration: underline; }
-.tw-post-username {
-    font-size: 14px;
+.tw-feed-header p {
+    margin: 2px 0 0;
+    font-size: 0.85rem;
     color: var(--text-muted);
-    white-space: nowrap;
-    line-height: 1.2;
 }
-.tw-post-time {
-    font-size: 14px;
+.detail-back-btn {
     color: var(--text-muted);
-    white-space: nowrap;
-    margin-left: auto;
-    line-height: 1.2;
-}
-
-.tw-post-menu-wrap {
-    position: relative;
-    margin-left: 2px;
-}
-.tw-post-menu-btn {
     background: none;
     border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    transition: background 0.15s;
 }
-.tw-post-menu-btn:hover { background: var(--hover-bg); }
+.detail-back-btn:hover { color: var(--text-main); }
+.detail-back-btn i { font-size: 1.1rem; }
 
-.tw-post-dropdown {
-    position: absolute;
-    right: 0;
-    top: 100%;
-    z-index: 100;
-    background: var(--card-bg);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    min-width: 160px;
-    padding: 4px;
-    margin-top: 4px;
-}
-.tw-dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 12px;
-    border: none;
-    background: none;
-    color: var(--text-main);
-    font-size: 14px;
-    cursor: pointer;
-    border-radius: 8px;
-    text-align: left;
-}
-.tw-dropdown-item:hover { background: var(--hover-bg); }
-.tw-dropdown-item.text-danger { color: #e74c3c; }
-.tw-dropdown-item.text-danger:hover { background: rgba(231,76,60,0.1); }
-
-/* Text content */
-.tw-post-text {
-    font-size: 15px;
-    line-height: 1.3;
-    color: var(--text-main);
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin: 4px 0 8px;
-}
-
-.tw-post-edit-wrap { margin: 4px 0 8px; }
-.tw-post-edit-textarea {
-    width: 100%;
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    padding: 8px 10px;
-    resize: none;
-}
-.tw-post-edit-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 6px;
-}
-.tw-edit-cancel-btn {
-    background: none;
-    border: 1px solid var(--border-light);
-    color: var(--text-muted);
-    font-weight: 600;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 14px;
-    cursor: pointer;
-}
-.tw-edit-cancel-btn:hover { background: var(--hover-bg); }
-
-/* Post image */
-.tw-post-img {
-    width: 100%;
-    max-height: 520px;
-    object-fit: cover;
-    border-radius: 12px;
-    border: 1px solid var(--border-light);
-    margin-bottom: 8px;
-    cursor: pointer;
-    display: block;
-}
-
-/* Action buttons */
-.tw-post-actions {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    margin-left: -6px;
-    margin-top: 2px;
-}
-.tw-action-btn {
-    background: none;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    color: var(--text-muted);
-    font-size: 14px;
-    cursor: pointer;
-    min-width: 34px;
-    height: 34px;
-    padding: 0 8px;
-    border-radius: 18px;
-    transition: all 0.15s;
-}
-.tw-action-btn:hover { color: var(--text-main); background: var(--hover-bg); }
-.tw-action-btn.tw-like-active { color: #ff3040; }
-.tw-action-btn.tw-like-active:hover { color: #ff3040; background: rgba(255,48,64,0.1); }
-.tw-action-btn.tw-repost-active { color: #00ba7c; }
-.tw-action-btn.tw-repost-active:hover { color: #00ba7c; background: rgba(0,186,124,0.1); }
-.tw-action-btn .action-count {
-    margin-left: 2px;
-    font-size: 13px;
-    font-weight: 400;
-}
-
-/* Stats row */
-.tw-post-stats {
-    margin-top: 2px;
-    font-size: 14px;
-    color: var(--text-muted);
-}
-.tw-post-stats-link {
-    color: var(--text-muted);
-    font-size: 14px;
-    cursor: pointer;
-    transition: color 0.15s;
-}
-.tw-post-stats-link:hover { color: var(--text-main); text-decoration: underline; }
-
-/* Activity modal */
-.tw-activity-modal {
-    text-align: left;
-    font-size: 14px;
-}
-.tw-activity-modal strong { display: block; margin-bottom: 8px; }
-.tw-activity-user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-}
-.tw-activity-user img {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-/* Empty state */
-.tw-empty-feed {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-muted);
-}
-.tw-empty-feed i { font-size: 2rem; display: block; margin-bottom: 8px; }
-
-/* Skeleton */
-.tw-skeleton {
-    display: flex;
-    gap: 10px;
-    padding: 14px 0;
-}
-.tw-skel-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--border-light);
-    flex-shrink: 0;
-}
-.tw-skel-body { flex: 1; }
-.tw-skel-line {
-    height: 12px;
-    border-radius: 6px;
-    background: var(--border-light);
-    margin-bottom: 8px;
-    animation: twPulse 1.2s ease-in-out infinite;
-}
-@keyframes twPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
-
-/* --- Avatars genéricos --- */
-.tw-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-    background: var(--hover-bg);
-    outline: 1px solid var(--border-light);
-    outline-offset: -0.5px;
-}
-.tw-avatar-sm { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.tw-avatar-lg {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid var(--card-bg);
-    background: var(--hover-bg);
-}
-
-/* --- Composer (criação de posts) --- */
+/* --- Composer (criação de posts) estilo Facebook --- */
 .tw-composer {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 0;
     background: var(--card-bg);
     border: 1px solid var(--border-light);
-    border-radius: 16px;
-    padding: 14px;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    padding: 12px 14px;
     margin-bottom: 16px;
 }
-.tw-composer-body { flex: 1; min-width: 0; }
+.fb-composer-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.fb-composer-top .tw-avatar { width: 38px; height: 38px; }
 .tw-composer-textarea {
     width: 100%;
     border: none;
     outline: none;
     resize: none;
-    background: transparent;
+    background: var(--fb-accent);
     color: var(--text-main);
     font-size: 15px;
-    min-height: 50px;
     font-family: inherit;
+    border-radius: 999px;
+    padding: 10px 14px;
+    min-height: 40px;
     line-height: 1.3;
 }
+.tw-composer-textarea::placeholder { color: var(--text-muted); font-style: normal; }
+.fb-composer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-light);
+}
+.fb-photo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    color: #58c472;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.fb-photo-btn:hover { background: rgba(88,196,114,0.12); }
 .tw-composer-preview {
     position: relative;
     margin-top: 8px;
     max-width: 100%;
-    border-radius: 12px;
+    border-radius: 4px;
     overflow: hidden;
     border: 1px solid var(--border-light);
 }
@@ -8626,56 +8525,328 @@ body.dark-theme .tw-thread-line { background: #313639; }
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
 }
-.tw-composer-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 8px;
-    border-top: 1px solid var(--border-light);
-    padding-top: 8px;
-}
-.tw-composer-toolbar .tw-icon-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    width: 34px; height: 34px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
-    transition: background 0.15s;
-    color: var(--text-muted);
-}
-.tw-composer-toolbar .tw-icon-btn:hover { background: var(--hover-bg); }
-
 .tw-post-btn {
-    background: #111;
+    background: var(--fb-primary);
     color: #fff;
     border: none;
     font-weight: 600;
     padding: 6px 18px;
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
     transition: opacity 0.15s;
 }
-.tw-post-btn:hover { opacity: 0.8; }
+.tw-post-btn:hover { opacity: 0.85; }
 .tw-post-btn:disabled { opacity: 0.4; cursor: default; }
-body.dark-theme .tw-post-btn { background: #f5f5f5; color: #111; }
 
-/* --- Perfil da comunidade --- */
+/* --- Card de post estilo Facebook --- */
+.tw-post {
+    display: block;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    padding: 12px 14px 6px;
+    margin-bottom: 10px;
+}
+
+/* Header do card (avatar + nome/hora + menu) */
+.fb-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.tw-post-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    flex-shrink: 0;
+    background: var(--hover-bg);
+}
+.fb-card-id {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.tw-post-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-main);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+.tw-post-name:hover { text-decoration: underline; }
+.tw-post-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.tw-post-menu-wrap { position: relative; margin-left: 2px; }
+.tw-post-menu-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: background 0.15s;
+}
+.tw-post-menu-btn:hover { background: var(--hover-bg); }
+.tw-post-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 100;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    min-width: 170px;
+    padding: 4px;
+    margin-top: 4px;
+}
+.tw-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    color: var(--text-main);
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 6px;
+    text-align: left;
+}
+.tw-dropdown-item:hover { background: var(--hover-bg); }
+.tw-dropdown-item.text-danger { color: var(--fb-danger); }
+.tw-dropdown-item.text-danger:hover { background: rgba(231,76,60,0.1); }
+
+/* Texto do post (colapsável ao clicar, como o Facebook) */
+.tw-post-text {
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--text-main);
+    white-space: pre-line;
+    word-break: break-word;
+    margin: 10px 0 6px;
+}
+.tw-post-text.fb-clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+/* Edição inline */
+.tw-post-edit-wrap { margin: 10px 0 8px; }
+.tw-post-edit-textarea {
+    width: 100%;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 8px 10px;
+    resize: none;
+    background: var(--fb-accent);
+    color: var(--text-main);
+}
+.tw-post-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+.tw-edit-cancel-btn {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.tw-edit-cancel-btn:hover { background: var(--hover-bg); }
+
+/* Imagem do post — espaço padrão compacto (16:9) com corte, sem esticar */
+.tw-post-img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-light);
+    margin-bottom: 8px;
+    cursor: pointer;
+    display: block;
+}
+
+/* Linha de contadores (curtidas | comentários) */
+.fb-card-stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 2px 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.fb-card-stats i { color: var(--fb-primary); margin-right: 4px; }
+.fb-stats-likes { display: inline-flex; align-items: center; cursor: pointer; }
+.fb-stats-likes:hover { text-decoration: underline; }
+.fb-stats-comments { cursor: pointer; }
+.fb-stats-comments:hover { text-decoration: underline; }
+.fb-card-divider { height: 1px; background: var(--border-light); }
+
+/* --- Botões de ação (Curtir / Comentar / Compartilhar) --- */
+.tw-post-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+}
+.tw-action-btn {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    flex: 1;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    height: 36px;
+    padding: 0 8px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+.tw-action-btn i { font-size: 16px; }
+.tw-action-btn:hover { background: var(--hover-bg); color: var(--text-main); }
+.tw-action-btn.tw-like-active { color: var(--fb-primary); font-weight: 600; }
+.tw-action-btn.tw-like-active:hover { color: var(--fb-primary); }
+
+/* --- Comentários (thread) estilo Facebook: balão ao lado do avatar --- */
+.tw-reply-list { margin-top: 8px; }
+.tw-bubble-comment {
+    display: flex;
+    gap: 8px;
+    padding: 6px 2px;
+    align-items: flex-start;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.tw-bubble-comment .tw-post-avatar { width: 32px; height: 32px; margin-top: 2px; }
+.fb-comment-bubble {
+    flex: 1;
+    min-width: 0;
+    background: var(--fb-accent);
+    border-radius: 16px;
+    padding: 8px 12px;
+}
+.fb-comment-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.fb-comment-head .tw-post-name { flex: 1; }
+.fb-comment-head .tw-post-time { font-size: 11px; }
+.fb-comment-head .tw-post-menu-btn { width: 26px; height: 26px; font-size: 1rem; }
+.fb-comment-head .tw-post-dropdown { min-width: 150px; }
+.fb-comment-text {
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--text-main);
+    white-space: pre-line;
+    word-break: break-word;
+    margin-top: 2px;
+}
+.fb-comment-text.fb-clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+}
+.fb-comment-img { margin-top: 6px; border-radius: 10px; }
+.fb-comment-actions {
+    display: flex;
+    gap: 4px;
+    padding: 4px 2px 0;
+}
+.fb-comment-actions .tw-action-btn {
+    flex: none;
+    font-size: 12px;
+    height: auto;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: var(--text-muted);
+}
+.fb-comment-actions .tw-action-btn i { font-size: 13px; }
+.fb-comment-actions .tw-action-btn:hover { background: var(--hover-bg); color: var(--text-main); }
+.fb-comment-actions .tw-action-btn.tw-like-active { color: var(--fb-primary); font-weight: 600; }
+
+/* --- Thread (post + respostas) --- */
+.tw-thread-original { margin-bottom: 10px; }
+.tw-reply-composer { margin-top: 8px; }
+.fb-reply-composer { margin-top: 8px; }
+.tw-thread-sort-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px;
+    margin: 4px 0;
+}
+.tw-thread-sort-btn {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+.tw-thread-sort-btn:hover { color: var(--text-main); }
+.tw-thread-activity-link {
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    transition: color 0.15s;
+}
+.tw-thread-activity-link:hover { color: var(--text-main); text-decoration: underline; }
+
+/* --- Perfil da Comunidade (mantido coerente com o novo visual) --- */
 .tw-profile-cover {
     height: 90px;
-    border-radius: 16px 16px 0 0;
-    background: linear-gradient(135deg, #1d9bf0, var(--primary-blue));
+    border-radius: 4px 4px 0 0;
+    background: linear-gradient(135deg, #1d9bf0, #2374e1);
 }
 .tw-profile-card {
     background: var(--card-bg);
     border: 1px solid var(--border-light);
-    border-radius: 16px;
+    border-radius: 4px;
     margin-bottom: 16px;
     overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 .tw-profile-info {
     padding: 0 16px 16px;
@@ -8690,61 +8861,20 @@ body.dark-theme .tw-post-btn { background: #f5f5f5; color: #111; }
 }
 .tw-profile-stats strong { color: var(--text-main); }
 .tw-follow-btn {
-    border-radius: 999px;
+    border-radius: 6px;
     font-weight: 700;
-    padding: 6px 18px;
+    padding: 6px 16px;
     font-size: 0.85rem;
-    border: 1px solid var(--primary-blue);
-    background: var(--primary-blue);
+    border: 1px solid var(--fb-primary);
+    background: var(--fb-primary);
     color: #fff;
+    cursor: pointer;
 }
 .tw-follow-btn.following {
     background: transparent;
     color: var(--text-main);
     border-color: var(--border-light);
 }
-body.dark-theme .tw-follow-btn { color: #fff; }
-
-/* --- Contexto citado (post ao qual uma resposta pertence) --- */
-.tw-quoted-context {
-    display: flex;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 6px 0 4px;
-    padding: 8px 10px;
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-.tw-quoted-context:hover { background: var(--hover-bg); }
-.tw-avatar-xs {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-    margin-top: 1px;
-}
-.tw-quoted-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text-main);
-}
-.tw-quoted-time {
-    font-size: 13px;
-    color: var(--text-muted);
-}
-.tw-quoted-text {
-    flex-basis: 100%;
-    font-size: 13px;
-    color: var(--text-muted);
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-/* --- Abas do perfil (Posts / Respostas), estilo Threads --- */
 .tw-profile-tabs {
     display: flex;
     border-bottom: 1px solid var(--border-light);
@@ -8768,90 +8898,100 @@ body.dark-theme .tw-follow-btn { color: #fff; }
     border-bottom-color: var(--text-main);
 }
 
-/* --- Thread (resposta a um post) --- */
-.tw-thread-original { padding-bottom: 0; border-bottom: none; }
-.tw-reply-composer { border-radius: 0; border-top: none; border-bottom: none; }
-.tw-reply-list .tw-post { border-bottom: none; }
-.tw-reply-list .tw-post:last-child { border-bottom: 1px solid var(--border-light); }
+/* --- Avatares genéricos --- */
+.tw-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--hover-bg);
+}
+.tw-avatar-sm { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.tw-avatar-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--card-bg);
+    background: var(--hover-bg);
+}
 
-/* --- Comunidade dentro do Chat --- */
-.tw-chat-feed {
+/* --- Contexto citado ("respondendo a") --- */
+.tw-quoted-context {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 4px 0;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    background: var(--fb-accent);
+    cursor: pointer;
+    transition: background 0.15s;
 }
-.tw-chat-feed .tw-post {
-    padding: 12px 14px;
-    margin: 0 2px;
-    border-bottom: none;
-    background: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+.tw-quoted-context:hover { background: var(--hover-bg); }
+.tw-avatar-xs {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    margin-top: 1px;
 }
-.tw-chat-feed .tw-post:last-child { border-bottom: none; }
+.tw-quoted-name { font-weight: 600; font-size: 13px; color: var(--text-main); }
+.tw-quoted-time { font-size: 12px; color: var(--text-muted); }
+.tw-quoted-text {
+    flex-basis: 100%;
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
 
-body.dark-theme .tw-chat-feed .tw-post {
-    background: #202c33;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
-}
+/* --- Modal de atividade (quem curtiu) --- */
+.tw-activity-modal { text-align: left; font-size: 14px; }
+.tw-activity-modal strong { display: block; margin-bottom: 8px; }
+.tw-activity-user { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.tw-activity-user img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
 
-.tw-composer.tw-composer-inline {
+/* --- Empty state --- */
+.tw-empty-feed {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+.tw-empty-feed i { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+/* --- Skeleton --- */
+.tw-skeleton {
     display: flex;
     gap: 10px;
-    padding: 10px 14px;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    border-top: 1px solid var(--border-light);
-    margin-bottom: 0;
+    padding: 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    margin-bottom: 10px;
 }
-.tw-composer.tw-composer-inline .tw-composer-textarea {
-    font-size: 15px;
-    min-height: 44px;
+.tw-skel-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--border-light);
+    flex-shrink: 0;
 }
-.tw-composer.tw-composer-inline .tw-composer-toolbar {
-    margin-top: 4px;
-    padding-top: 6px;
+.tw-skel-body { flex: 1; }
+.tw-skel-line {
+    height: 12px;
+    border-radius: 6px;
+    background: var(--border-light);
+    margin-bottom: 8px;
+    animation: twPulse 1.2s ease-in-out infinite;
 }
-.tw-composer.tw-composer-inline .tw-composer-preview {
-    max-height: 120px;
-}
-.tw-composer.tw-composer-inline .tw-composer-preview img {
-    max-height: 120px;
-}
+@keyframes twPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
 
-.tw-thread-sort-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 4px;
-    border-bottom: 1px solid var(--border-light);
-}
-.tw-thread-sort-btn {
-    background: none;
-    border: none;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 4px 2px;
-}
-.tw-thread-sort-btn:hover { color: var(--text-main); }
-.tw-thread-activity-link {
-    color: var(--text-muted);
-    font-size: 13px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    transition: color 0.15s;
-}
-.tw-thread-activity-link:hover { color: var(--text-main); text-decoration: underline; }
-
+/* --- Botão "Carregar mais" --- */
 .tw-load-more {
     display: block;
     width: 100%;
@@ -8859,9 +8999,10 @@ body.dark-theme .tw-chat-feed .tw-post {
     margin: 8px 0;
     background: none;
     border: 1px solid var(--border-light);
-    border-radius: 12px;
+    border-radius: 8px;
     color: var(--text-muted);
     font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
     text-align: center;
     transition: background 0.15s;
@@ -8869,74 +9010,1038 @@ body.dark-theme .tw-chat-feed .tw-post {
 .tw-load-more:hover { background: var(--hover-bg); color: var(--text-main); }
 .tw-load-more:disabled { opacity: 0.5; cursor: default; }
 
-.tw-chat-community .chat-header-pro,
-.tw-chat-community .chat-status-bar {
-    display: none !important;
+/* --- Splash de carregamento da Comunidade (estilo app nativo: ícone
+   central + rótulo pequeno embaixo), mostrado por cima do painel enquanto
+   o feed inicial carrega. --- */
+#waChatActive.tw-chat-community { position: relative; }
+.tw-community-splash {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--fb-bg);
+    transition: opacity 0.5s ease;
+}
+.tw-community-splash.tw-splash-out { opacity: 0; pointer-events: none; }
+.tw-community-splash i {
+    font-size: 5rem;
+    color: var(--fb-text);
+}
+.tw-community-splash-from {
+    margin-top: 48px;
+    text-align: center;
+}
+.tw-community-splash-from span {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--fb-muted);
+}
+.tw-community-splash-from strong {
+    display: block;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--fb-text);
+    letter-spacing: -0.01em;
 }
 
-/* --- Comunidade: paleta mais próxima do Threads --- */
-.tw-chat-community .chat-container,
-.tw-chat-community .chat-messages {
-    background-color: #ffffff;
+/* --- Comunidade dentro do Chat: molda o container do WhatsApp ao visual FB ---
+   Usa #waChatActive para vencer a especificidade de body.dark-theme .chat-* */
+#waChatActive.tw-chat-community .chat-status-bar {
+    display: none !important;
 }
-body.dark-theme .tw-chat-community .chat-container,
-body.dark-theme .tw-chat-community .chat-messages {
-    background-color: #000000;
+#waChatActive.tw-chat-community .chat-header-pro {
+    background: var(--fb-bg);
+    border-bottom: none;
+    align-items: center;
+    /* Alinhado com a largura dos posts (mesma faixa de 620px centralizada
+       usada por .tw-feed-card/.tw-chat-feed), em vez de ocupar a tela toda. */
+    max-width: 620px;
+    width: 100%;
+    margin: 0 auto;
+    padding-left: 14px;
+    padding-right: 14px;
+    box-sizing: border-box;
 }
-.tw-chat-community .chat-messages {
+#waChatActive.tw-chat-community .chat-header-avatar-wrap {
+    display: none !important;
+}
+#waChatActive.tw-chat-community .chat-header-name {
+    color: var(--text-main);
+    font-weight: 700;
+    font-size: 1.3rem;
+    letter-spacing: -0.01em;
+}
+#waChatActive.tw-chat-community .chat-header-order-id,
+#waChatActive.tw-chat-community .chat-header-typing {
+    display: none !important;
+}
+#waChatActive.tw-chat-community .chat-header-back,
+#waChatActive.tw-chat-community .chat-header-close {
+    color: var(--text-muted);
+}
+#waChatActive.tw-chat-community .chat-header-back:hover,
+#waChatActive.tw-chat-community .chat-header-close:hover {
+    background: var(--hover-bg);
+}
+#waChatActive.tw-chat-community .chat-container,
+#waChatActive.tw-chat-community .chat-messages {
+    background-color: var(--fb-bg);
     background-image: none;
 }
 
-.tw-chat-community .chat-input-bar {
-    background: #ffffff;
-    border-color: #e2e2e2;
-}
-body.dark-theme .tw-chat-community .chat-input-bar {
-    background: #000000;
-    border-color: #262626;
+/* O composer de novo post ("No que você está pensando?") não fica mais numa
+   barra fixa fora da rolagem — ele é renderizado dentro do próprio feed
+   (ver twComposerBoxHtml em script.js), logo abaixo do cabeçalho "Para
+   você", e rola junto com os posts. A barra antiga de mensagens fica
+   escondida (recebe .d-none via JS). */
+#waChatActive.tw-chat-community .chat-input-bar {
+    display: none;
 }
 
-.tw-chat-community .tw-post {
-    background: transparent;
+/* Composer inline do chat: avatar + campo pill + foto + Postar, numa linha */
+.tw-composer.tw-composer-inline {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: none;
     border-radius: 0;
+    background: transparent;
     box-shadow: none;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 620px;
+    box-sizing: border-box;
+}
+.tw-composer.tw-composer-inline .tw-avatar { width: 36px; height: 36px; flex-shrink: 0; }
+.tw-composer.tw-composer-inline .tw-composer-body { flex: 1; min-width: 0; }
+.tw-composer.tw-composer-inline .tw-composer-textarea { flex: 1; min-height: 40px; }
+.tw-composer.tw-composer-inline .tw-icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.tw-composer.tw-composer-inline .tw-icon-btn:hover { background: var(--hover-bg); }
+.tw-composer.tw-composer-inline .tw-post-btn { flex-shrink: 0; }
+.tw-composer.tw-composer-inline .tw-composer-preview { max-height: 120px; flex-shrink: 0; }
+.tw-composer.tw-composer-inline .tw-composer-preview img { max-height: 120px; }
+
+/* Feed (lista de cards) dentro do chat */
+.tw-chat-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 14px 16px;
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+.tw-chat-feed .tw-post { margin-bottom: 0; }
+
+/* --- Cartão único envolvendo a caixa de postar + a lista de posts ---
+   (igual à referência: um só contorno arredondado por cima de tudo,
+   com linhas finas separando cada item, em vez de um contorno por post). */
+.tw-feed-card {
+    /* Mesma cor de fundo da página da Comunidade (--fb-bg), sem o
+       cinza/branco do card (--fb-card) — só o contorno fica visível. */
+    background: var(--fb-bg);
+    border: 1px solid var(--fb-border);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+.tw-feed-card .tw-composer.tw-composer-inline {
+    max-width: none;
+    width: 100%;
     margin: 0;
-    padding: 12px 16px;
-    border-bottom: 1px solid #e2e2e2;
-}
-body.dark-theme .tw-chat-community .tw-post {
+    border: none;
+    border-radius: 0;
     background: transparent;
-    box-shadow: none;
-    border-bottom: 1px solid #262626;
+    border-bottom: 1px solid var(--fb-border);
 }
-.tw-chat-community .tw-post:last-child { border-bottom: none; }
+.tw-feed-card .tw-chat-feed {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+}
+.tw-feed-card .tw-chat-feed .tw-post:not(.tw-bubble-comment) {
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--fb-border);
+}
+.tw-feed-card .tw-chat-feed .tw-post:not(.tw-bubble-comment):last-child { border-bottom: none; }
 
-.tw-chat-community .tw-composer.tw-composer-inline {
+/* --- Badge verificado (administradores) --- */
+.tw-verified { color: #2374e1; font-size: 0.9em; margin-left: 3px; vertical-align: middle; }
+
+/* --- Toolbar do feed: sino + busca --- */
+.tw-feed-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 2px 12px;
+    background: var(--fb-bg);
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+.tw-notif-bell {
+    position: relative;
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: var(--fb-hover);
+    color: var(--fb-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    padding: 0;
+}
+.tw-notif-bell:hover { background: rgba(0, 0, 0, 0.08); }
+body.dark-theme .tw-notif-bell:hover { background: rgba(255, 255, 255, 0.08); }
+.tw-notif-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #f02849;
+    border: 2px solid var(--fb-card);
+}
+/* --- Busca --- */
+.tw-search { position: relative; flex: 1; min-width: 0; }
+.tw-search > i {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fb-muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+.tw-search input {
+    width: 100%;
+    border: 1px solid var(--fb-border);
+    background: var(--fb-card);
+    border-radius: 999px;
+    padding: 8px 12px 8px 30px;
+    font-size: 13px;
+    color: var(--fb-text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+.tw-search input::placeholder { color: var(--fb-muted); }
+.tw-search input:focus { border-color: var(--fb-primary); }
+.tw-search-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--fb-card);
+    border: 1px solid var(--fb-border);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 60;
+    overflow: hidden;
+    margin: 0;
+}
+.tw-search-label {
+    padding: 9px 12px 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--fb-muted);
+}
+.tw-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--fb-text);
+}
+.tw-search-row:hover { background: var(--fb-hover); }
+.tw-search-empty { padding: 14px 12px; color: var(--fb-muted); font-size: 13px; }
+
+/* --- Painel de notificações estilo Facebook --- */
+.tw-notif-popover {
+    position: fixed;
+    width: 340px;
+    background: var(--fb-card);
+    border: 1px solid var(--fb-border);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.tw-notif-popover.d-none { display: none; }
+.tw-notif-header {
+    padding: 12px 14px;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--fb-text);
+    border-bottom: 1px solid var(--fb-border);
+    background: var(--fb-card);
+}
+.tw-notif-list { max-height: 420px; overflow-y: auto; }
+.tw-notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--fb-border);
+}
+.tw-notif-item:hover { background: var(--fb-hover); }
+.tw-notif-item:last-child { border-bottom: none; }
+.tw-notif-avatar-wrap { position: relative; flex-shrink: 0; }
+.tw-notif-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    background: var(--fb-hover);
+}
+.tw-notif-type-icon {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 10px;
+    border: 2px solid var(--fb-card);
+}
+.tw-notif-like { background: #2374e1; }
+.tw-notif-comment { background: #48b15c; }
+.tw-notif-body { flex: 1; min-width: 0; }
+.tw-notif-text {
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--fb-text);
+    overflow-wrap: anywhere;
+}
+.tw-notif-quote { font-style: italic; color: var(--fb-muted); }
+.tw-notif-time { font-size: 11px; color: var(--fb-muted); margin-top: 2px; }
+.tw-notif-del {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--fb-muted);
+    padding: 2px 4px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.tw-notif-del:hover { color: var(--fb-danger); background: var(--fb-hover); }
+.tw-notif-empty {
+    padding: 30px 16px;
+    text-align: center;
+    color: var(--fb-muted);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tw-notif-empty i { font-size: 1.6rem; opacity: 0.5; }
+
+/* --- Comentários inline no card (estilo sociobook) --- */
+.fb-inline-comments {
+    display: none;
+    border-top: 1px solid var(--fb-border);
+    padding: 8px 12px 2px;
+}
+.fb-inline-comments.open { display: block; }
+.fb-inline-list { display: flex; flex-direction: column; gap: 4px; padding: 2px 0 4px; }
+.fb-comment-inline { padding: 4px 0; }
+.fb-inline-empty {
+    padding: 8px 0;
+    color: var(--fb-muted);
+    font-size: 13px;
+    text-align: center;
+}
+.fb-inline-load { padding: 2px 0 4px; }
+.fb-see-more {
+    background: none;
+    border: none;
+    padding: 2px 0;
+    color: var(--fb-primary);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+.fb-see-more:hover { text-decoration: underline; }
+.fb-inline-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0 8px;
+}
+.fb-inline-input-wrap .tw-avatar-xs { width: 28px; height: 28px; flex-shrink: 0; }
+.fb-inline-input {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    background: var(--fb-hover);
+    border-radius: 999px;
+    padding: 5px 6px 5px 12px;
+}
+.fb-inline-input input {
+    flex: 1;
+    min-width: 0;
+    border: none;
     background: transparent;
-    border-top: 1px solid #e2e2e2;
+    outline: none;
+    color: var(--fb-text);
+    font-size: 13px;
 }
-body.dark-theme .tw-chat-community .tw-composer.tw-composer-inline {
-    border-top: 1px solid #262626;
+.fb-inline-input input::placeholder { color: var(--fb-muted); }
+.fb-inline-input .fb-send {
+    background: none;
+    border: none;
+    color: var(--fb-primary);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
+.fb-inline-input .fb-send:hover { color: var(--fb-primary); background: rgba(0, 0, 0, 0.06); }
+body.dark-theme .fb-inline-input .fb-send:hover { background: rgba(255, 255, 255, 0.08); }
+.fb-comment-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fb-comment-del {
+    background: none;
+    border: none;
+    color: var(--fb-muted);
+    font-size: 11px;
+    padding: 1px 3px;
+    margin-left: auto;
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+.fb-comment-del:hover { color: var(--fb-danger); }
+.fb-mini-action { font-size: 12px; gap: 4px; }
+.fb-mini-action i { font-size: 0.9rem; }
 
-/* Composer de resposta dentro da thread (Post > Postar sua resposta):
-   deve usar o mesmo fundo chapado da comunidade, sem destacar como um card. */
-.tw-chat-community .tw-reply-composer {
-    background: #ffffff;
-}
-body.dark-theme .tw-chat-community .tw-reply-composer {
-    background: #000000;
-}
-
-/* Mobile overrides */
+/* --- Mobile overrides --- */
 @media (max-width: 767px) {
-    .tw-feed-wrap { max-width: 100%; padding: 0 4px 24px; }
-    .tw-post { padding: 10px 0; }
-    .tw-post-avatar-col { width: 32px; min-width: 32px; }
-    .tw-post-avatar { width: 32px; height: 32px; }
-    .tw-post-name { font-size: 14px; }
+    .tw-feed-wrap { max-width: 100%; padding: 0 2px 24px; }
+    .tw-post { padding: 10px 10px 6px; }
+    .tw-bubble-comment { padding: 6px 2px; }
+    .tw-post-avatar { width: 36px; height: 36px; }
+    .tw-post-name { font-size: 13px; }
+    .tw-post-time { font-size: 11px; }
     .tw-post-text { font-size: 14px; }
-    .tw-composer { border-radius: 12px; padding: 12px; }
+    .tw-composer { border-radius: 4px; padding: 10px 12px; }
     .tw-avatar-lg { width: 72px; height: 72px; }
     .tw-profile-info { margin-top: -36px; }
+    .tw-action-btn { font-size: 13px; gap: 5px; }
+    .fb-comment-bubble { padding: 7px 10px; }
+    .tw-feed-toolbar { padding: 4px 2px 10px; }
+    .tw-search input { font-size: 12px; padding: 7px 10px 7px 28px; }
+    .tw-notif-bell { width: 34px; height: 34px; font-size: 1rem; }
+    .tw-notif-popover { left: 8px !important; right: 8px; width: auto; }
+    .tw-notif-list { max-height: 60vh; }
 }
+
+/* ============================================================
+   COMUNIDADE ElectroMarket — REDESIGN "THREADS-CLONE" (dark)
+   ------------------------------------------------------------
+   No tema escuro (body.dark-theme) aplica o visual estilo Threads:
+   fundo #101010, posts em linha sem cards, corações vermelhos,
+   botões de ação circulares. No tema claro prevalecem os tokens
+   Facebook-clone definidos acima (L8366).
+   ============================================================ */
+body.dark-theme .community-active,
+body.dark-theme .tw-chat-community,
+body.dark-theme #communityChatMsgs,
+body.dark-theme #twSidebar,
+body.dark-theme .tw-feed-wrap {
+    --fb-bg: #101010 !important;
+    --fb-card: #141414 !important;
+    --fb-text: #f5f5f5 !important;
+    --fb-muted: #8a8a8a !important;
+    --fb-border: #262626 !important;
+    --fb-hover: #1a1a1a !important;
+    --fb-primary: #f5f5f5 !important;
+    --fb-accent: #181818 !important;
+    --fb-danger: #ff3040 !important;
+    --text-main: var(--fb-text) !important;
+    --text-muted: var(--fb-muted) !important;
+    --border-light: var(--fb-border) !important;
+    --hover-bg: var(--fb-hover) !important;
+    --card-bg: var(--fb-card) !important;
+}
+
+/* Fundo geral da aba */
+.community-active,
+.community-active .detail-page,
+.tw-chat-community,
+.tw-chat-community .detail-page,
+#communityChatMsgs .detail-page {
+    background: var(--fb-bg) !important;
+    color: var(--fb-text);
+}
+
+/* Header do feed (ícone Voltar + "Comunidade") */
+.community-active .tw-feed-header {
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--fb-border);
+    margin-bottom: 0;
+}
+.community-active .tw-feed-header h4 { font-size: 1.5rem; letter-spacing: -0.02em; }
+.community-active .tw-feed-header p { display: none; }
+.community-active .detail-back-btn:hover { color: var(--fb-text); }
+
+/* Toolbar (sino + busca): fica colada logo abaixo, com hairline */
+.community-active .tw-feed-toolbar,
+#waChatActive.tw-chat-community .tw-feed-toolbar {
+    background: var(--fb-bg);
+    padding: 10px 14px 12px;
+    border-bottom: 1px solid var(--fb-border);
+}
+.community-active .tw-notif-bell,
+#waChatActive.tw-chat-community .tw-notif-bell {
+    background: transparent;
+}
+.community-active .tw-search input,
+#waChatActive.tw-chat-community .tw-search input {
+    background: var(--fb-accent);
+    border-color: transparent;
+    border-radius: 999px;
+    padding: 9px 12px 9px 32px;
+    font-size: 14px;
+}
+.community-active .tw-search input::placeholder,
+#waChatActive.tw-chat-community .tw-search input::placeholder { color: var(--fb-muted); }
+.community-active .tw-search input:focus,
+#waChatActive.tw-chat-community .tw-search input:focus {
+    border-color: var(--fb-border);
+    background: var(--fb-card);
+}
+
+/* Composer de novo post: caixa "Start a Thread" estendida no topo do feed */
+.community-active .tw-composer,
+#waChatActive.tw-chat-community .tw-composer {
+    background: var(--fb-bg);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 14px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--fb-border);
+}
+.community-active .fb-composer-top { align-items: flex-start; }
+.community-active .tw-composer-textarea,
+#waChatActive.tw-chat-community .tw-composer-textarea {
+    background: var(--fb-accent);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 12px 16px;
+    min-height: 40px;
+    font-size: 15px;
+}
+.community-active .fb-composer-actions {
+    border-top: none;
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
+/* Botão publicar: no dark, pill claro estilo Threads; no light, usa o --fb-primary azul */
+body.dark-theme .community-active .tw-post-btn,
+body.dark-theme #waChatActive.tw-chat-community .tw-post-btn {
+    background: #f5f5f5;
+    color: #0f0f0f;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 7px 20px;
+    font-size: 15px;
+}
+.community-active .tw-post-btn:hover { opacity: 0.9; }
+.community-active .tw-post-btn:disabled { opacity: 0.35; }
+
+/* Posts do feed: separados por linha fina — o contorno fica só na borda
+   externa do .tw-feed-card, não em cada post individualmente. Sem fundo
+   próprio: o post usa o mesmo fundo da página (--fb-bg), só a linha embaixo
+   como contorno. !important porque essas telas (Pesquisar, Seguindo,
+   Repostados) usam os mesmos cards fora do .tw-feed-card, sem o wrapper
+   que absorveria a regra base .tw-post (fundo branco/cinza + sombra). */
+.community-active #communityPostsList .tw-post,
+.community-active .tw-post:not(.tw-bubble-comment),
+.tw-chat-feed .tw-post:not(.tw-bubble-comment),
+#waChatActive.tw-chat-community .tw-post:not(.tw-bubble-comment),
+#twPageSearchResults .tw-post:not(.tw-bubble-comment),
+#twSeguindoFeed .tw-post:not(.tw-bubble-comment),
+#twRepostsFeed .tw-post:not(.tw-bubble-comment) {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 14px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--fb-border);
+}
+.community-active .tw-skeleton {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--fb-border);
+    margin-bottom: 0;
+}
+
+/* Avatar com contorno fino */
+.community-active .tw-post-avatar,
+#waChatActive.tw-chat-community .tw-post-avatar {
+    background: var(--fb-accent);
+    border: 1px solid var(--fb-border);
+    width: 40px;
+    height: 40px;
+}
+
+/* Header: nome + hora na mesma linha */
+.community-active .fb-card-id {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+.community-active .fb-card-id .tw-post-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+}
+.community-active .tw-post-name:hover { text-decoration: underline; }
+.community-active .tw-post-time { font-size: 12px; }
+
+/* Badge verificado dourado (Threads) */
+.community-active .tw-verified { color: #e8b526; }
+
+/* Texto e imagem */
+.community-active .tw-post-text {
+    font-size: 15px;
+    line-height: 1.45;
+    margin: 10px 0 8px;
+    color: var(--fb-text);
+}
+.community-active .tw-post-img { border-radius: 10px; }
+
+/* Stats (curtidas | comentários) em cinza, como o Threads */
+.community-active .fb-card-stats { color: var(--fb-muted); }
+.community-active .fb-card-stats i,
+#waChatActive.tw-chat-community .fb-card-stats i { color: var(--fb-muted); }
+.community-active .fb-card-divider { background: var(--fb-border); }
+
+/* Ações do card: botões circulares só de ícone */
+.community-active .tw-post-actions,
+#waChatActive.tw-chat-community .tw-post-actions,
+.tw-chat-feed .tw-post-actions {
+    gap: 4px;
+    padding: 2px 0;
+    margin: 4px 0 2px;
+}
+.community-active .tw-post-actions .tw-action-btn,
+#waChatActive.tw-chat-community .tw-post-actions .tw-action-btn,
+.tw-chat-feed .tw-post-actions .tw-action-btn {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    padding: 0;
+    gap: 0;
+    color: var(--fb-muted);
+}
+.community-active .tw-post-actions .tw-action-btn i,
+#waChatActive.tw-chat-community .tw-post-actions .tw-action-btn i,
+.tw-chat-feed .tw-post-actions .tw-action-btn i { font-size: 20px; }
+.community-active .tw-post-actions .tw-action-btn:hover,
+#waChatActive.tw-chat-community .tw-post-actions .tw-action-btn:hover,
+.tw-chat-feed .tw-post-actions .tw-action-btn:hover {
+    background: var(--fb-hover);
+    color: var(--fb-text);
+}
+
+/* Coração vermelho no curtir (ativo e hover) */
+.community-active .tw-action-btn.tw-like-active,
+#waChatActive.tw-chat-community .tw-action-btn.tw-like-active,
+.tw-chat-feed .tw-action-btn.tw-like-active,
+.community-active .fb-comment-actions .tw-action-btn.tw-like-active,
+#waChatActive.tw-chat-community .fb-comment-actions .tw-action-btn.tw-like-active {
+    color: var(--fb-danger);
+}
+.community-active .tw-action-btn.tw-like-active i,
+#waChatActive.tw-chat-community .tw-action-btn.tw-like-active i,
+.tw-chat-feed .tw-action-btn.tw-like-active i { color: var(--fb-danger); }
+
+/* Repostar ativo: seta circular verde (padrão Threads) */
+.tw-action-btn.tw-repost-active,
+.community-active .tw-action-btn.tw-repost-active,
+#waChatActive.tw-chat-community .tw-action-btn.tw-repost-active,
+.tw-chat-feed .tw-action-btn.tw-repost-active { color: #19b643; }
+.tw-action-btn.tw-repost-active i,
+.community-active .tw-action-btn.tw-repost-active i,
+#waChatActive.tw-chat-community .tw-action-btn.tw-repost-active i,
+.tw-chat-feed .tw-action-btn.tw-repost-active i { color: #19b643; }
+.tw-action-btn .action-count { font-size: 0.62rem; font-weight: 600; min-width: 14px; line-height: 1; }
+
+/* Ações dos comentários/respostas: redondas e compactas */
+.community-active .fb-comment-actions .tw-action-btn,
+#waChatActive.tw-chat-community .fb-comment-actions .tw-action-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0;
+    justify-content: center;
+}
+.community-active .fb-comment-actions .tw-action-btn i,
+#waChatActive.tw-chat-community .fb-comment-actions .tw-action-btn i { font-size: 15px; }
+
+/* Balão de comentário plano sobre fundo #101010 */
+.community-active .fb-comment-bubble,
+#waChatActive.tw-chat-community .fb-comment-bubble {
+    background: var(--fb-accent);
+    border-radius: 16px;
+    padding: 8px 12px;
+}
+
+/* Comentários inline sociobook */
+.community-active .fb-inline-comments {
+    border-top: 1px solid var(--fb-border);
+    padding: 6px 6px 2px;
+    margin-top: 6px;
+}
+.community-active .fb-inline-input { background: var(--fb-accent); }
+.community-active .fb-see-more { color: var(--fb-muted); }
+.community-active .fb-inline-input .fb-send { color: var(--fb-muted); }
+.community-active .fb-inline-input .fb-send:hover { background: var(--fb-hover); color: var(--fb-text); }
+
+/* Feed dentro do chat */
+.tw-chat-feed { gap: 0; padding: 0; }
+
+/* Perfil */
+.community-active .tw-profile-card {
+    background: var(--fb-card);
+    border-color: var(--fb-border);
+    border-radius: 12px;
+    box-shadow: none;
+    overflow: hidden;
+}
+.community-active .tw-profile-cover {
+    border-radius: 12px 12px 0 0;
+    background: linear-gradient(135deg, var(--fb-primary), var(--fb-accent));
+}
+body.dark-theme .community-active .tw-profile-cover {
+    border-radius: 12px 12px 0 0;
+    background: linear-gradient(135deg, #232527, #101010);
+}
+body.dark-theme .community-active .tw-follow-btn {
+    border-radius: 999px;
+    background: #f5f5f5;
+    color: #0f0f0f;
+    border: none;
+    font-weight: 700;
+    padding: 7px 18px;
+}
+body.dark-theme .community-active .tw-follow-btn.following {
+    background: transparent;
+    color: var(--fb-text);
+    border: 1px solid var(--fb-border);
+}
+
+/* Notificações e dropdowns: herdam os tokens escuros (--fb-card etc.) */
+.tw-notif-like { background: #ff3040; }
+.community-active .tw-notif-popover,
+#waChatActive.tw-chat-community .tw-notif-popover {
+    box-shadow: 0 8px 30px rgba(0,0,0,0.55);
+}
+
+/* --- Páginas internas (Pesquisar / Atividade / Seguindo) --- */
+.tw-page-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--fb-border);
+    background: var(--fb-bg);
+}
+.tw-page-head h4 { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--fb-text); }
+.tw-page-head .detail-back-btn { color: var(--fb-muted); }
+.tw-page-head .detail-back-btn:hover { color: var(--fb-text); }
+
+.tw-page-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px 16px;
+    color: var(--fb-muted);
+    font-size: 14px;
+}
+
+/* Busca em página cheia */
+.tw-search-page { padding: 14px 14px 24px; width: 100%; max-width: 620px; margin: 0 auto; box-sizing: border-box; }
+.tw-search-box { position: relative; margin-bottom: 4px; }
+.tw-search-box > i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fb-muted);
+    font-size: 1rem;
+    pointer-events: none;
+}
+.tw-search-box input {
+    width: 100%;
+    background: var(--fb-accent);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 11px 16px 11px 38px;
+    font-size: 15px;
+    color: var(--fb-text);
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.tw-search-box input::placeholder { color: var(--fb-muted); }
+.tw-search-box input:focus { border-color: var(--fb-border); background: var(--fb-card); }
+.tw-search-hints { color: var(--fb-muted); padding: 4px 8px 14px; }
+.tw-search-section-head {
+    padding: 14px 6px 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--fb-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.tw-search-section-head:first-child { padding-top: 6px; }
+.tw-search-user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 6px;
+    margin: 0 8px;
+    border-bottom: 1px solid var(--fb-border);
+    cursor: pointer;
+    color: var(--fb-text);
+    font-size: 14px;
+}
+.tw-search-user-row:hover { background: var(--fb-hover); }
+.tw-search-user-row img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--fb-accent);
+    border: 1px solid var(--fb-border);
+}
+
+/* --- Ajustes finos "minimalista" (spec): tipografia leve, hierarquia clara --- */
+.community-active,
+.tw-chat-community,
+#twSidebar {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+}
+/* Contadores alinhados à esquerda, sem ocupar a linha inteira */
+.community-active .fb-card-stats {
+    justify-content: flex-start;
+    gap: 14px;
+}
+/* Badge verificado neutro (cinza), reforçando o preto/branco/cinza */
+.community-active .tw-verified {
+    color: var(--fb-muted);
+    font-size: 0.85em;
+}
+.community-active .tw-post-text,
+.community-active .tw-composer-textarea { letter-spacing: 0; }
+
+/* ============================================================
+   THREADS OFICIAL (Barcelona) — compactação final
+   Baseado nos tokens reais do threads.net: conteúdo 572px,
+   fundo #0A0A0A, coração rgb(255,48,64), borda sutil
+   rgba(255,255,255,0.1), texto secundário rgb(153,153,153).
+   ============================================================ */
+body.dark-theme .community-active,
+body.dark-theme .tw-chat-community,
+body.dark-theme #communityChatMsgs,
+body.dark-theme #twSidebar,
+body.dark-theme .tw-feed-wrap {
+    --fb-bg: #0A0A0A !important;
+    --fb-card: #161616 !important;
+    --fb-text: #f5f5f5 !important;
+    --fb-muted: #999999 !important;
+    --fb-border: #262626 !important;
+    --fb-hover: #1e1e1e !important;
+    --fb-primary: #f5f5f5 !important;
+    --fb-accent: #121212 !important;
+    --fb-danger: #ff3040 !important;
+}
+.community-active,
+.tw-chat-community,
+#twSidebar {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* --- Estrutura do feed: coluna fina, cinza uniforme, sem sombras --- */
+.community-active .tw-feed-wrap { max-width: 620px; }
+.tw-chat-feed { padding: 0; }
+.community-active .tw-feed-header { padding: 10px 14px 8px; }
+
+/* Posts compactos (~60% da altura), separados por linha fina dentro do
+   cartão único (.tw-feed-card cuida do contorno externo). */
+.community-active #communityPostsList .tw-post,
+.community-active .tw-post:not(.tw-bubble-comment),
+.tw-chat-feed .tw-post:not(.tw-bubble-comment),
+#waChatActive.tw-chat-community .tw-post:not(.tw-bubble-comment) {
+    padding: 10px 12px 6px;
+    border-bottom: 1px solid var(--fb-border);
+    margin-bottom: 0;
+}
+.community-active .tw-post-avatar,
+#waChatActive.tw-chat-community .tw-post-avatar {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--fb-border);
+}
+.community-active .fb-card-header { gap: 8px; }
+.community-active .fb-card-id { gap: 8px; }
+.community-active .fb-card-id .tw-post-name { font-size: 14px; font-weight: 600; }
+.community-active .tw-post-time { font-size: 11px; }
+.community-active .tw-post-menu-btn { width: 28px; height: 28px; font-size: 1rem; }
+
+.community-active .tw-post-text { font-size: 14px; line-height: 1.4; margin: 6px 0 4px; font-weight: 400; }
+.community-active .tw-post-img { border-radius: 10px; aspect-ratio: 16 / 9; margin-bottom: 4px; }
+
+.community-active .fb-card-stats { padding: 2px 0 4px; font-size: 12px; }
+.community-active .fb-card-divider { height: 1px; background: var(--fb-border); }
+
+/* Ícones de ação pequenos (16–18px), circulares, na mesma linha */
+.community-active .tw-post-actions,
+#waChatActive.tw-chat-community .tw-post-actions,
+.tw-chat-feed .tw-post-actions {
+    gap: 2px;
+    padding: 0;
+    margin: 2px 0 0;
+}
+.community-active .tw-post-actions .tw-action-btn,
+#waChatActive.tw-chat-community .tw-post-actions .tw-action-btn,
+.tw-chat-feed .tw-post-actions .tw-action-btn {
+    width: 36px;
+    height: 36px;
+}
+.community-active .tw-post-actions .tw-action-btn i,
+#waChatActive.tw-chat-community .tw-post-actions .tw-action-btn i,
+.tw-chat-feed .tw-post-actions .tw-action-btn i { font-size: 18px; }
+
+.community-active .fb-comment-actions .tw-action-btn,
+.tw-chat-community .fb-comment-actions .tw-action-btn {
+    width: 30px;
+    height: 30px;
+}
+.community-active .fb-comment-actions .tw-action-btn i,
+.tw-chat-community .fb-comment-actions .tw-action-btn i { font-size: 15px; }
+
+/* --- Composer compacto: avatar + campo pill + Postar na mesma linha ---
+   Envolvido numa caixa com borda arredondada (igual ao card do Threads/X),
+   com a MESMA largura/alinhamento dos posts do feed logo abaixo — e como
+   agora faz parte do conteúdo rolável (ver twComposerBoxHtml), some da
+   tela junto com os posts ao rolar, em vez de ficar fixo. */
+/* --- Composer compacto: avatar + campo pill + Postar na mesma linha ---
+   Fica dentro do .tw-feed-card (contorno único que engloba composer +
+   posts), então aqui só cuida do espaçamento interno — sem borda/raio
+   próprios, pra não duplicar o contorno externo do cartão. */
+.community-active .tw-composer.tw-composer-inline,
+#waChatActive.tw-chat-community .tw-composer.tw-composer-inline {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 16px;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    border-bottom: 1px solid var(--fb-border);
+    border-radius: 0;
+    margin: 0;
+    max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+.community-active .tw-composer-inline .tw-avatar,
+#waChatActive.tw-chat-community .tw-composer-inline .tw-avatar { width: 36px; height: 36px; }
+.community-active .tw-composer-inline .tw-composer-textarea,
+#waChatActive.tw-chat-community .tw-composer-inline .tw-composer-textarea {
+    flex: 1;
+    min-width: 120px;
+    min-height: 40px;
+    padding: 10px 16px;
+    font-size: 15px;
+    font-weight: 400;
+    border: 1px solid transparent;
+    background: var(--fb-accent);
+    border-radius: 999px;
+    box-sizing: border-box;
+}
+.community-active .tw-composer-inline .tw-composer-textarea:focus,
+#waChatActive.tw-chat-community .tw-composer-inline .tw-composer-textarea:focus {
+    border-color: var(--fb-primary);
+    background: var(--fb-card);
+}
+.community-active .tw-composer-inline #twComposerPreviewWrap:not(:empty) { flex-basis: 100%; }
+.community-active .tw-composer-inline .tw-icon-btn { width: 32px; height: 32px; font-size: 1.1rem; flex-shrink: 0; }
+.community-active .tw-composer-inline .tw-post-btn { padding: 7px 20px; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+
+/* --- Barra lateral: segue os tokens --fb-* (claro = branco, dark = preto) --- */
+#twSidebar { background: var(--fb-card) !important; border-right-color: var(--fb-border); }
+#twSidebar .tw-sidebar-logo { color: var(--fb-text); font-size: 1.5rem; padding: 4px 12px 12px; }
+#twSidebar .tw-sidebar-logo { display: flex; align-items: center; gap: 10px; }
+#twSidebar .tw-sidebar-logo span { font-size: 0.98rem; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+@media (max-width: 992px) {
+    #twSidebar .tw-sidebar-logo span { display: none; }
+    #twSidebar .tw-sidebar-logo { justify-content: center; padding: 4px 0 12px; }
+}
+#twSidebar .tw-sidebar-item { padding: 9px 12px; gap: 12px; border-radius: 12px; font-size: 0.9rem; color: var(--fb-muted); }
+#twSidebar .tw-sidebar-item i { font-size: 1.2rem; }
+#twSidebar .tw-sidebar-item:hover { background: var(--fb-hover); color: var(--fb-text); }
+#twSidebar .tw-sidebar-item.active { background: transparent; color: var(--fb-text); font-weight: 600; }
+#twSidebar .tw-sidebar-feeds-head { font-size: 0.7rem; color: var(--fb-muted); }
+#twSidebar .tw-sidebar-subitem { padding: 7px 14px 7px 22px; font-size: 0.82rem; }

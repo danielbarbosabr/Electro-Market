@@ -161,23 +161,26 @@
                 </div>
             </div>
         </div>
-        <!-- Dropdown de notificações (fora do bloco d-none d-md-flex para funcionar também no mobile) -->
-        <div class="notif-dropdown" id="notifDropdown">
-            <div class="notif-dropdown-header">
-                <div class="notif-dropdown-title">
-                    <i class="bi bi-bell-fill"></i>
-                    <span>Notificações</span>
-                </div>
-                <div class="notif-dropdown-actions">
-                                        <button type="button" class="notif-dropdown-btn notif-dropdown-btn-danger" onclick="window.deleteAllNotifs()" title="Apagar todas"><i class="bi bi-trash3"></i></button>
-                    <button type="button" class="notif-dropdown-close" onclick="window.closeNotifications()">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="notif-dropdown-body" id="notificacoesList"></div>
-        </div>
     </header>
+
+    <!-- Dropdown de notificações (fora do header: em tela cheia da Comunidade
+         o header fica display:none, e o mesmo painel precisa continuar abrindo
+         pelo sino dentro do chat). -->
+    <div class="notif-dropdown" id="notifDropdown">
+        <div class="notif-dropdown-header">
+            <div class="notif-dropdown-title">
+                <i class="bi bi-bell-fill"></i>
+                <span>Notificações</span>
+            </div>
+            <div class="notif-dropdown-actions">
+                                <button type="button" class="notif-dropdown-btn notif-dropdown-btn-danger" onclick="window.deleteAllNotifs()" title="Apagar todas"><i class="bi bi-trash3"></i></button>
+                <button type="button" class="notif-dropdown-close" onclick="window.closeNotifications()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+        <div class="notif-dropdown-body" id="notificacoesList"></div>
+    </div>
 
     <!-- Banner principal -->
     <section id="heroSection" class="hero-banner py-4 py-md-5 text-white text-center">
@@ -1073,6 +1076,44 @@
                 <img id="waRailAvatar" class="wa-rail-avatar" src="" alt="Você" referrerpolicy="no-referrer" title="Meu perfil" onclick="window.showProfileEdit()" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=64'">
             </div>
         </nav>
+        <nav class="tw-sidebar" id="twSidebar">
+            <div class="tw-sidebar-top">
+                <div class="tw-sidebar-logo"><i class="bi bi-threads"></i><span>Comunidade</span></div>
+                <button type="button" class="tw-sidebar-item active" id="twNavParaVoce" title="Para você" onclick="window.twSidebarGoFeed()">
+                    <i class="bi bi-house-door-fill"></i><span>Para você</span>
+                </button>
+                <button type="button" class="tw-sidebar-item" title="Nova thread" onclick="window.twSidebarNovaThread()">
+                    <i class="bi bi-plus-square"></i><span>Nova thread</span>
+                </button>
+                <button type="button" class="tw-sidebar-item" title="Pesquisar" onclick="window.twSidebarGoSearch()">
+                    <i class="bi bi-search"></i><span>Pesquisar</span>
+                </button>
+                <button type="button" class="tw-sidebar-item" title="Conversas" onclick="window.renderDirectChats()">
+                    <i class="bi bi-send"></i><span>Conversas</span>
+                </button>
+                <button type="button" class="tw-sidebar-item" title="Atividade" onclick="window.twSidebarGoAtividade()">
+                    <i class="bi bi-heart"></i><span>Atividade</span>
+                </button>
+                <button type="button" class="tw-sidebar-item" title="Perfil" onclick="window.twSidebarGoProfile()">
+                    <i class="bi bi-person"></i><span>Perfil</span>
+                </button>
+                <button type="button" class="tw-sidebar-item" title="Repostados" onclick="window.twSidebarGoReposts()">
+                    <i class="bi bi-arrow-repeat"></i><span>Repostados</span>
+                </button>
+            </div>
+            <div class="tw-sidebar-bottom">
+                <div class="dropdown dropup">
+                    <button type="button" class="tw-sidebar-item" data-bs-toggle="dropdown" title="Mais">
+                        <i class="bi bi-list"></i><span>Mais</span>
+                    </button>
+                    <ul class="dropdown-menu shadow-sm">
+                        <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openSupportRequestModal()"><i class="bi bi-headset me-2"></i>Relatar problema</a></li>
+                        <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.closeCommunityChat(); window.goHome();"><i class="bi bi-house-door me-2"></i>Sair do Comunidade</a></li>
+                        <li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleTema()"><i class="bi bi-moon-stars me-2"></i>Alterar tema</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
         <section class="wa-side">
             <div class="wa-side__header">
                 <div class="wa-side__title-block">
@@ -1140,8 +1181,8 @@
                             <div class="create-ad-section-body">
                                 <div class="text-center mb-3">
                                     <div class="position-relative d-inline-block">
-                                        <img id="newGroupAvatarPreview" src="" class="d-none rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;">
-                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" style="width:70px;height:70px;border:3px dashed #ccc;" id="newGroupAvatarPlaceholder">
+                                        <img id="newGroupAvatarPreview" src="" class="d-none rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;overflow:hidden;">
+                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" style="width:70px;height:70px;border:3px dashed #ccc;overflow:hidden;" id="newGroupAvatarPlaceholder">
                                             <i class="bi bi-camera" style="font-size:1.5rem;color:#999;"></i>
                                         </div>
                                         <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:26px;height:26px;cursor:pointer;border:2px solid #fff;">
@@ -1226,7 +1267,7 @@
                         <div class="create-ad-section-body">
                             <div class="text-center mb-3">
                                 <div class="position-relative d-inline-block">
-                                    <img id="editGroupAvatarPreview" src="" class="rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;">
+                                    <img id="editGroupAvatarPreview" src="" class="rounded-circle border" style="width:70px;height:70px;object-fit:cover;border:3px solid #00A884;overflow:hidden;">
                                     <label class="position-absolute bottom-0 end-0 bg-success rounded-circle d-flex align-items-center justify-content-center" style="width:26px;height:26px;cursor:pointer;border:2px solid #fff;">
                                         <i class="bi bi-plus text-white" style="font-size:0.75rem;"></i>
                                         <input type="file" accept="image/*" hidden onchange="window.uploadEditGroupModalAvatar(this)">
@@ -1497,7 +1538,7 @@
                         <label for="editEmail">E-mail</label>
                     </div>
                     <div class="ml-field">
-                        <input type="text" id="editCPF" placeholder=" " readonly style="background-color: var(--hover-bg);">
+                        <input type="text" id="editCPF" placeholder=" " maxlength="14" inputmode="numeric">
                         <label for="editCPF">CPF</label>
                     </div>
                     <div class="ml-field">
@@ -1789,6 +1830,8 @@
     </div>
 
     <script src="js/script.js"></script>
+    <script src="js/conversas.js"></script>
+    <script src="js/comunidade.js"></script>
     <script src="js/cliente.js"></script>
     <script src="js/seller.js"></script>
     <script src="js/admin.js"></script>

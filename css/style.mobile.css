@@ -488,15 +488,14 @@
     }
 }
 
-/* ---- Comunidade (Threads-clone) no mobile ---- */
+/* ---- Comunidade (Facebook-clone) no mobile ---- */
 @media (max-width: 767px) {
-    .tw-feed-wrap { max-width: 100%; padding: 0 4px 24px; }
-    .tw-post { padding: 10px 0; }
-    .tw-post-avatar-col { width: 32px; min-width: 32px; }
-    .tw-post-avatar { width: 32px; height: 32px; }
-    .tw-post-name { font-size: 14px; }
+    .tw-feed-wrap { max-width: 100%; padding: 0 2px 24px; }
+    .tw-post { padding: 10px 10px 6px; }
+    .tw-post-avatar { width: 36px; height: 36px; }
+    .tw-post-name { font-size: 13px; }
     .tw-post-text { font-size: 14px; }
-    .tw-composer { border-radius: 12px; padding: 12px; }
+    .tw-composer { border-radius: 4px; padding: 10px 12px; }
     .tw-avatar-lg { width: 72px; height: 72px; }
     .tw-profile-info { margin-top: -36px; }
 }
