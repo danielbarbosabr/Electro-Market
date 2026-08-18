@@ -50,8 +50,9 @@ input::placeholder {
 }
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Montserrat:wght@700;800&family=Sora:wght@400;600&display=swap');
 
-:root {
+:root { /* Tema Marketplace Azul (base original) */
     --header-bg: #003070;
+    --header-text: #ffffff;
     --header-height: 92px;
     --primary-blue: #003070;
     --market-color: #2dcc71;
@@ -62,23 +63,28 @@ input::placeholder {
     --text-muted: #666666;
     --border-light: #e7eaf3;
     --input-bg: #ffffff;
+    --search-bg: #f1f3f4;
+    --search-border: #d3d3d3;
     --modal-bg: #ffffff;
     --hover-bg: #f5f5f5;
     --shadow-color: rgba(0,0,0,0.1);
     --footer-bg: #001529;
 }
 
-body.dark-theme { /* Tema Netflix: Preto e Vermelho */
-    --bg-color: #000000; /* Preto Netflix */
+body.dark-theme { /* Tema Escuro — Netflix (base original) */
+    --bg-color: #000000;
     --card-bg: #141414;
     --header-bg: #000000;
+    --header-text: #ffffff;
     --text-main: #ffffff;
     --text-muted: #b3b3b3;
     --border-light: #333333;
     --input-bg: #232323;
+    --search-bg: #000000;
+    --search-border: rgba(255,255,255,0.3);
     --modal-bg: #181818;
     --hover-bg: #222222;
-    --market-color: #E50914; /* Vermelho Netflix */
+    --market-color: #E50914;
     --primary-blue: #E50914;
     --primary-action: #b9090b;
     --shadow-color: rgba(0,0,0,0.8);
@@ -318,7 +324,8 @@ body {
     box-shadow: 0 8px 30px var(--shadow-color);
 }
 
-/* Garante que textos da navbar fiquem sempre brancos */
+/* Cor do texto da navbar acompanha o tema (antes ficava sempre branco,
+   invisível quando o header-bg virava branco no tema claro) */
 .header-main,
 .header-main .logo h1,
 .header-main .nav-links > a,
@@ -328,7 +335,7 @@ body {
 .header-main .shipping-info,
 .header-main .shipping-info span,
 .header-main .btn-outline-light {
-    color: #ffffff !important;
+    color: var(--header-text) !important;
 }
 
 .header-main .btn-outline-light {
@@ -336,6 +343,15 @@ body {
 }
 
 .header-main .btn-outline-light:hover {
+    background-color: rgba(255,255,255,0.1);
+    border-color: var(--header-text);
+}
+
+body.dark-theme .header-main .btn-outline-light {
+    border-color: rgba(255,255,255,0.5);
+}
+
+body.dark-theme .header-main .btn-outline-light:hover {
     background-color: rgba(255,255,255,0.1);
     border-color: #ffffff;
 }
@@ -355,7 +371,7 @@ body {
 .search-bar .form-control {
     border-radius: 2px 0 0 2px;
     border: none;
-    background-color: var(--input-bg);
+    background-color: var(--search-bg);
     color: var(--text-main);
 }
 
@@ -1148,6 +1164,151 @@ body.dark-theme .ml-shipping-card {
 .chat-attach-panel .input-group-sm .ml-attach:active,
 #supportAttachPanel .input-group-sm .ml-attach:active {
     transform: scale(0.93);
+}
+
+/* ===== Painel de anexo estilo WhatsApp: menu flutuante (popup) que abre
+   acima do clipe, em vez da barra de abas fixa em cima do chat. ===== */
+.chat-attach-wrapper {
+    position: relative;
+}
+.chat-attach-wrapper .chat-attach-content { display: block; }
+.chat-attach-wrapper[data-attach-view="content"] .chat-attach-popup { display: none; }
+.chat-attach-wrapper[data-attach-view="menu"] .chat-attach-content { display: none; }
+
+.chat-attach-popup {
+    position: absolute;
+    left: 8px;
+    bottom: calc(100% + 8px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 220px;
+    padding: 8px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    transform-origin: bottom left;
+    animation: chatAttachPopupIn .15s ease-out;
+}
+body.dark-theme .chat-attach-popup {
+    background: #233138;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+}
+
+@keyframes chatAttachPopupIn {
+    from { opacity: 0; transform: scale(.85) translateY(6px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.chat-attach-popup-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 9px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    text-align: left;
+    font-size: 0.92rem;
+    color: #3b4a54;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+body.dark-theme .chat-attach-popup-item { color: #d1d7db; }
+.chat-attach-popup-item:hover { background: rgba(0,0,0,0.05); }
+body.dark-theme .chat-attach-popup-item:hover { background: rgba(255,255,255,0.06); }
+
+.chat-attach-icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.chat-attach-back {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #54656f;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    transition: background .15s ease;
+    z-index: 2;
+}
+body.dark-theme .chat-attach-back { color: #aebac1; }
+.chat-attach-back:hover { background: rgba(0,0,0,0.06); }
+body.dark-theme .chat-attach-back:hover { background: rgba(255,255,255,0.08); }
+
+/* Caixa que aparece depois de escolher uma opção do menu (link, upload,
+   Imgur, endereço...) — visual próximo ao anexo do WhatsApp, com verde no
+   lugar da cor de destaque padrão do tema (que no escuro é vermelho). */
+.chat-attach-content {
+    position: relative;
+    padding: 44px 14px 16px 14px;
+    background: #f0f2f5;
+}
+body.dark-theme .chat-attach-content {
+    background: #202c33;
+}
+
+.chat-attach-content .input-group-sm {
+    border: none !important;
+    border-radius: 24px !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+body.dark-theme .chat-attach-content .input-group-sm {
+    background: #2a3942 !important;
+}
+.chat-attach-content .input-group-sm:focus-within {
+    border-color: transparent !important;
+    box-shadow: 0 0 0 2px #00A884 !important;
+}
+.chat-attach-content .input-group-sm .input-group-text {
+    color: #54656f;
+    padding-left: 16px;
+}
+body.dark-theme .chat-attach-content .input-group-sm .input-group-text { color: #8696a0; }
+.chat-attach-content .input-group-sm .form-control {
+    color: #111b21;
+}
+body.dark-theme .chat-attach-content .input-group-sm .form-control { color: #e9edef; }
+.chat-attach-content .input-group-sm .form-control::placeholder { color: #8696a0; }
+.chat-attach-content .input-group-sm .ml-attach {
+    color: #00A884 !important;
+    padding: 0 16px;
+}
+.chat-attach-content .input-group-sm .ml-attach:hover {
+    background: color-mix(in srgb, #00A884 12%, transparent) !important;
+}
+
+.chat-attach-content .ml-attach {
+    background: transparent;
+    border: 1.5px solid #00A884;
+    color: #00A884 !important;
+    border-radius: 22px;
+    box-shadow: none;
+}
+.chat-attach-content .ml-attach:hover {
+    background: color-mix(in srgb, #00A884 12%, transparent);
+    box-shadow: none;
 }
 
 .ml-btn-danger {
@@ -2699,6 +2860,27 @@ body.dark-theme .msg-bubble.is-me { background: #005c4b; color: #e9edef; }
 .msg-bubble.is-them { background: #ffffff; color: #111b21; }
 body.dark-theme .msg-bubble.is-them { background: #202c33; color: #e9edef; }
 
+/* Vídeos enviados no chat: sempre num iframe (funciona tanto para link de
+   YouTube/Vimeo quanto pra arquivo direto), com o mesmo tamanho/cantos
+   arredondados que a mensagem de imagem já usava. */
+.chat-video-embed {
+    position: relative;
+    width: 260px;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.chat-video-embed iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
 /* ── Grouped border-radius ──
    WhatsApp Web rule: the side facing the avatar has 0 radius where
    the tail connects (first) or where messages join (middle/last).
@@ -3643,6 +3825,71 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
     .tw-sidebar-subitem { display: none; }
 }
 
+/* -------- Barra inferior da Comunidade no mobile (estilo Threads) --------
+   Em telas de celular a sidebar lateral (.tw-sidebar) some e dá lugar a
+   essa barra fixa embaixo, com os mesmos atalhos (Início, Pesquisar,
+   Postar, Atividade, Perfil). Só existe dentro do painel da Comunidade
+   (#twBottomNav é criado por window.openCommunityInChat). */
+.tw-bottom-nav {
+    display: none;
+}
+@media (max-width: 767px) {
+    #whatsappOrdersView.wa-community-mode .tw-sidebar {
+        display: none !important;
+    }
+    .tw-bottom-nav {
+        display: flex !important;
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 56px;
+        align-items: center;
+        justify-content: space-around;
+        background: var(--fb-bg, #e9eef5); /* Mesma cor de fundo da Comunidade */
+        border-top: 1px solid var(--fb-border, #d8dbe0);
+        z-index: 25;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .tw-bottom-nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 1.35rem;
+        border-radius: 50%;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .tw-bottom-nav-item:hover,
+    .tw-bottom-nav-item.active {
+        color: var(--text-main);
+    }
+    .tw-bottom-nav-item.active {
+        background: var(--hover-bg);
+    }
+    .tw-bottom-nav-post {
+        background: var(--fb-muted, #8a8d91); /* Cinza (igual ao resto da Comunidade) */
+        color: #ffffff !important;
+        width: 40px;
+        height: 40px;
+    }
+    .tw-bottom-nav-post:hover { opacity: 0.9; background: var(--fb-muted, #8a8d91); }
+    body.dark-theme .tw-bottom-nav {
+        background: var(--fb-bg, #17191c);
+        border-top: 1px solid var(--fb-border, #3a3d42);
+    }
+    /* Espaço reservado no fim do feed pra barra fixa não cobrir o
+       último post nem o composer. */
+    #whatsappOrdersView.wa-community-mode .tw-chat-feed,
+    #whatsappOrdersView.wa-community-mode .tw-feed-wrap {
+        padding-bottom: 64px;
+    }
+}
+
 /* -------- Tela de "boot" da aba Conversas (estilo WhatsApp Web) -------- */
 .wa-boot-screen {
     position: absolute;
@@ -3669,7 +3916,7 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.05);
+    background: transparent;
     color: #8f9aa3;
     font-size: 2.4rem;
     margin-bottom: 18px;
@@ -3680,25 +3927,21 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
     margin-bottom: 22px;
     letter-spacing: 0.3px;
 }
-.wa-boot-bar {
-    width: 210px;
-    height: 3px;
-    border-radius: 2px;
+/* Barra de progresso real (mesma da área Mídias) no boot de Conversas —
+   estilo mais próximo do WhatsApp original: barra fina e curta, sem
+   número de porcentagem visível ao lado. */
+#waBootScreen .nflx-intro-progress {
     background: rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+}
+#waBootScreen .nflx-intro-progress-fill {
+    background: #1c1e21;
+}
+#waBootScreen .nflx-intro-pct {
+    display: none;
+}
+#waBootScreen .nflx-intro-progress-row {
+    width: 200px;
     margin-bottom: 22px;
-}
-.wa-boot-bar span {
-    display: block;
-    height: 100%;
-    width: 40%;
-    border-radius: 2px;
-    background: #00A884;
-    animation: waBootBarSlide 1.1s ease-in-out infinite;
-}
-@keyframes waBootBarSlide {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
 }
 .wa-boot-subtitle {
     font-size: 0.65rem;
@@ -3713,14 +3956,20 @@ body.dark-theme .wa-boot-screen {
     color: #8696a0;
 }
 body.dark-theme .wa-boot-icon {
-    background: rgba(134, 150, 160, 0.08);
+    background: transparent;
     color: #667781;
 }
 body.dark-theme .wa-boot-title {
     color: #e9edef;
 }
-body.dark-theme .wa-boot-bar {
+body.dark-theme #waBootScreen .nflx-intro-progress {
     background: rgba(134, 150, 160, 0.25);
+}
+body.dark-theme #waBootScreen .nflx-intro-progress-fill {
+    background: #ffffff;
+}
+body.dark-theme #waBootScreen .nflx-intro-pct {
+    color: #8696a0;
 }
 
 /* -------- Sidebar (lista de contatos = pedidos) -------- */
@@ -4008,6 +4257,10 @@ body.dark-theme .wa-boot-bar {
     display: block;
 }
 
+/* ---- Preview da foto do grupo nos modais (criar/editar grupo) ----
+   Garante o recorte circular mesmo se o CSS do Bootstrap não carregar
+   (a foto nunca deve "vazar" do círculo). */
+
 .wa-header-group-icon {
     width: 100%;
     height: 100%;
@@ -4127,6 +4380,14 @@ body.dark-theme .wa-boot-bar {
 
 .wa-empty-illustration { width: 200px; height: 200px; max-width: 55%; margin-bottom: 8px; }
 .wa-empty-illustration svg { width: 100%; height: 100%; display: block; }
+.wa-empty-illustration .wa-empty-img {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+}
 .wa-empty-state i { font-size: 5.5rem; color: #d1d7db; margin-bottom: 6px; }
 .wa-empty-state p { font-size: 0.9rem; }
 .wa-empty-title { font-weight: 400; color: #000000; font-size: 2rem !important; margin: 0 0 4px; }
@@ -8095,260 +8356,7 @@ body.dark-theme .create-ad-input:focus {
     flex-shrink: 0;
 }
 
-/* ---- Painel de Informações do Grupo (overlay) ---- */
-.wa-group-info-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1060;
-    display: flex;
-}
-.wa-gi-backdrop {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.4);
-}
-.wa-gi-panel {
-    position: relative;
-    width: 100%;
-    max-width: 480px;
-    height: 100%;
-    background: #fff;
-    margin-left: auto;
-    display: flex;
-    flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.15);
-}
-.wa-gi-panel.wa-gi-open {
-    transform: translateX(0);
-}
-.wa-gi-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: #00A884;
-    color: #fff;
-    flex-shrink: 0;
-}
-.wa-gi-header h6 {
-    margin: 0;
-    font-weight: 600;
-}
-.wa-gi-close {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 1.2rem;
-    padding: 4px;
-    cursor: pointer;
-}
-.wa-gi-body {
-    flex: 1;
-    overflow-y: auto;
-    padding-bottom: 20px;
-}
-
-/* ---- Hero section ---- */
-.wa-gi-hero {
-    border-bottom: 1px solid #e9edef;
-    padding: 24px 16px;
-}
-.wa-gi-hero-avatar {
-    position: relative;
-    display: inline-block;
-    border-radius: 50%;
-    overflow: hidden;
-}
-.wa-gi-hero-avatar img {
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #e9edef;
-}
-.wa-gi-hero-overlay {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 1.5rem;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-.wa-gi-hero-avatar:hover .wa-gi-hero-overlay {
-    opacity: 1;
-}
-.wa-gi-meta {
-    opacity: 0.7;
-}
-
-/* ---- Sections ---- */
-.wa-gi-section {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e9edef;
-}
-.wa-gi-section-title {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #00A884;
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-/* ---- Setting rows ---- */
-.wa-gi-setting {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: background 0.15s;
-}
-.wa-gi-setting:hover {
-    background: #f0f2f5;
-}
-
-/* ---- Search ---- */
-.wa-gi-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #f0f2f5;
-    border-radius: 8px;
-    padding: 6px 10px;
-    margin-bottom: 8px;
-}
-.wa-gi-search i {
-    color: #667781;
-    font-size: 0.85rem;
-}
-.wa-gi-search input {
-    border: none;
-    background: transparent;
-    outline: none;
-    flex: 1;
-    font-size: 0.85rem;
-}
-
-/* ---- Participants ---- */
-.wa-gi-participants {
-    max-height: 400px;
-    overflow-y: auto;
-}
-.wa-gi-participant {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    border-radius: 8px;
-    transition: background 0.15s;
-}
-.wa-gi-participant:hover {
-    background: #f0f2f5;
-}
-.wa-gi-participant-avatar {
-    position: relative;
-    flex-shrink: 0;
-}
-.wa-gi-participant-avatar img {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-.wa-gi-participant-avatar.online .wa-gi-dot {
-    position: absolute;
-    bottom: 0; right: 0;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: #2ecc71;
-    border: 2px solid #fff;
-}
-.wa-gi-participant-info {
-    flex: 1;
-    min-width: 0;
-}
-.wa-gi-participant-info strong {
-    font-size: 0.9rem;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.wa-gi-participant-badges {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-.wa-gi-badge {
-    font-size: 0.6rem;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-weight: 600;
-}
-.wa-gi-badge-creator {
-    background: #fff3e0;
-    color: #e65100;
-}
-.wa-gi-badge-admin {
-    background: #e3f2fd;
-    color: #1565c0;
-}
-.wa-gi-participant-actions {
-    flex-shrink: 0;
-}
-.wa-gi-action-btn {
-    background: none;
-    border: none;
-    color: #667781;
-    padding: 4px 8px;
-    cursor: pointer;
-    border-radius: 50%;
-    transition: background 0.15s;
-}
-.wa-gi-action-btn:hover {
-    background: #e9edef;
-}
-
 /* ---- Lista de membros no modal de criar grupo ---- */
-#newGroupModal .wa-group-member-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-#newGroupModal .wa-group-member-row:hover {
-    background: rgba(0,0,0,0.04);
-}
-#newGroupModal .wa-group-member-row.selected {
-    background: rgba(0,168,132,0.1);
-}
-#newGroupModal .wa-group-member-row img {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-body.dark-theme #newGroupModal .wa-group-member-row:hover {
-    background: rgba(255,255,255,0.06);
-}
-body.dark-theme #newGroupModal .wa-group-member-row.selected {
-    background: rgba(0,168,132,0.2);
-}
 #newGroupModal .create-ad-section {
     margin-bottom: 12px;
 }
@@ -8357,13 +8365,6 @@ body.dark-theme #newGroupModal .wa-group-member-row.selected {
 }
 #newGroupModalDialog {
     max-width: 520px;
-}
-
-/* ---- Responsivo: mobile = tela cheia ---- */
-@media (max-width: 767px) {
-    .wa-gi-panel {
-        max-width: 100%;
-    }
 }
 
 /* ============================================ */
@@ -9046,6 +9047,23 @@ body.dark-theme .tw-feed-wrap {
     color: var(--fb-text);
     letter-spacing: -0.01em;
 }
+/* Barra de progresso real (mesma da área Mídias) no splash da Comunidade —
+   mesmo ajuste da tela de Conversas: barra curta e discreta, sem número
+   de porcentagem visível ao lado. */
+#twCommunitySplash .nflx-intro-progress-row {
+    margin-top: 36px;
+    width: 200px;
+}
+#twCommunitySplash .nflx-intro-progress {
+    background: rgba(127, 127, 127, 0.3);
+}
+#twCommunitySplash .nflx-intro-progress-fill {
+    /* Acompanha o tema automaticamente: escuro no tema claro, branco no escuro */
+    background: var(--fb-text);
+}
+#twCommunitySplash .nflx-intro-pct {
+    display: none;
+}
 
 /* --- Comunidade dentro do Chat: molda o container do WhatsApp ao visual FB ---
    Usa #waChatActive para vencer a especificidade de body.dark-theme .chat-* */
@@ -9632,11 +9650,11 @@ body.dark-theme #waChatActive.tw-chat-community .tw-post-btn {
     margin-bottom: 0;
 }
 
-/* Avatar com contorno fino */
+/* Avatar sem contorno — mesmo visual do "Para você" em todos os
+   lugares da Comunidade (thread, respostas, busca, etc.) */
 .community-active .tw-post-avatar,
 #waChatActive.tw-chat-community .tw-post-avatar {
     background: var(--fb-accent);
-    border: 1px solid var(--fb-border);
     width: 40px;
     height: 40px;
 }
@@ -9812,12 +9830,45 @@ body.dark-theme .community-active .tw-follow-btn.following {
 
 .tw-page-loading {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 28px 16px;
+    gap: 10px;
+    padding: 40px 16px;
     color: var(--fb-muted);
     font-size: 14px;
+    min-height: 120px;
+}
+
+/* Barra de carregamento centralizada, mesmo padrão visual da tela de
+   entrada do Mídias/Conversas (.nflx-intro-progress), só que compacta
+   e sem porcentagem — usada em qualquer lugar da Comunidade que
+   precise de um loading (busca, atividade, seguindo, reposts). */
+.nflx-mini-progress {
+    width: min(220px, 70%);
+    height: 4px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--border-light);
+    position: relative;
+}
+.nflx-mini-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 40%;
+    border-radius: 999px;
+    background: var(--market-color, #e50914);
+    animation: nflx-mini-progress-slide 1.1s ease-in-out infinite;
+}
+@keyframes nflx-mini-progress-slide {
+    0%   { left: -40%; }
+    100% { left: 100%; }
+}
+.tw-page-loading-label {
+    color: var(--fb-muted);
+    font-size: 13px;
 }
 
 /* Busca em página cheia */
@@ -9942,7 +9993,6 @@ body.dark-theme .tw-feed-wrap {
 #waChatActive.tw-chat-community .tw-post-avatar {
     width: 36px;
     height: 36px;
-    border: 1px solid var(--fb-border);
 }
 .community-active .fb-card-header { gap: 8px; }
 .community-active .fb-card-id { gap: 8px; }
@@ -10045,3 +10095,2307 @@ body.dark-theme .tw-feed-wrap {
 #twSidebar .tw-sidebar-item.active { background: transparent; color: var(--fb-text); font-weight: 600; }
 #twSidebar .tw-sidebar-feeds-head { font-size: 0.7rem; color: var(--fb-muted); }
 #twSidebar .tw-sidebar-subitem { padding: 7px 14px 7px 22px; font-size: 0.82rem; }
+
+
+
+/* ============================================
+   FILMES — Tela estilo Nextflix (demo visual)
+   (aberto pelo botão de filme no wa-rail-bottom)
+   ============================================ */
+#whatsappOrdersView.wa-filmes-mode .wa-rail,
+#whatsappOrdersView.wa-filmes-mode .wa-side {
+    display: none;
+}
+#whatsappOrdersView.wa-filmes-mode .wa-chat {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+}
+
+.nflx-root {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #141414;
+    color: #ffffff;
+}
+
+/* ---------- Navbar ---------- */
+.nflx-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 0.8rem 1.2rem;
+    background-image: linear-gradient(to bottom, rgba(20, 20, 20, 0.7) 10%, rgba(20, 20, 20, 0));
+    transition: background-color 0.2s ease-out;
+}
+.nflx-nav.filled {
+    background-color: #141414;
+    background-image: none;
+}
+.nflx-nav-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+}
+.nflx-back {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #ffffff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.nflx-back:hover { background: rgba(255, 255, 255, 0.12); }
+.nflx-brand {
+    margin: 0 1.1rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #e50914;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.nflx-nav-options {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+}
+.nflx-nav-item {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.86rem;
+    color: #e5e5e5;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.nflx-nav-item:hover { color: #b3b3b3; }
+.nflx-nav-item.active { font-weight: 700; color: #ffffff; }
+.nflx-nav-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.nflx-profile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+.nflx-avatar-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.nflx-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+    background: #252525;
+}
+.nflx-avatar-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #252525;
+    flex-shrink: 0;
+}
+.nflx-avatar-wrap .nflx-avatar { width: 100%; height: 100%; }
+.nflx-avatar-fallback {
+    position: absolute;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: #e50914;
+    background: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+.nflx-avatar-btn > i {
+    font-size: 0.7rem;
+    color: #b3b3b3;
+    transition: transform 0.2s ease;
+}
+.nflx-avatar-btn > i:not(.nflx-avatar-fallback) {
+    font-size: 0.7rem;
+    color: #b3b3b3;
+    transition: transform 0.2s ease;
+}
+.nflx-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 220px;
+    background: var(--modal-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 6px;
+    z-index: 300;
+    box-shadow: 0 10px 30px var(--shadow-color);
+    flex-direction: column;
+    gap: 2px;
+}
+.nflx-menu.open { display: flex; }
+.nflx-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.nflx-menu-item i { font-size: 1rem; color: #e50914; width: 20px; text-align: center; flex-shrink: 0; }
+.nflx-menu-item:hover { background: var(--hover-bg); }
+.nflx-search {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 0.25rem 0.65rem;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 4px;
+    color: #e5e5e5;
+}
+.nflx-search > i { cursor: pointer; font-size: 0.95rem; }
+#nflxSearchInput {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 0.85rem;
+    width: 130px;
+    min-width: 0;
+}
+#nflxSearchInput::placeholder { color: #9aa0a6; }
+
+/* ---------- Botão redondo ---------- */
+.nflx-round {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    background: rgba(42, 42, 42, 0.6);
+    color: #ffffff;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s ease;
+}
+.nflx-round:hover { border-color: #ffffff; }
+.nflx-round-play { background: #ffffff; border-color: #ffffff; color: #000000; }
+.nflx-round-play:hover { opacity: 0.85; }
+
+/* ---------- Banner ---------- */
+.nflx-banner {
+    position: relative;
+    width: 100%;
+    height: 85vh;
+    min-height: 420px;
+    display: flex;
+    align-items: flex-end;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.nflx-banner-art {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    mask-image: linear-gradient(to bottom, #141414 36%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #141414 36%, transparent 100%);
+}
+.nflx-art-emoji-hero {
+    font-size: 14rem;
+    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6));
+}
+.nflx-banner-details {
+    position: relative;
+    z-index: 10;
+    width: 42%;
+    max-width: 620px;
+    margin: 0 0 4rem 3.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.45);
+}
+.nflx-banner-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.9rem;
+    width: fit-content;
+}
+.nflx-banner-badge-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    background: #e50914;
+    border-radius: 3px;
+    color: #ffffff;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+.nflx-banner-badge-text {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #e5e5e5;
+}
+.nflx-banner-title {
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1.08;
+    margin: 0 0 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.nflx-banner-synopsis {
+    font-size: 1.05rem;
+    line-height: 1.45;
+    font-weight: 400;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0 0 1.2rem;
+}
+.nflx-banner-buttons {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.nflx-btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0.65rem 1.6rem;
+    border: none;
+    border-radius: 0.3rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffffff;
+    cursor: pointer;
+    margin-right: 0.6rem;
+}
+.nflx-btn i { font-size: 1.2rem; }
+.nflx-btn:hover { opacity: 0.8; }
+.nflx-btn-play { background: #e50914; color: #ffffff; }
+.nflx-btn-info { background: rgba(109, 109, 110, 0.8); color: #ffffff; }
+
+/* ---------- Conteúdo / seções ---------- */
+.nflx-content {
+    position: relative;
+    z-index: 5;
+    padding-bottom: 2rem;
+}
+.nflx-section {
+    display: flex;
+    flex-direction: column;
+    text-transform: capitalize;
+    margin-bottom: 0.3rem;
+}
+.nflx-section-heading {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 1.2rem 0 0.4rem 3rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.nflx-section-heading i {
+    font-size: 1.1rem;
+    color: #e50914;
+    line-height: 1;
+}
+
+/* ---------- Carrossel (wrapper + setas + trilho) ---------- */
+.nflx-row-wrap {
+    position: relative;
+}
+.nflx-row-wrap:hover .nflx-arrow:not(.nflx-arrow-hidden) { opacity: 1; }
+.nflx-row.nflx-card-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 2.5rem 3rem 5rem;
+    margin-top: -2.5rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+}
+.nflx-row.nflx-card-row::-webkit-scrollbar { display: none; }
+.nflx-arrow {
+    position: absolute;
+    top: 0;
+    bottom: 5rem;
+    width: 3.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to right, rgba(20, 20, 20, 0.75), rgba(20, 20, 20, 0));
+    border: none;
+    color: #ffffff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 200ms ease, background 200ms ease;
+}
+.nflx-arrow-right { right: 0; left: auto; background: linear-gradient(to left, rgba(20, 20, 20, 0.75), rgba(20, 20, 20, 0)); }
+.nflx-arrow:hover { background-color: rgba(20, 20, 20, 0.55); }
+.nflx-arrow-hidden { opacity: 0 !important; pointer-events: none; }
+@media (max-width: 768px) { .nflx-arrow { display: none; } }
+
+/* ---------- Estados de carregamento / vazio ---------- */
+.nflx-loading, .nflx-empty {
+    padding: 1.2rem 3rem;
+    color: var(--text-muted, #8c8c8c);
+    font-size: 0.85rem;
+    width: 100%;
+}
+.nflx-empty::before { content: "⚠️ "; }
+
+/* ---------- Card vertical (capa DVD/Blu-ray) ---------- */
+.nflx-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 10.5rem;
+    height: 15.75rem;
+    background: #252525;
+    border-radius: 0.28rem;
+    margin-right: 0.3rem;
+    cursor: pointer;
+    transition: transform 300ms ease, box-shadow 300ms ease;
+    z-index: 1;
+}
+.nflx-card:hover {
+    z-index: 5;
+    transform: scale(1.25);
+    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.6), 0 6px 6px rgba(0, 0, 0, 0.5);
+}
+.nflx-card-art {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 0.28rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.nflx-card-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+.nflx-card:hover .nflx-card-art {
+    height: 72%;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.nflx-art-emoji-lg {
+    font-size: 3.2rem;
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45));
+}
+.nflx-card-info {
+    display: none;
+    flex-direction: column;
+    height: fit-content;
+    background: #141414;
+    border-bottom-left-radius: 0.28rem;
+    border-bottom-right-radius: 0.28rem;
+    padding: 0.5rem;
+}
+.nflx-card:hover .nflx-card-info {
+    display: flex;
+    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.75), 0 6px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Selo de ranking (#1, #2, #3...) nos posters ---------- */
+.nflx-rank-badge {
+    position: absolute;
+    left: 0.35rem;
+    bottom: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 1.7rem;
+    padding: 0 0.5rem;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 0.35rem;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    user-select: none;
+    z-index: 6;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Card retrato / long ---------- */
+.nflx-long {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 14rem;
+    height: 24rem;
+    background: #252525;
+    border-radius: 0.28rem;
+    margin-right: 0.3rem;
+    cursor: pointer;
+    transition: transform 320ms ease-in-out, box-shadow 320ms ease-in-out;
+    z-index: 1;
+}
+.nflx-long:hover {
+    z-index: 5;
+    transform: scale(1.15);
+    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.6), 0 4px 4px rgba(0, 0, 0, 0.5);
+}
+.nflx-long-art {
+    width: 100%;
+    height: 100%;
+    border-radius: 0.28rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.nflx-long:hover .nflx-long-art {
+    mask-image: linear-gradient(to bottom, #141414 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #141414 70%, transparent 100%);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.nflx-art-emoji {
+    font-size: 3.2rem;
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45));
+}
+.nflx-long-info {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: fit-content;
+    background: #141414;
+    border-bottom-left-radius: 0.28rem;
+    border-bottom-right-radius: 0.28rem;
+    padding: 0.5rem;
+    display: none;
+    z-index: 8;
+}
+.nflx-long:hover .nflx-long-info { display: flex; flex-direction: column; }
+
+/* ---------- Detalhes do card ---------- */
+.nflx-actionRow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.15rem 0.2rem;
+}
+.nflx-card-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.25rem 0.3rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.nflx-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0.15rem 0.3rem;
+}
+.nflx-green {
+    color: #53d853;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+.nflx-text {
+    font-size: 0.7rem;
+    color: #b3b3b3;
+    font-weight: 400;
+}
+
+/* ---------- Modal ---------- */
+.nflx-modal-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.nflx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+.nflx-modal {
+    position: relative;
+    z-index: 1;
+    width: min(55vw, 46rem);
+    min-width: 40rem;
+    max-height: 86vh;
+    overflow-y: auto;
+    background: #141414;
+    color: #ffffff;
+    border-radius: 0.7rem;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.nflx-modal-art {
+    position: relative;
+    width: 100%;
+    height: 24rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    mask-image: linear-gradient(to bottom, #141414 36%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #141414 36%, transparent 100%);
+}
+.nflx-modal-art .nflx-art-emoji-hero { font-size: 9rem; }
+.nflx-modal-x {
+    position: absolute;
+    top: 1rem;
+    right: 1.6rem;
+    z-index: 20;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(20, 20, 20, 0.7);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+}
+.nflx-modal-details {
+    position: relative;
+    z-index: 10;
+    margin-top: -9rem;
+    margin-left: 3rem;
+}
+.nflx-modal-title {
+    font-size: 2.1rem;
+    font-weight: 800;
+    margin: 0 0 1rem;
+}
+.nflx-round-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0.7rem 0 0.2rem;
+}
+.nflx-modal-match { font-size: 1rem; margin-top: 0.4rem; }
+.nflx-modal-body {
+    display: flex;
+    flex-direction: row;
+    gap: 1.5rem;
+    padding: 1rem 3rem 2.5rem;
+}
+.nflx-modal-col {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #ffffff;
+}
+.nflx-modal-col:last-child {
+    flex: 0 0 40%;
+    max-width: 40%;
+}
+.nflx-modal-genre-label,
+.nflx-modal-meta,
+.nflx-modal-source,
+.nflx-modal-demo {
+    display: block;
+    color: #b3b3b3;
+    padding: 0.2rem 0;
+}
+.nflx-modal-genre-label { font-weight: 600; }
+.nflx-modal-source i, .nflx-modal-meta i { color: #e50914; margin-right: 0.3rem; }
+.nflx-modal-demo {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #8c8c8c;
+    margin-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.6rem;
+}
+/* Máscara adicional atrás do card de detalhes do modal (sobre a arte) */
+.nflx-modal-mask {
+    position: relative;
+    height: 5rem;
+    margin-top: -5rem;
+    background: linear-gradient(to bottom, transparent, #141414 85%);
+    pointer-events: none;
+}
+
+/* ---------- Footer ---------- */
+.nflx-footer {
+    display: none !important;
+}
+
+/* ---------- Barra de player de áudio (rádios) ---------- */
+.nflx-audio-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #181818;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1.2rem;
+    z-index: 1100;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.nflx-audio-info { display: flex; align-items: center; gap: 0.6rem; color: #ffffff; }
+.nflx-audio-emoji { font-size: 1.4rem; }
+.nflx-audio-text { display: flex; flex-direction: column; font-size: 0.8rem; }
+.nflx-audio-text span { color: #b3b3b3; font-size: 0.72rem; }
+.nflx-audio-close { background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 1rem; }
+.nflx-audio-close:hover { color: #ffffff; }
+
+/* ---------- Busca (estilo Netflix: recolhida, expande no foco) ---------- */
+.nflx-search { transition: background-color 0.2s ease, border-color 0.2s ease; }
+.nflx-search.expanded { background: #000000; border-color: #ffffff; }
+#nflxSearchInput { width: 0; opacity: 0; transition: width 0.3s ease, opacity 0.2s ease; }
+.nflx-search.expanded #nflxSearchInput { width: 170px; opacity: 1; }
+.nflx-search-clear {
+    display: none;
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+}
+.nflx-search-clear.show { display: inline-flex; }
+.nflx-search-clear:hover { color: #ffffff; }
+
+/* ---------- Resultados de busca ---------- */
+.nflx-search-status {
+    padding: 1.2rem 3rem 0;
+    color: #b3b3b3;
+    font-size: 0.95rem;
+}
+.nflx-search-status strong { color: #ffffff; }
+.nflx-footer i { color: #e50914; font-size: 1.1rem; }
+
+/* ---------- Tela de carregamento (estilo Netflix) ---------- */
+/* Trava o scroll do app enquanto a intro está visível (evita barras
+   de rolagem durante o carregamento em qualquer dispositivo). */
+body.nflx-locked-intro {
+    overflow: hidden !important;
+}
+
+#nflxIntro {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh; /* altura real do viewport nos celulares Android */
+    background:
+        linear-gradient(rgba(10, 10, 10, 0.55), rgba(10, 10, 10, 0.88)),
+        url('https://cdn.wallpapersafari.com/24/74/zgeTuV.jpg') center / cover no-repeat;
+    background-color: #141414;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    overflow-x: hidden;
+    touch-action: none;
+}
+.nflx-intro-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(14px, 2.6vh, 30px);
+    width: 100%;
+    max-width: 100%;
+    padding: 0 6vw;
+    text-align: center;
+    animation: nflx-intro-content-in 0.9s ease-out both;
+}
+/* M da marca: letra vetorial (SVG) — nítida em qualquer tamanho e
+   proporcional, sem clip-path que deformava as diagonais. */
+.nflx-intro-m {
+    display: block;
+    width: clamp(120px, 26vw, 250px);
+    aspect-ratio: 1;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 28px rgba(229, 9, 20, 0.5));
+    animation: nflx-intro-m-in 0.5s ease-out both;
+}
+.nflx-intro-m path { stroke-width: 14; }
+
+/* Palavra "MÍDIAS": surge logo após a marca (zoom estilo Netflix) */
+.nflx-intro-title {
+    color: #e50914;
+    font-size: clamp(1.9rem, 7vw, 4.6rem);
+    font-weight: 900;
+    letter-spacing: clamp(6px, 1.3vw, 14px);
+    text-transform: uppercase;
+    line-height: 1;
+    margin: 0;
+    white-space: nowrap;
+    opacity: 0;
+    text-shadow: 0 0 26px rgba(229, 9, 20, 0.55);
+    animation: nflx-intro-word-in 0.7s ease-out 0.55s forwards;
+}
+
+/* Barra de carregamento com porcentagem: reflete o progresso real da
+   inicialização — cada fonte concluída avança o percentual. */
+.nflx-intro-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: min(360px, 66vw);
+    opacity: 0;
+    animation: nflx-intro-content-in 0.5s ease-out 0.9s forwards;
+}
+.nflx-intro-progress {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.nflx-intro-progress-fill {
+    height: 100%;
+    width: 0%;
+    /* Cor neutra de contraste (não mais vermelho da marca): branco sobre
+       fundos escuros, escuro sobre fundos claros — ajustado por contexto
+       (tema claro/escuro) logo abaixo. */
+    background: #ffffff;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+.nflx-intro-pct {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #e5e5e5;
+    min-width: 38px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Saída: quando o carregamento chega a 100%, a marca expande (zoom
+   estilo Netflix), a palavra sai e a cortina revela a tela. */
+.nflx-intro-sair .nflx-intro-m {
+    animation: nflx-intro-m-expand 0.6s ease-in forwards;
+}
+.nflx-intro-sair .nflx-intro-title {
+    animation: nflx-intro-title-out 0.45s ease-in forwards;
+}
+.nflx-intro-sair .nflx-intro-progress-row {
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+@keyframes nflx-intro-content-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes nflx-intro-m-in {
+    from { opacity: 0; transform: scale(0.72); }
+    to   { opacity: 1; transform: scale(1); }
+}
+@keyframes nflx-intro-word-in {
+    from { opacity: 0; letter-spacing: 0.4em; filter: blur(8px); }
+    to   { opacity: 1; letter-spacing: clamp(6px, 1.3vw, 14px); filter: blur(0); }
+}
+@keyframes nflx-intro-m-expand {
+    0%   { transform: scale(1); opacity: 1; }
+    100% { transform: scale(8.5); opacity: 0; }
+}
+@keyframes nflx-intro-title-out {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(1.08); }
+}
+
+/* ---------- Spinner de loading (estilo netflix-clone-react-typescript) ---------- */
+.nflx-loading {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted, #b3b3b3);
+}
+.nflx-loading::before {
+    content: "";
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border-light, rgba(255,255,255,0.25));
+    border-top-color: var(--market-color, #e50914);
+    border-radius: 50%;
+    animation: nflx-spin 0.8s linear infinite;
+}
+@keyframes nflx-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Top 10 (número grande com contorno, estilo nextflix) ---------- */
+.nflx-feature-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+    cursor: pointer;
+}
+.nflx-feature-wrap:hover .nflx-feature {
+    border-radius: 0.28rem;
+}
+.nflx-rank {
+    font-size: clamp(7rem, 12vw, 13rem);
+    font-weight: 900;
+    line-height: 0.78;
+    -webkit-text-stroke: 5px #7c7c7c;
+    -webkit-text-fill-color: #000000;
+    margin-right: -2.4rem;
+    margin-bottom: 1rem;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+}
+.nflx-feature {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 7.2rem;
+    height: 10rem;
+    background: #252525;
+    border-top-right-radius: 0.28rem;
+    border-bottom-right-radius: 0.28rem;
+    margin-right: 0;
+    cursor: pointer;
+    transition: transform 300ms ease, box-shadow 300ms ease, width 300ms ease, height 300ms ease;
+    z-index: 3;
+}
+.nflx-feature:hover {
+    z-index: 5;
+    transform: scale(1.6);
+    width: 14rem;
+    height: 9rem;
+    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.6), 0 6px 6px rgba(0, 0, 0, 0.5);
+}
+.nflx-feature-art {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top-right-radius: 0.28rem;
+    border-bottom-right-radius: 0.28rem;
+    overflow: hidden;
+    transition: height 300ms ease, border-radius 300ms ease;
+}
+.nflx-feature:hover .nflx-feature-art {
+    height: 85%;
+    border-top-left-radius: 0.28rem;
+    border-bottom-right-radius: 0;
+}
+.nflx-feature-art .nflx-art-emoji { font-size: 2.4rem; }
+.nflx-feature-info {
+    display: none;
+    flex-direction: column;
+    height: fit-content;
+    background: #141414;
+    border-bottom-left-radius: 0.28rem;
+    border-bottom-right-radius: 0.28rem;
+    padding: 0.5rem;
+}
+.nflx-feature:hover .nflx-feature-info {
+    display: flex;
+    box-shadow: 0 0 1rem rgba(0, 0, 0, 0.75), 0 6px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Tipografia fluida do banner (estilo nextflix Banner.module.scss) ---------- */
+.nflx-row-top10 {
+    padding-top: 3.5rem;
+    padding-bottom: 6rem;
+}
+.nflx-row-top10 .nflx-feature-wrap {
+    margin-right: 1.2rem;
+}
+.nflx-banner-title {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+.nflx-banner-synopsis {
+    font-size: clamp(0.85rem, 1.6vw, 1.05rem);
+}
+.nflx-section-heading {
+    font-size: clamp(1.05rem, 2vw, 1.35rem);
+}
+
+/* ---------- Navbar: hover estilo nextflix ---------- */
+.nflx-nav-item {
+    transition: color 200ms ease;
+}
+.nflx-avatar-btn:hover i { color: #ffffff; }
+
+/* ============================================
+   MÍDIAS — Layout estilo YouTube
+   ============================================ */
+
+.yt-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--bg-color);
+    color: var(--text-main);
+    overflow: hidden;
+
+    /* Tema próprio da Mídias (escopado em .yt-root): NÃO altera o Electro Market.
+       Claro = cores do YouTube | Escuro = cores da Netflix */
+    --bg-color: #f9f9f9;
+    --text-main: #0f0f0f;
+    --text-muted: #606060;
+    --border-light: #e5e5e5;
+    --card-bg: #ffffff;
+    --hover-bg: #f2f2f2;
+    --header-bg: #ffffff;
+    --market-color: #E50914;
+    --primary-action: #E50914;
+    --input-bg: #f1f3f4;
+    --search-bg: #f1f3f4;
+    --search-border: #d3d3d3;
+    --shadow-color: rgba(0,0,0,0.1);
+}
+
+body.dark-theme .yt-root {
+    --bg-color: #141414;
+    --text-main: #f1f1f1;
+    --text-muted: #b3b3b3;
+    --border-light: #2a2a2a;
+    --card-bg: #181818;
+    --hover-bg: #2a2a2a;
+    --header-bg: #000000;
+    --market-color: #E50914;
+    --primary-action: #E50914;
+    --input-bg: #1f1f1f;
+    --search-bg: #000000;
+    --search-border: rgba(255,255,255,0.3);
+    --shadow-color: rgba(0,0,0,0.9);
+}
+
+.yt-header {
+    flex-shrink: 0;
+    height: 64px;
+    background: var(--bg-color);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 1020;
+    gap: 12px;
+}
+
+.yt-root .yt-header {
+    background: var(--bg-color);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.yt-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.yt-menu-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: background 0.15s ease;
+}
+
+.yt-menu-btn:hover { background: var(--hover-bg); }
+
+.yt-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--market-color);
+    white-space: nowrap;
+}
+
+.yt-logo-icon {
+    width: 28px;
+    height: 28px;
+}
+
+.yt-header-center {
+    flex: 1;
+    max-width: 640px;
+    min-width: 0;
+}
+
+.yt-search {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--input-bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    flex: 1;
+    min-width: 0;
+}
+
+.yt-search:focus-within {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+}
+
+.yt-search > input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13px;
+    padding: 0 16px;
+    min-width: 0;
+}
+
+.yt-search > input::placeholder { color: var(--text-muted); }
+
+#nflxSearchInput {
+    width: 100% !important;
+    opacity: 1 !important;
+    transition: none !important;
+    font-size: 13px !important;
+}
+
+#nflxSearch {
+    background: var(--input-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 20px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+#nflxSearch > i {
+    display: none !important;
+}
+
+.nflx-search-clear {
+    color: var(--text-muted) !important;
+    padding: 0 8px !important;
+}
+.nflx-search-clear:hover {
+    color: var(--text-main) !important;
+}
+
+.yt-search-btn {
+    height: 40px;
+    width: 64px;
+    border: none;
+    border-left: 1px solid var(--border-light);
+    background: var(--hover-bg);
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s ease;
+}
+
+.yt-search-btn:hover { background: var(--border-light); }
+
+.yt-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    max-width: 640px;
+}
+
+.yt-mic-btn {
+    height: 40px;
+    width: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: background 0.15s ease, color 0.15s ease;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.yt-mic-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-main);
+}
+
+.yt-search:focus-within {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.12);
+}
+
+.yt-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.yt-icon-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: background 0.15s ease;
+}
+
+.yt-icon-btn:hover { background: var(--hover-bg); }
+
+.yt-notif-btn {
+    position: relative;
+}
+
+.yt-notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: #ff0000;
+    color: #ffffff;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-color);
+}
+
+.yt-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    display: block;
+    /* É um <button>: sem isso, o navegador desenha o retângulo/moldura
+       padrão do botão por trás do avatar redondo. */
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    overflow: hidden;
+    /* Contorno único e sutil ao redor do avatar */
+    border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.yt-source-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.yt-source-status.ok { background: #4caf50; }
+.yt-source-status.warn { background: #ff9800; }
+.yt-source-status.error { background: #f44336; }
+
+.yt-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.yt-menu-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: background 0.15s ease;
+}
+
+.yt-menu-btn:hover { background: var(--hover-bg); }
+
+.yt-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--market-color);
+    white-space: nowrap;
+}
+
+.yt-logo-icon {
+    width: 28px;
+    height: 28px;
+}
+
+.yt-header-center {
+    flex: 1;
+    max-width: 640px;
+    min-width: 0;
+}
+
+.yt-search {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--input-bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    flex: 1;
+    min-width: 0;
+}
+
+.yt-search:focus-within {
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+}
+
+.yt-search > input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13px;
+    padding: 0 16px;
+    min-width: 0;
+}
+
+.yt-search > input::placeholder { color: var(--text-muted); }
+
+#nflxSearchInput {
+    width: 100% !important;
+    opacity: 1 !important;
+    transition: none !important;
+    font-size: 13px !important;
+}
+
+#nflxSearch {
+    background: var(--input-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 20px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+#nflxSearch > i {
+    display: none !important;
+}
+
+.nflx-search-clear {
+    color: var(--text-muted) !important;
+    padding: 0 8px !important;
+}
+.nflx-search-clear:hover {
+    color: var(--text-main) !important;
+}
+
+.yt-search-btn {
+    height: 40px;
+    width: 64px;
+    border: none;
+    border-left: 1px solid var(--border-light);
+    background: var(--hover-bg);
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s ease;
+}
+
+.yt-search-btn:hover { background: var(--border-light); }
+
+.yt-icon-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: background 0.15s ease;
+}
+
+.yt-icon-btn:hover { background: var(--hover-bg); }
+
+.yt-notif-btn {
+    position: relative;
+}
+
+.yt-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    display: block;
+    /* É um <button>: sem isso, o navegador desenha o retângulo/moldura
+       padrão do botão por trás do avatar redondo. */
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    overflow: hidden;
+    /* Contorno único e sutil ao redor do avatar */
+    border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+/* ---------- Ícones da navbar do Mídias no mesmo tamanho ---------- */
+.yt-menu-btn svg { width: 22px; height: 22px; }
+.yt-mic-btn { font-size: 1.375rem; }
+.yt-icon-btn { font-size: 1.375rem; }
+.yt-search-btn { font-size: 1.375rem; }
+.yt-logo-icon { width: 24px; height: 24px; }
+
+/* ---------- Gerenciar fontes (modal + switches) ---------- */
+.nflx-fontes-modal {
+    width: min(52vw, 42rem) !important;
+    min-width: 22rem;
+    padding: 1.6rem;
+    background: var(--bg-color) !important;
+    color: var(--text-main) !important;
+    border-radius: 14px;
+}
+.nflx-fontes-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+}
+.nflx-fontes-head .nflx-modal-title { font-size: 1.4rem; }
+.nflx-fontes-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0.3rem 0 0;
+    line-height: 1.4;
+}
+.nflx-fontes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.yt-fonte-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--hover-bg);
+    transition: background 0.15s;
+}
+.yt-fonte-item:hover { background: var(--border-light); }
+.yt-fonte-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.yt-fonte-info > i {
+    font-size: 1.3rem;
+    color: var(--market-color);
+    flex-shrink: 0;
+}
+.yt-fonte-icon.ok { color: #4caf50 !important; }
+.yt-fonte-icon.warn { color: #ff9800 !important; }
+.yt-fonte-icon.error { color: #f44336 !important; }
+.yt-fonte-label {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+.yt-fonte-heading {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.yt-switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.yt-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.yt-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border-light);
+    border-radius: 24px;
+    transition: background 0.2s;
+}
+.yt-switch-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+.yt-switch input:checked + .yt-switch-slider {
+    background: var(--market-color);
+}
+.yt-switch input:checked + .yt-switch-slider::before {
+    transform: translateX(18px);
+}
+
+/* ---------- Header nav ---------- */
+.yt-header-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 1;
+    min-width: 0;
+}
+.yt-header-nav::-webkit-scrollbar { display: none; }
+.yt-header-nav-item {
+    color: var(--text-main);
+    text-decoration: none;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 999px;
+    transition: background 0.15s ease;
+    border: 1px solid transparent;
+}
+.yt-header-nav-item:hover { background: var(--hover-bg); }
+.yt-header-nav-item.active {
+    background: var(--hover-bg);
+    border-color: var(--border-light);
+    font-weight: 600;
+}
+
+.yt-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg-color);
+    border-right: 1px solid var(--border-light);
+    overflow-y: auto;
+    padding: 12px;
+    transition: width 0.2s ease, padding 0.2s ease;
+}
+
+.yt-sidebar.collapsed {
+    width: 72px;
+    padding: 8px 4px;
+}
+
+.yt-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.yt-sidebar::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 3px;
+}
+
+.yt-sidebar:not(:hover)::-webkit-scrollbar {
+    width: 0;
+}
+
+.yt-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--text-main);
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+    position: relative;
+}
+
+.yt-nav-item:hover {
+    background: var(--hover-bg);
+}
+
+.yt-nav-item.active {
+    background: var(--hover-bg);
+    font-weight: 600;
+}
+
+.yt-nav-item i {
+    font-size: 1.2rem;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.yt-sidebar.collapsed .yt-nav-item span {
+    display: none;
+}
+
+.yt-sidebar.collapsed .yt-nav-item {
+    justify-content: center;
+    padding: 10px;
+    gap: 0;
+}
+
+.yt-sidebar.collapsed .yt-nav-item i {
+    margin: 0;
+}
+
+.yt-sidebar.collapsed .yt-sidebar-hr {
+    margin: 8px 0;
+}
+
+.yt-sidebar.collapsed .yt-sidebar-label {
+    display: none;
+}
+
+.yt-sidebar-hr {
+    border: none;
+    border-top: 1px solid var(--border-light);
+    margin: 12px 0;
+}
+
+.yt-sidebar-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 8px 12px 4px;
+    font-weight: 500;
+}
+
+.yt-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.yt-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ---------- Filter bar ---------- */
+.yt-filters {
+    display: none;
+}
+
+/* ---------- Main content ---------- */
+.yt-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+}
+
+.yt-section {
+    margin-bottom: 32px;
+}
+
+.yt-banner {
+    margin-bottom: 32px;
+}
+
+.yt-banner-card {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--loading-gradient);
+    aspect-ratio: 16 / 6;
+    display: flex;
+    align-items: flex-end;
+}
+
+.yt-banner-media {
+    position: absolute;
+    inset: 0;
+}
+
+.yt-banner-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.yt-banner-mask {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.05) 70%, transparent 100%);
+}
+
+.yt-banner-info {
+    position: relative;
+    z-index: 2;
+    padding: 24px;
+    width: 100%;
+}
+
+.yt-banner-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    max-width: 700px;
+}
+
+.yt-banner-meta {
+    font-size: 0.95rem;
+    color: rgba(255,255,255,0.9);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    margin-bottom: 14px;
+}
+
+.yt-banner-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.yt-banner-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.yt-banner-btn:hover {
+    transform: scale(1.03);
+}
+
+.yt-banner-btn-primary {
+    background: #ffffff;
+    color: #000000;
+}
+
+.yt-banner-btn-primary:hover {
+    background: rgba(255,255,255,0.85);
+}
+
+.yt-banner-btn-secondary {
+    background: rgba(109, 109, 110, 0.7);
+    color: #ffffff;
+}
+
+.yt-banner-btn-secondary:hover {
+    background: rgba(109, 109, 110, 0.85);
+}
+
+.yt-section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.yt-section-title i {
+    color: var(--market-color);
+    font-size: 1.1rem;
+}
+
+/* ---------- Video grid ---------- */
+.yt-video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    align-items: stretch;
+}
+/* ---------- Video card ---------- */
+
+.yt-video-card {
+    cursor: pointer;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: background 0.2s, transform 200ms ease;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+}
+
+.yt-video-card:hover {
+    background: var(--hover-bg);
+    transform: translateY(-2px);
+}
+
+.yt-video-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--loading-gradient);
+    border-radius: 12px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.yt-video-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+.yt-video-emoji {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+}
+
+.yt-video-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0);
+    border: none;
+    color: #fff;
+    font-size: 2.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    pointer-events: none;
+}
+
+.yt-video-card:hover .yt-video-play {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.yt-video-info {
+    display: flex;
+    gap: 10px;
+    padding: 10px 4px;
+    flex: 1;
+    align-items: flex-start;
+}
+
+.yt-video-avatar {
+    display: none;
+}
+
+.yt-video-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.yt-video-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--text-main);
+}
+
+.yt-video-channel {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.yt-video-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* ---------- Feature / ranking ---------- */
+.yt-feature-rank {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 4.5rem;
+    font-weight: 900;
+    line-height: 1;
+    -webkit-text-stroke: 2px #7c7c7c;
+    -webkit-text-fill-color: transparent;
+    margin-right: -0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0 !important;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.95;
+}
+
+/* ---------- Loading / empty ---------- */
+.yt-loading, .yt-empty {
+    padding: 1.2rem 3rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    width: 100%;
+}
+
+/* ---------- Modal / Audio theme-aware ---------- */
+.nflx-modal {
+    background: var(--modal-bg) !important;
+    color: var(--text-main) !important;
+}
+
+.nflx-modal-mask {
+    background: linear-gradient(to bottom, transparent, var(--modal-bg) 85%) !important;
+}
+
+.nflx-audio-bar {
+    background: var(--card-bg) !important;
+    border-top: 1px solid var(--border-light) !important;
+}
+
+.nflx-audio-info { color: var(--text-main) !important; }
+.nflx-audio-text span { color: var(--text-muted) !important; }
+.nflx-audio-close { color: var(--text-muted) !important; }
+.nflx-audio-close:hover { color: var(--text-main) !important; }
+
+.nflx-round {
+    border: 2px solid var(--text-muted) !important;
+    color: var(--text-main) !important;
+    background: transparent !important;
+}
+.nflx-round:hover { border-color: var(--text-main) !important; }
+.nflx-round-play { background: var(--market-color) !important; border-color: var(--market-color) !important; color: #fff !important; }
+
+.yt-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    max-width: 640px;
+}
+
+.yt-search {
+    flex: 1;
+    min-width: 0;
+}
+
+.yt-header-center {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+    .yt-sidebar {
+        width: 72px;
+        padding: 8px 4px;
+    }
+    .yt-nav-item span {
+        display: none;
+    }
+    .yt-nav-item {
+        justify-content: center;
+        padding: 10px;
+    }
+    .yt-nav-item i {
+        margin: 0;
+    }
+    .yt-sidebar-hr {
+        margin: 8px 0;
+    }
+    .yt-sidebar-label {
+        display: none;
+    }
+    .yt-video-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 767px) {
+    .yt-sidebar {
+        display: none;
+    }
+    .yt-header-center {
+        display: none;
+    }
+    .yt-video-grid {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+    .yt-content {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .yt-video-grid {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+    .yt-video-thumb {
+        border-radius: 8px;
+    }
+    .yt-video-card {
+        border-radius: 8px;
+    }
+}
+
+/* ---------- Intro do Mídias (estilo YouTube) ---------- */
+.yt-intro-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    transition: opacity 0.4s ease;
+}
+
+.yt-intro-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.yt-intro-logo {
+    width: 64px;
+    height: 64px;
+}
+
+.yt-intro-logo path {
+    stroke: #e50914;
+}
+
+.yt-intro-title {
+    color: #0f0f0f;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin: 0;
+}
+
+.yt-intro-bar {
+    width: 240px;
+    height: 3px;
+    background: #e5e5e5;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.yt-intro-fill {
+    height: 100%;
+    width: 0%;
+    background: #e50914;
+    border-radius: 2px;
+    transition: width 0.2s linear;
+}
+
+.yt-intro-pct {
+    color: #606060;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* Tela de carregamento acompanha o tema (claro = branco, escuro = preto) */
+body.dark-theme .yt-intro-overlay {
+    background: #0f0f0f;
+}
+body.dark-theme .yt-intro-title {
+    color: #f1f1f1;
+}
+body.dark-theme .yt-intro-bar {
+    background: #303030;
+}
+body.dark-theme .yt-intro-fill {
+    background: #ffffff;
+}
+body.dark-theme .yt-intro-pct {
+    color: #aaaaaa;
+}
+/* ============================================================
+   MÍDIAS — Barra superior mais próxima da Netflix real, mas
+   APENAS no tema escuro: fundo preto sólido, logo em vermelho,
+   nav enxuta (sem "pill" de fundo), busca compacta à direita
+   colada nos ícones.
+   No tema claro o .yt-header usa as regras "base" (mais acima),
+   que já seguem as variáveis de tema (fundo claro, texto escuro),
+   deixando o resultado mais parecido com o YouTube claro.
+   Antes esse bloco tinha !important sem escopo de tema e por isso
+   o header ficava sempre preto, mesmo no tema claro — corrigido
+   prefixando tudo com body.dark-theme.
+   ============================================================ */
+body.dark-theme .yt-header {
+    background: #000000 !important;
+    border-bottom: 1px solid #1a1a1a !important;
+    padding: 0 40px !important;
+    gap: 28px !important;
+}
+
+.yt-logo-icon {
+    display: block !important;
+    width: 26px !important;
+    height: 26px !important;
+    color: #E50914 !important;
+}
+.yt-logo-icon path { stroke: #E50914 !important; }
+.yt-logo {
+    color: #E50914 !important;
+    font-size: 1.6rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.5px !important;
+    text-transform: uppercase !important;
+}
+
+body.dark-theme .yt-header-nav {
+    margin-right: auto !important;
+    gap: 20px !important;
+    padding: 0 !important;
+}
+body.dark-theme .yt-header-nav-item {
+    color: #d2d2d2 !important;
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
+    padding: 4px 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+body.dark-theme .yt-header-nav-item:hover {
+    color: #b3b3b3 !important;
+    background: transparent !important;
+}
+body.dark-theme .yt-header-nav-item.active {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Busca compacta, colada nos ícones (não estica pelo centro) */
+.yt-header-center {
+    flex: 0 0 auto !important;
+    max-width: 260px !important;
+}
+.yt-search-wrap { max-width: 260px !important; }
+body.dark-theme #nflxSearch {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 4px !important;
+    height: 36px !important;
+}
+body.dark-theme #nflxSearch .yt-search-btn {
+    order: 1 !important;
+    width: 34px !important;
+    height: 34px !important;
+    border: none !important;
+    background: transparent !important;
+    color: #ffffff !important;
+    font-size: 0.95rem !important;
+}
+body.dark-theme #nflxSearchInput {
+    order: 2 !important;
+    color: #ffffff !important;
+    font-size: 13px !important;
+}
+body.dark-theme .nflx-search-clear { order: 3 !important; color: #b3b3b3 !important; }
+body.dark-theme .nflx-search-clear:hover { color: #ffffff !important; }
+body.dark-theme .yt-mic-btn { display: none !important; }
+
+body.dark-theme .yt-header-right { gap: 20px !important; }
+body.dark-theme .yt-icon-btn { color: #ffffff !important; }
+body.dark-theme .yt-menu-btn { color: #ffffff !important; }
+
+/* Navbar do Mídias: fundo escuro no tema escuro */
+body.dark-theme .yt-menu-btn:hover,
+body.dark-theme .yt-icon-btn:hover,
+body.dark-theme .yt-mic-btn:hover {
+    background: #2a2a2a !important;
+}
+
+/* Tema claro: navbar do Mídias branca */
+body:not(.dark-theme) .yt-header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e5e5e5 !important;
+}
+body:not(.dark-theme) .yt-header-nav-item {
+    color: #606060 !important;
+}
+body:not(.dark-theme) .yt-header-nav-item:hover,
+body:not(.dark-theme) .yt-header-nav-item.active {
+    color: #0f0f0f !important;
+}
+body:not(.dark-theme) #nflxSearch {
+    background: #f1f3f4 !important;
+    border: 1px solid #d3d3d3 !important;
+    border-radius: 20px !important;
+}
+body:not(.dark-theme) #nflxSearchInput {
+    color: #0f0f0f !important;
+}
+body:not(.dark-theme) .yt-icon-btn,
+body:not(.dark-theme) .yt-menu-btn {
+    color: #0f0f0f !important;
+}
+body:not(.dark-theme) .yt-mic-btn:hover,
+body:not(.dark-theme) .yt-icon-btn:hover,
+body:not(.dark-theme) .yt-menu-btn:hover {
+    background: #f2f2f2 !important;
+}
+
+@media (max-width: 991px) {
+    .yt-header { padding: 0 12px !important; gap: 12px !important; }
+    .yt-logo { font-size: 1.25rem !important; }
+}

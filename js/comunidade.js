@@ -1290,6 +1290,7 @@ window.startPostReplyInChat = async function(postId) {
 window.openCommunityThread = async function(postId) {
     const user = getSavedUser();
     if (!user) { showToast('Faça login!', 'warning'); return; }
+    window._twCommunityOnHome = false;
 
     // A Comunidade só abre dentro do painel de Conversas (communityChatMsgs).
     const grid = document.getElementById('communityChatMsgs');
@@ -1431,6 +1432,7 @@ window.submitCommunityReply = async function(parentId) {
 window.openCommunityProfile = async function(userId) {
     const me = getSavedUser();
     if (!me) { showToast('Faça login!', 'warning'); return; }
+    window._twCommunityOnHome = false;
     // A Comunidade só abre dentro do painel de Conversas (communityChatMsgs) —
     // antes esta função sempre escrevia em #productsGrid, que fica escondido
     // atrás do painel de chat, então clicar num avatar parecia não fazer nada.
@@ -1532,6 +1534,7 @@ window.openCommunityInChat = async function() {
     }
     window.currentChat = 'community';
     window.lastChatSignature = null;
+    window._twCommunityOnHome = true;
     stopDirectChatPolling();
     stopDirectTypingWatcher();
 
@@ -1548,7 +1551,7 @@ window.openCommunityInChat = async function() {
         attachPanelId: `dattachPanel_${chatId}`,
         attachLinkId: `dattachLink_${chatId}`,
         statusBarId: `dstatusBar_${chatId}`,
-        onBack: 'window.closeCommunityChat()',
+        onBack: 'window.twHeaderBack()',
         onClose: 'window.closeCommunityChat()',
         showBackBtn: true,
         showCloseBtn: true,
@@ -1571,13 +1574,28 @@ window.openCommunityInChat = async function() {
                 <span>de</span>
                 <strong>Electro Market</strong>
             </div>
+            <div class="nflx-intro-progress-row">
+                <div class="nflx-intro-progress"><div class="nflx-intro-progress-fill" id="twSplashFill"></div></div>
+                <span class="nflx-intro-pct" id="twSplashPct">0%</span>
+            </div>
         </div>`);
+    // Barra inferior de navegação (só aparece no mobile, igual ao app
+    // do Threads): Início, Pesquisar, Postar, Atividade e Perfil.
+    panel.insertAdjacentHTML('beforeend', `
+        <nav class="tw-bottom-nav" id="twBottomNav" aria-label="Navegação da Comunidade">
+            <button type="button" class="tw-bottom-nav-item active" data-tw-nav="feed" title="Início" onclick="window.twSidebarGoFeed()"><i class="bi bi-house-fill"></i></button>
+            <button type="button" class="tw-bottom-nav-item" data-tw-nav="search" title="Pesquisar" onclick="window.twSidebarGoSearch()"><i class="bi bi-search"></i></button>
+            <button type="button" class="tw-bottom-nav-item tw-bottom-nav-post" data-tw-nav="post" title="Nova publicação" onclick="window.twMobileGoToComposer()"><i class="bi bi-plus-lg"></i></button>
+            <button type="button" class="tw-bottom-nav-item" data-tw-nav="activity" title="Atividade" onclick="window.twSidebarGoAtividade()"><i class="bi bi-heart"></i></button>
+            <button type="button" class="tw-bottom-nav-item" data-tw-nav="profile" title="Perfil" onclick="window.twSidebarGoProfile()"><i class="bi bi-person"></i></button>
+        </nav>`);
     // Marca o instante em que o splash apareceu, pra garantir um tempo
     // mínimo de exibição mais à frente (o feed às vezes carrega rápido
     // demais e o splash sumia quase instantaneamente).
     const splashShownAt = Date.now();
     // Threads em tela inteira: some com a lateral de contatos/conversas
     // (.wa-rail + .wa-side) enquanto a Comunidade estiver aberta.
+    document.getElementById('whatsappOrdersView')?.classList.remove('wa-filmes-mode');
     document.getElementById('whatsappOrdersView')?.classList.add('wa-community-mode');
 
     // Ícone de comunidade no lugar do avatar (igual ao grupo antigo)
@@ -1603,6 +1621,9 @@ window.openCommunityInChat = async function() {
     panel.querySelector('.chat-header-pro .dropdown')?.remove();
     // Remove o X (fechar) do cabeçalho — a saída é pela sidebar (Mensagens).
     panel.querySelector('.chat-header-pro .chat-header-x')?.remove();
+    // A seta "<" de voltar fica escondida só no feed inicial ("Para você");
+    // nas outras telas (Pesquisar, Atividade...) ela aparece pra voltar ao feed.
+    window.twSyncCommunityBackBtn();
     // Sino de notificações no cabeçalho (o botão de alterar tema foi removido
     // daqui). O sino abre as MESMAS notificações do Electro Market
     // (window.showNotifications, o dropdown global do site), com o mesmo
@@ -1665,18 +1686,47 @@ window.openCommunityInChat = async function() {
 function twSetCommunityHeaderTitle(title) {
     const nameEl = document.querySelector('#waChatActive .chat-header-pro .chat-header-name');
     if (nameEl) nameEl.textContent = title;
+    window.twSyncCommunityBackBtn();
 }
+
+/** Mostra/esconde a seta "<" de voltar do cabeçalho da Comunidade:
+ *  visível em qualquer tela (Pesquisar, Atividade, Seguindo, Repostados...)
+ *  e escondida no feed "Para você". */
+window.twSyncCommunityBackBtn = function() {
+    const backBtn = document.querySelector('#waChatActive .chat-header-pro .chat-header-back');
+    if (backBtn) backBtn.style.display = window._twCommunityOnHome ? 'none' : '';
+};
+
+/** Controla se o botão de "voltar" do cabeçalho da Comunidade (a seta no
+ *  topo do painel) deve fechar a Comunidade (voltar pra Conversas) ou só
+ *  voltar pro início da própria Comunidade ("Para você"). Fica true
+ *  apenas quando estamos exatamente no feed inicial; qualquer outra tela
+ *  (Pesquisar, Atividade, Seguindo, Repostados, um post, um perfil...)
+ *  marca false, então a seta sempre traz de volta pro início da
+ *  Comunidade primeiro — só fecha de vez quando já se está nela. */
+window._twCommunityOnHome = true;
+
+/** Handler único do botão de voltar do cabeçalho da Comunidade. */
+window.twHeaderBack = function() {
+    if (window._twCommunityOnHome) {
+        window.closeCommunityChat();
+    } else {
+        window.twSidebarGoFeed();
+    }
+};
 
 /** Itens da barra lateral do Threads (ver #twSidebar no index.html). Os que
  *  ainda não têm uma tela própria só avisam que estão a caminho, em vez de
  *  ficarem quebrados/sem reação. */
 window.twSidebarGoFeed = function() {
+    window._twCommunityOnHome = true;
     const container = document.getElementById('communityChatMsgs');
     if (container) {
         container.scrollTop = 0;
         renderCommunityFeedInChat(container, false);
     }
     twSetCommunityHeaderTitle('Para você');
+    twMobileSetBottomNavActive('feed');
 };
 
 window.twSidebarNovaThread = function() {
@@ -1687,19 +1737,48 @@ window.twSidebarNovaThread = function() {
     }
 };
 
+/** Botão "+" da barra inferior mobile: garante que estamos no feed
+ *  "Para você" (onde o composer inline existe) antes de focar nele. */
+window.twMobileGoToComposer = function() {
+    if (!window._twCommunityOnHome) {
+        window.twSidebarGoFeed();
+        setTimeout(() => window.twSidebarNovaThread(), 250);
+    } else {
+        window.twSidebarNovaThread();
+    }
+    twMobileSetBottomNavActive('post');
+};
+
+/** Marca visualmente qual ícone da barra inferior mobile está ativo,
+ *  igual ao comportamento da .yt-bottom-nav do Mídias. */
+function twMobileSetBottomNavActive(key) {
+    const nav = document.getElementById('twBottomNav');
+    if (!nav) return;
+    nav.querySelectorAll('.tw-bottom-nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.twNav === key);
+    });
+}
+
 window.twSidebarGoProfile = function() {
     const user = getSavedUser();
     if (!user) { showToast('Faça login para editar seu perfil.', 'warning'); return; }
     window.showProfileEdit();
+    twMobileSetBottomNavActive('profile');
 };
 
-function twPageLoadingHtml() {
-    return `<div class="tw-page-loading"><div class="spinner-border spinner-border-sm text-muted me-2"></div>Carregando...</div>`;
+function twPageLoadingHtml(label) {
+    // Mesmo padrão visual da tela de carregamento do Mídias/Conversas:
+    // barra fina centralizada, sem texto de spinner solto.
+    return `<div class="tw-page-loading tw-page-loading-bar">
+        <div class="nflx-mini-progress"><div class="nflx-mini-progress-fill"></div></div>
+        ${label ? `<span class="tw-page-loading-label">${label}</span>` : ''}
+    </div>`;
 }
 
 /** Página de busca da Comunidade (item "Pesquisar" da sidebar): posts + pessoas,
  *  usando só o banco atual (users + threads de chat). */
 window.twSidebarGoSearch = function() {
+    window._twCommunityOnHome = false;
     const container = document.getElementById('communityChatMsgs');
     if (!container) return;
     twSetCommunityHeaderTitle('Pesquisar');
@@ -1715,6 +1794,7 @@ window.twSidebarGoSearch = function() {
         </div>`;
     const input = document.getElementById('twPageSearchInput');
     if (input) input.focus();
+    twMobileSetBottomNavActive('search');
 };
 
 window.twRunCommunitySearch = async function(raw) {
@@ -1722,7 +1802,7 @@ window.twRunCommunitySearch = async function(raw) {
     const list = document.getElementById('twPageSearchResults');
     if (!list) return;
     if (term.length < 2) { list.innerHTML = '<div class="tw-empty-feed"><small>Digite pelo menos 2 letras.</small></div>'; return; }
-    list.innerHTML = twPageLoadingHtml().replace('Carregando...', 'Buscando...');
+    list.innerHTML = twPageLoadingHtml('Buscando...');
     const termLower = term.toLowerCase();
     try {
         let userHtml = '';
@@ -1800,9 +1880,11 @@ function twAtividadeItemHtml(n, actors) {
 /** Página de Atividade (item "Atividade" da sidebar): curtidas, comentários e
  *  novos seguidores, calculados só do banco atual (chats + users). */
 window.twSidebarGoAtividade = async function() {
+    window._twCommunityOnHome = false;
     const container = document.getElementById('communityChatMsgs');
     if (!container) return;
     twSetCommunityHeaderTitle('Atividade');
+    twMobileSetBottomNavActive('activity');
     container.innerHTML = `<div class="tw-chat-feed"><div id="twAtividadeList">${twPageLoadingHtml()}</div></div>`;
     const list = document.getElementById('twAtividadeList');
     if (!list) return;
@@ -1824,6 +1906,7 @@ window.twSidebarGoAtividade = async function() {
 /** Feed "Seguindo" (item Seguindo da sidebar): posts de quem eu sigo, com base
  *  nas linhas community_follow_* e nos posts da própria tabela `chats`. */
 window.twSidebarGoFollowing = async function() {
+    window._twCommunityOnHome = false;
     const container = document.getElementById('communityChatMsgs');
     if (!container) return;
     twSetCommunityHeaderTitle('Seguindo');
@@ -1856,6 +1939,7 @@ window.twSidebarGoFollowing = async function() {
 /** Página "Repostados": mostra os posts (originais e respostas) que o usuário
  *  repostou — campo `reposts` (array de ids) guardado em cada mensagem do chat. */
 window.twSidebarGoReposts = async function() {
+    window._twCommunityOnHome = false;
     const container = document.getElementById('communityChatMsgs');
     if (!container) return;
     twSetCommunityHeaderTitle('Repostados');
@@ -1915,9 +1999,19 @@ async function renderCommunityFeedInChat(container, silent) {
 }
 
 async function loadMorePosts(container, silent, reset = false) {
+    // Barra de progresso real do splash: avança conforme o feed responde.
+    const splashPct = (pct) => {
+        if (!document.getElementById('twCommunitySplash')) return;
+        const fill = document.getElementById('twSplashFill');
+        const pctEl = document.getElementById('twSplashPct');
+        if (fill) fill.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+    };
     try {
         const posts = await twPostsQuery({ parentId: null, orderDir: 'desc', limit: _TW_FEED_LIMIT, offset: _twFeedOffset });
+        splashPct(50);
         if (!posts || !posts.length) {
+            splashPct(100);
             if (reset) {
                 container.innerHTML = `<div class="tw-feed-card">${window.twComposerBoxHtml('community')}<div class="tw-chat-feed"><div class="tw-empty-feed"><i class="bi bi-people"></i>Nenhum post ainda.<br><small>Seja o primeiro a postar!</small></div></div></div>`;
             }
@@ -1925,6 +2019,7 @@ async function loadMorePosts(container, silent, reset = false) {
         }
         const authorIds = [...new Set((posts || []).map(p => p.author_id).filter(Boolean))];
         const authors = authorIds.length ? await twFetchAuthors(authorIds) : {};
+        splashPct(100);
         const user = getSavedUser();
 
         const feedHtml = (posts || []).map(p => renderCommunityPostCard(p, authors[String(p.author_id)], user)).join('');
@@ -1958,6 +2053,7 @@ async function loadMorePosts(container, silent, reset = false) {
         if (reset) window.refreshCommunityNotifs().catch(() => {});
     } catch (e) {
         console.error('Erro ao carregar feed da Comunidade:', e);
+        splashPct(100);
         if (reset) container.innerHTML = `<div class="tw-feed-card">${window.twComposerBoxHtml('community')}<div class="text-center py-4 text-danger">Erro ao carregar Comunidade.</div></div>`;
     }
 }

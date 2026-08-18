@@ -944,10 +944,9 @@ let adminChatsTabAttachType = 'image'; // 'image' | 'file'
 window.toggleAdminChatsTabAttachPanel = function() {
     const panel = document.getElementById('adminChatsTabAttachPanel');
     if (!panel) return;
+    const wasHidden = panel.classList.contains('d-none');
     panel.classList.toggle('d-none');
-    if (!panel.classList.contains('d-none')) {
-        document.getElementById('adminChatsTabAttachLinkInput')?.focus();
-    }
+    if (wasHidden) panel.setAttribute('data-attach-view', 'menu');
 };
 
 
@@ -1910,18 +1909,23 @@ window.adminToggleSupportFullscreen = function() {
  */
 function supportAttachPanelHtml(prefix) {
     return `
-    <div id="${prefix}AttachPanel" class="p-3 bg-light border-top d-none chat-attach-panel">
-        <div class="d-flex gap-2 mb-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="media" onclick="window.setAdminSupportAttachType('media')">
-                <i class="bi bi-play-circle me-1"></i>Mídia
+    <div id="${prefix}AttachPanel" class="d-none chat-attach-panel chat-attach-wrapper" data-attach-view="menu">
+        <div class="chat-attach-popup">
+            <button type="button" class="chat-attach-popup-item" onclick="window.setAdminSupportAttachType('media')">
+                <span class="chat-attach-icon-circle" style="background:#0088cc;"><i class="bi bi-image-fill"></i></span>
+                <span>Fotos e vídeos</span>
             </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="docs" onclick="window.setAdminSupportAttachType('docs')">
-                <i class="bi bi-file-earmark me-1"></i>Documentos
+            <button type="button" class="chat-attach-popup-item" onclick="window.setAdminSupportAttachType('docs')">
+                <span class="chat-attach-icon-circle" style="background:#7f66ff;"><i class="bi bi-file-earmark-text-fill"></i></span>
+                <span>Documento</span>
             </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="address" onclick="window.setAdminSupportAttachType('address')">
-                <i class="bi bi-geo-alt-fill me-1"></i>Endereço
+            <button type="button" class="chat-attach-popup-item" onclick="window.setAdminSupportAttachType('address')">
+                <span class="chat-attach-icon-circle" style="background:#fa4b4b;"><i class="bi bi-geo-alt-fill"></i></span>
+                <span>Localização</span>
             </button>
         </div>
+        <div class="chat-attach-content">
+        <button type="button" class="chat-attach-back" onclick="window.setAdminSupportAttachType('')" title="Voltar" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
 
         <!-- MÍDIA -->
         <div id="${prefix}AttachBoxMedia">
@@ -1979,6 +1983,7 @@ function supportAttachPanelHtml(prefix) {
                     <i class="bi bi-house-door me-1"></i>Endereço cadastrado
                 </button>
             </div>
+        </div>
         </div>
     </div>`;
 }
@@ -2281,21 +2286,24 @@ window.adminDeleteUserAccount = async function(userId, label) {
 window.toggleAdminSupportAttachPanel = function() {
     const panel = document.getElementById('adminSupportAttachPanel');
     if (!panel) return;
+    const wasHidden = panel.classList.contains('d-none');
     panel.classList.toggle('d-none');
-    if (!panel.classList.contains('d-none')) {
-        window.setAdminSupportAttachType(adminSupportAttachType || 'media');
-    }
+    if (wasHidden) panel.setAttribute('data-attach-view', 'menu');
 };
 
 window.setAdminSupportAttachType = function(type) {
+    const panel = document.getElementById('adminSupportAttachPanel');
+    if (!type) {
+        // Botão "Voltar": some com a caixa aberta e mostra o menu de novo.
+        panel?.setAttribute('data-attach-view', 'menu');
+        return;
+    }
     adminSupportAttachType = type;
-    document.querySelectorAll('#adminSupportAttachPanel .chat-attach-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.attachType === type);
-    });
+    panel?.setAttribute('data-attach-view', 'content');
     const mapping = {
-        media:   'adminSupportAttachPanelImageBox',
-        docs:    'adminSupportAttachPanelFileBox',
-        address: 'adminSupportAttachPanelLocationBox'
+        media:   'adminSupportAttachBoxMedia',
+        docs:    'adminSupportAttachBoxDocs',
+        address: 'adminSupportAttachBoxAddress'
     };
     Object.entries(mapping).forEach(([k, id]) => {
         document.getElementById(id)?.classList.toggle('d-none', k !== type);
@@ -3413,7 +3421,11 @@ window.sendAdminTicketLocation = async function() {
 };
 
 window.toggleAdminTicketAttachPanel = function() {
-    document.getElementById('adminTicketAttachPanel')?.classList.toggle('d-none');
+    const panel = document.getElementById('adminTicketAttachPanel');
+    if (!panel) return;
+    const wasHidden = panel.classList.contains('d-none');
+    panel.classList.toggle('d-none');
+    if (wasHidden) panel.setAttribute('data-attach-view', 'menu');
 };
 window.confirmAdminTicketAttach = async function() {
     const ticketId = window._activeSupportTicketId;

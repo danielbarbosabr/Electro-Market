@@ -3080,25 +3080,39 @@ window.toggleChatAttachPanel = function() {
     if (!panel) return;
     const logistics = window._chatActiveElements?.logistics || document.getElementById('logisticsAgreementArea');
     if (logistics) logistics.classList.remove('show-menu');
+    const wasHidden = panel.classList.contains('d-none');
     panel.classList.toggle('d-none');
-    if (!panel.classList.contains('d-none')) {
-        const orderId = window.currentChat;
-        (document.getElementById(`attachLink_${orderId}`) || document.getElementById('chatAttachLinkInput'))?.focus();
+    if (wasHidden) {
+        // Sempre abre mostrando o menu (estilo WhatsApp), nunca direto numa aba.
+        panel.setAttribute('data-attach-view', 'menu');
     }
 };
 
+// Fecha o menu de anexo se a pessoa clicar fora dele (fora do popup e do botão de clipe).
+document.addEventListener('click', function(ev) {
+    document.querySelectorAll('.chat-attach-wrapper:not(.d-none)').forEach(panel => {
+        if (panel.contains(ev.target)) return;
+        if (ev.target.closest('[onclick*="toggleChatAttachPanel"],[onclick*="AttachPanel"],[title="Anexar"]')) return;
+        panel.classList.add('d-none');
+    });
+}, true);
+
 window.setChatAttachType = function(type, panelId) {
-    chatAttachType = type;
-    const panel = panelId ? document.getElementById(panelId) : null;
-    const tabs = panel ? panel.querySelectorAll('.chat-attach-tab') : document.querySelectorAll('.chat-attach-tab');
-    tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.attachType === type));
-    if (panel) {
-        const mapping = { image: `${panelId}ImageBox`, file: `${panelId}FileBox`, location: `${panelId}LocationBox` };
-        Object.entries(mapping).forEach(([t, id]) => {
-            const el = document.getElementById(id);
-            if (el) el.classList.toggle('d-none', type !== t);
-        });
+    const panel = panelId ? document.getElementById(panelId) : (window._chatActiveElements?.attachPanel || document.getElementById('chatAttachPanel'));
+    if (!panel) return;
+    if (!type) {
+        // Botão "Voltar": some com a caixa aberta e mostra o menu de novo.
+        panel.setAttribute('data-attach-view', 'menu');
+        return;
     }
+    chatAttachType = type;
+    panel.setAttribute('data-attach-view', 'content');
+    const mapping = { image: `${panel.id}ImageBox`, file: `${panel.id}FileBox`, location: `${panel.id}LocationBox` };
+    Object.entries(mapping).forEach(([t, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('d-none', type !== t);
+    });
+    panel.querySelector(`#${mapping[type]} input[type="url"]`)?.focus();
 };
 
 window.abrirDocHost = function(host) {
@@ -3949,6 +3963,20 @@ function bootstrapApp() {
             const user = getSavedUser();
             if (!user) { showToast('Faça login!', 'warning'); return; }
             window.renderDirectChats({ skipBoot: false });
+            return;
+        }
+
+        // Área de Mídias: rota própria com id único e persistente
+        // (#/chat/midia_<uuid>). Também aceita a rota legada (#/chat/filmes).
+        const midiaMatch = window.location.hash.match(/^#\/chat\/midia_(.+)/);
+        if (midiaMatch || window.location.hash === '#/chat/filmes') {
+            const user = getSavedUser();
+            if (!user) { showToast('Faça login!', 'warning'); return; }
+            // Guarda de reentrância: o pushState da rota da Mídia dispara
+            // hashchange enquanto a área já está aberta — abrir de novo
+            // relançaria o closeWaChat/closeDirectChat e sobrescreveria a URL.
+            if (window.currentChat && String(window.currentChat).startsWith('midia_')) return;
+            window.openFilmes({ skipIntro: true });
             return;
         }
 
@@ -5274,6 +5302,58 @@ function avatarClickAttr(src) {
     return src ? ` onclick="window.openImageFull('${String(src).replace(/'/g, "\\'")}')" style="cursor:pointer;"` : '';
 }
 
+/** Monta o HTML de exibição de um vídeo enviado no chat, sempre dentro de um
+ *  <iframe> (em vez da tag <video>, que só funciona com link direto de
+ *  arquivo .mp4/.webm e falha silenciosamente com link de YouTube, Vimeo,
+ *  Imgur "gifv" etc). Detecta o serviço pelo link e converte pra URL de embed
+ *  quando necessário; senão, carrega o link original dentro do iframe (o
+ *  próprio navegador exibe o player nativo quando o link aponta pra um
+ *  arquivo de vídeo direto). */
+function buildChatVideoIframe(rawUrl) {
+    const url = String(rawUrl || '').trim();
+    if (!url) return '';
+
+    let embedSrc = url;
+    try {
+        const u = new URL(url);
+        const host = u.hostname.replace(/^www\./, '');
+
+        if (host === 'youtu.be') {
+            const id = u.pathname.slice(1);
+            if (id) embedSrc = `https://www.youtube.com/embed/${id}`;
+        } else if (host === 'youtube.com' || host === 'm.youtube.com') {
+            if (u.pathname === '/watch' && u.searchParams.get('v')) {
+                embedSrc = `https://www.youtube.com/embed/${u.searchParams.get('v')}`;
+            } else if (u.pathname.startsWith('/shorts/')) {
+                embedSrc = `https://www.youtube.com/embed/${u.pathname.split('/')[2] || ''}`;
+            } else if (u.pathname.startsWith('/embed/')) {
+                embedSrc = url;
+            }
+        } else if (host === 'vimeo.com') {
+            const id = u.pathname.split('/').filter(Boolean)[0];
+            if (id) embedSrc = `https://player.vimeo.com/video/${id}`;
+        } else if (host === 'player.vimeo.com') {
+            embedSrc = url;
+        } else if (host === 'drive.google.com') {
+            // Aceita tanto ".../file/d/ID/view" quanto "...?id=ID" e
+            // converte pro link de preview, que já é embutível em iframe.
+            let fileId = '';
+            const m = u.pathname.match(/\/file\/d\/([^/]+)/);
+            if (m) fileId = m[1];
+            else if (u.searchParams.get('id')) fileId = u.searchParams.get('id');
+            if (fileId) embedSrc = `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+    } catch (e) { /* URL inválida: usa como veio mesmo */ }
+
+    const safeUrl = url.replace(/'/g, "\\'");
+    const safeEmbed = embedSrc.replace(/"/g, '&quot;');
+    return `
+        <div class="chat-video-embed">
+            <iframe src="${safeEmbed}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen
+                    onerror="this.parentElement.outerHTML='<a href=\\'${safeUrl}\\' target=\\'_blank\\' class=\\'small text-break\\'>${safeUrl}</a>'"></iframe>
+        </div>`;
+}
+
 window.renderMsgBubble = function(msg, index, opts = {}) {
     const {
         userId, myAvatar, partnerAvatar,
@@ -5436,10 +5516,7 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
                 <img src="${msg.image}" class="img-fluid rounded mb-2" referrerpolicy="no-referrer"
                      style="max-width:220px;cursor:pointer;"
                      onclick="window.openImageFull('${msg.image}')" onerror="this.onerror=null;this.style.display='none'">` : ''}
-            ${msg.video ? `
-                <video src="${msg.video}" class="img-fluid rounded mb-2" controls
-                       style="max-width:220px;max-height:200px;background:#000;border-radius:8px;"
-                       onerror="this.outerHTML='<a href=\\'${msg.video.replace(/'/g, "\\'")}\\' target=\\'_blank\\' class=\\'small text-break\\'>${msg.video}</a>'"></video>` : ''}
+            ${msg.video ? buildChatVideoIframe(msg.video) : ''}
             ${fileChipHtml}
             ${locationChipHtml}
             ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${window.formatLinks?.(cleanText) ?? cleanText}</div>` : ''}
@@ -5825,8 +5902,6 @@ window.renderChatContainer = function(opts) {
         extraBeforeInput = '',
         headerSubtitle = '',
         isGroupChat = false,
-        onAddMember = '',
-        onLeaveGroup = '',
         onClearChat = '',
         isDirectChat = false
     } = opts;
@@ -5846,7 +5921,7 @@ window.renderChatContainer = function(opts) {
         : '';
 
     const participantsBtnHtml = onToggleParticipants
-        ? `<button type="button" class="chat-header-close" onclick="${isGroupChat && chatId ? `window.openEditGroupModal('${chatId}')` : onToggleParticipants}" title="${isGroupChat ? 'Dados do grupo' : 'Participantes'}"><i class="bi bi-people-fill"></i></button>`
+        ? `<button type="button" class="chat-header-close" onclick="${onToggleParticipants}" title="Participantes"><i class="bi bi-people-fill"></i></button>`
         : '';
 
     const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
@@ -5856,13 +5931,11 @@ window.renderChatContainer = function(opts) {
 
     const dropdownItems = [];
     if (isGroupChat) {
-        if (chatId) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.openEditGroupModal('${chatId}')"><i class="bi bi-info-circle me-2"></i>Dados do grupo</a></li>`);
         if (onMute) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onMute}"><i class="bi ${isMuted ? 'bi-bell-fill' : 'bi-bell-slash'} me-2"></i>${isMuted ? 'Reativar notificações' : 'Silenciar notificações'}</a></li>`);
         if (onPin) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onPin}"><i class="bi ${isPinned ? 'bi-heart-fill' : 'bi-heart'} me-2"></i>${isPinned ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}</a></li>`);
         dropdownItems.push(`<li><hr class="dropdown-divider my-1"></li>`);
         if (onClose) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClose}"><i class="bi bi-x-circle me-2"></i>Fechar conversa</a></li>`);
         if (onClearChat) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onClearChat}"><i class="bi bi-eraser me-2"></i>Limpar conversa</a></li>`);
-        if (onLeaveGroup) dropdownItems.push(`<li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="${onLeaveGroup}"><i class="bi bi-box-arrow-right me-2"></i>Sair do grupo</a></li>`);
     } else if (isDirectChat) {
     if (onViewProfile) dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="${onViewProfile}"><i class="bi bi-info-circle me-2"></i>Dados do contato</a></li>`);
     dropdownItems.push(`<li><a class="dropdown-item small" href="javascript:void(0)" onclick="window.toggleChatSearch('${msgsId}')"><i class="bi bi-search me-2"></i>Pesquisar</a></li>`);
@@ -5960,46 +6033,58 @@ window.renderChatContainer = function(opts) {
 
     const attachHtml = showAttach ? `
     <div id="${previewId}" class="p-2 bg-warning bg-opacity-10 border-bottom d-none"></div>
-    <div id="${attachPanelId}" class="p-3 bg-light border-top d-none chat-attach-panel">
-        <div class="d-flex gap-2 mb-3">
-            <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab active" data-attach-type="image" onclick="window.setChatAttachType('image','${attachPanelId}')"><i class="bi bi-play-circle me-1"></i>Mídia</button>
-            <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="file" onclick="window.setChatAttachType('file','${attachPanelId}')"><i class="bi bi-file-earmark me-1"></i>Documentos</button>
-            <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1 chat-attach-tab" data-attach-type="location" onclick="window.setChatAttachType('location','${attachPanelId}')"><i class="bi bi-geo-alt-fill me-1"></i>Endereço</button>
+    <div id="${attachPanelId}" class="d-none chat-attach-panel chat-attach-wrapper" data-attach-view="menu">
+        <div class="chat-attach-popup">
+            <button type="button" class="chat-attach-popup-item" onclick="window.setChatAttachType('image','${attachPanelId}')">
+                <span class="chat-attach-icon-circle" style="background:#0088cc;"><i class="bi bi-image-fill"></i></span>
+                <span>Fotos e vídeos</span>
+            </button>
+            <button type="button" class="chat-attach-popup-item" onclick="window.setChatAttachType('file','${attachPanelId}')">
+                <span class="chat-attach-icon-circle" style="background:#7f66ff;"><i class="bi bi-file-earmark-text-fill"></i></span>
+                <span>Documento</span>
+            </button>
+            <button type="button" class="chat-attach-popup-item" onclick="window.setChatAttachType('location','${attachPanelId}')">
+                <span class="chat-attach-icon-circle" style="background:#fa4b4b;"><i class="bi bi-geo-alt-fill"></i></span>
+                <span>Localização</span>
+            </button>
         </div>
-        <div id="${attachPanelId}ImageBox">
-            <div class="input-group input-group-sm mb-2">
-                <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
-                <input type="url" id="${attachLinkId}" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF...">
-                <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+        <div class="chat-attach-content">
+            <button type="button" class="chat-attach-back" onclick="window.setChatAttachType('','${attachPanelId}')" title="Voltar" aria-label="Voltar"><i class="bi bi-chevron-left"></i></button>
+            <div id="${attachPanelId}ImageBox" class="d-none">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
+                    <input type="url" id="${attachLinkId}" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF...">
+                    <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+                </div>
+                <div class="d-flex gap-2">
+                    <label class="ml-attach flex-grow-1" style="cursor:pointer;">
+                        <i class="bi bi-cloud-upload"></i>Escolher arquivos
+                        <input type="file" accept="image/*" hidden onchange="${onSendFile}(this)">
+                    </label>
+                    <button type="button" class="ml-attach flex-grow-1" onclick="${openImgurFn}()"><i class="bi bi-box-arrow-up-right"></i>Imgur</button>
+                </div>
             </div>
-            <div class="d-flex gap-2">
-                <label class="ml-attach flex-grow-1" style="cursor:pointer;">
-                    <i class="bi bi-cloud-upload"></i>Escolher arquivos
-                    <input type="file" accept="image/*" hidden onchange="${onSendFile}(this)">
-                </label>
-                <button type="button" class="ml-attach flex-grow-1" onclick="${openImgurFn}()"><i class="bi bi-box-arrow-up-right"></i>Imgur</button>
+            <div id="${attachPanelId}FileBox" class="d-none">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
+                    <input type="url" id="${attachLinkId}File" class="form-control" placeholder="Cole o link do documento...">
+                    <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn1}')"><i class="bi bi-google"></i>${docHostBtn1}</button>
+                    <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn2}')"><i class="bi bi-microsoft"></i>${docHostBtn2}</button>
+                </div>
             </div>
-        </div>
-        <div id="${attachPanelId}FileBox" class="d-none">
-            <div class="input-group input-group-sm mb-2">
-                <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
-                <input type="url" id="${attachLinkId}File" class="form-control" placeholder="Cole o link do documento...">
-                <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
-            </div>
-            <div class="d-flex gap-2">
-                <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn1}')"><i class="bi bi-google"></i>${docHostBtn1}</button>
-                <button type="button" class="ml-attach flex-grow-1" onclick="${openDocHostFn}('${docHostBtn2}')"><i class="bi bi-microsoft"></i>${docHostBtn2}</button>
-            </div>
-        </div>
-        <div id="${attachPanelId}LocationBox" class="d-none">
-            <div class="input-group input-group-sm mb-2">
-                <span class="input-group-text"><i class="bi bi-geo-alt-fill text-muted"></i></span>
-                <input type="url" id="${attachLinkId}Loc" class="form-control" placeholder="Cole o link do endereço (Google Maps)...">
-                <button type="button" class="ml-attach" onclick="${onSendLocation}('other')"><i class="bi bi-send"></i></button>
-            </div>
-            <div class="d-flex gap-2">
-                <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('current')"><i class="bi bi-geo-alt-fill"></i>Endereço atual</button>
-                <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('stored')"><i class="bi bi-house-door"></i>Endereço cadastrado</button>
+            <div id="${attachPanelId}LocationBox" class="d-none">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text"><i class="bi bi-geo-alt-fill text-muted"></i></span>
+                    <input type="url" id="${attachLinkId}Loc" class="form-control" placeholder="Cole o link do endereço (Google Maps)...">
+                    <button type="button" class="ml-attach" onclick="${onSendLocation}('other')"><i class="bi bi-send"></i></button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('current')"><i class="bi bi-geo-alt-fill"></i>Endereço atual</button>
+                    <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('stored')"><i class="bi bi-house-door"></i>Endereço cadastrado</button>
+                </div>
             </div>
         </div>
     </div>` : '';
