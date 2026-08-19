@@ -1616,11 +1616,11 @@ window.openCommunityInChat = async function() {
     // Remove o ícone de busca padrão do cabeçalho de conversa (não se aplica
     // ao feed da Comunidade, que não tem "mensagens" pra pesquisar).
     panel.querySelector('.chat-header-pro [title="Pesquisar na conversa"]')?.remove();
-    // Remove o menu "..." do cabeçalho — o sino de notificações do Electro
+    // O "..." do cabeçalho é removido — o sino de notificações do Electro
     // Market fica no lugar, e "Voltar para Conversas" segue na sidebar.
     panel.querySelector('.chat-header-pro .dropdown')?.remove();
-    // Remove o X (fechar) do cabeçalho — a saída é pela sidebar (Mensagens).
-    panel.querySelector('.chat-header-pro .chat-header-x')?.remove();
+    // O X (fechar) fica no cabeçalho, à esquerda do sino, pra sair da
+    // Comunidade (window.closeCommunityChat).
     // A seta "<" de voltar fica escondida só no feed inicial ("Para você");
     // nas outras telas (Pesquisar, Atividade...) ela aparece pra voltar ao feed.
     window.twSyncCommunityBackBtn();

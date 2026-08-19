@@ -2653,6 +2653,10 @@ body.dark-theme .presence-dot {
 @media (max-width: 768px) {
     .chat-header-x { display: none !important; }
 }
+/* Comunidade: o X de sair também aparece no mobile (ao lado do sino) */
+@media (max-width: 768px) {
+    #waChatActive.tw-chat-community .chat-header-x { display: flex !important; }
+}
 
 /* ---------- Resumo do produto ---------- */
 /* ---------- Chat product summary (inline no cabeçalho) ---------- */
@@ -3928,8 +3932,8 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
     letter-spacing: 0.3px;
 }
 /* Barra de progresso real (mesma da área Mídias) no boot de Conversas —
-   estilo mais próximo do WhatsApp original: barra fina e curta, sem
-   número de porcentagem visível ao lado. */
+   estilo mais próximo do WhatsApp original: barra fina e curta, com
+   o número de porcentagem visível ao lado. */
 #waBootScreen .nflx-intro-progress {
     background: rgba(0, 0, 0, 0.1);
 }
@@ -3937,7 +3941,7 @@ body.dark-theme .wa-rail-btn.active { background: rgba(0,168,132,0.18); color: #
     background: #1c1e21;
 }
 #waBootScreen .nflx-intro-pct {
-    display: none;
+    display: block;
 }
 #waBootScreen .nflx-intro-progress-row {
     width: 200px;
@@ -11587,6 +11591,16 @@ body.dark-theme .yt-root {
     color: var(--text-main) !important;
     border-radius: 14px;
 }
+/* Gerenciar fontes: modal ancorado mais abaixo (não corta o topo em
+   telas menores / teclado aberto) — rola caso a lista seja muito alta. */
+#nflxFontesModal {
+    align-items: flex-end;
+    padding: 24px 12px;
+    overflow-y: auto;
+}
+#nflxFontesModal .modal-content {
+    margin: 0 auto;
+}
 .nflx-fontes-head {
     display: flex;
     align-items: flex-start;
@@ -12277,12 +12291,54 @@ body.dark-theme .yt-intro-pct {
    o header ficava sempre preto, mesmo no tema claro — corrigido
    prefixando tudo com body.dark-theme.
    ============================================================ */
-body.dark-theme .yt-header {
-    background: #000000 !important;
-    border-bottom: 1px solid #1a1a1a !important;
+/* ============================================================
+   MÍDIAS — Header
+   Posicionamento/layout idêntico nos dois temas (base = versão
+   escura da Netflix). O tema claro reaproveita EXATAMENTE a mesma
+   base, mudando SOMENTE o contraste (cores), nunca o layout.
+   ============================================================ */
+
+/* --- Layout/forma comum aos dois temas (vem da versão escura) --- */
+.yt-header {
     padding: 0 40px !important;
     gap: 28px !important;
 }
+.yt-header-nav {
+    margin-right: auto !important;
+    gap: 20px !important;
+    padding: 0 !important;
+}
+.yt-header-nav-item {
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
+    padding: 4px 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+.yt-header-center {
+    flex: 0 0 auto !important;
+    max-width: 260px !important;
+}
+.yt-search-wrap { max-width: 260px !important; }
+#nflxSearch {
+    border-radius: 4px !important;
+    height: 36px !important;
+}
+#nflxSearch .yt-search-btn {
+    order: 1 !important;
+    width: 34px !important;
+    height: 34px !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: 0.95rem !important;
+}
+#nflxSearchInput {
+    order: 2 !important;
+    font-size: 13px !important;
+}
+.nflx-search-clear { order: 3 !important; }
+.yt-mic-btn { display: none !important; }
 
 .yt-logo-icon {
     display: block !important;
@@ -12299,101 +12355,46 @@ body.dark-theme .yt-header {
     text-transform: uppercase !important;
 }
 
-body.dark-theme .yt-header-nav {
-    margin-right: auto !important;
-    gap: 20px !important;
-    padding: 0 !important;
+/* --- TEMA ESCURO: apenas cores (Netflix) --- */
+body.dark-theme .yt-header {
+    background: #000000 !important;
+    border-bottom: 1px solid #1a1a1a !important;
 }
-body.dark-theme .yt-header-nav-item {
-    color: #d2d2d2 !important;
-    font-size: 0.875rem !important;
-    font-weight: 400 !important;
-    padding: 4px 0 !important;
-    border-radius: 0 !important;
-    border: none !important;
-    background: transparent !important;
-}
-body.dark-theme .yt-header-nav-item:hover {
-    color: #b3b3b3 !important;
-    background: transparent !important;
-}
-body.dark-theme .yt-header-nav-item.active {
-    color: #ffffff !important;
-    font-weight: 700 !important;
-    background: transparent !important;
-    border: none !important;
-}
-
-/* Busca compacta, colada nos ícones (não estica pelo centro) */
-.yt-header-center {
-    flex: 0 0 auto !important;
-    max-width: 260px !important;
-}
-.yt-search-wrap { max-width: 260px !important; }
+body.dark-theme .yt-header-nav-item { color: #d2d2d2 !important; }
+body.dark-theme .yt-header-nav-item:hover { color: #b3b3b3 !important; background: transparent !important; }
+body.dark-theme .yt-header-nav-item.active { color: #ffffff !important; font-weight: 700 !important; background: transparent !important; border: none !important; }
 body.dark-theme #nflxSearch {
     background: rgba(255, 255, 255, 0.08) !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    border-radius: 4px !important;
-    height: 36px !important;
 }
-body.dark-theme #nflxSearch .yt-search-btn {
-    order: 1 !important;
-    width: 34px !important;
-    height: 34px !important;
-    border: none !important;
-    background: transparent !important;
-    color: #ffffff !important;
-    font-size: 0.95rem !important;
-}
-body.dark-theme #nflxSearchInput {
-    order: 2 !important;
-    color: #ffffff !important;
-    font-size: 13px !important;
-}
-body.dark-theme .nflx-search-clear { order: 3 !important; color: #b3b3b3 !important; }
+body.dark-theme #nflxSearchInput { color: #ffffff !important; }
+body.dark-theme .nflx-search-clear { color: #b3b3b3 !important; }
 body.dark-theme .nflx-search-clear:hover { color: #ffffff !important; }
-body.dark-theme .yt-mic-btn { display: none !important; }
-
 body.dark-theme .yt-header-right { gap: 20px !important; }
-body.dark-theme .yt-icon-btn { color: #ffffff !important; }
+body.dark-theme .yt-icon-btn,
 body.dark-theme .yt-menu-btn { color: #ffffff !important; }
-
-/* Navbar do Mídias: fundo escuro no tema escuro */
 body.dark-theme .yt-menu-btn:hover,
 body.dark-theme .yt-icon-btn:hover,
-body.dark-theme .yt-mic-btn:hover {
-    background: #2a2a2a !important;
-}
+body.dark-theme .yt-mic-btn:hover { background: #2a2a2a !important; }
 
-/* Tema claro: navbar do Mídias branca */
+/* --- TEMA CLARO: MESMO layout, só contraste (YouTube) --- */
 body:not(.dark-theme) .yt-header {
     background: #ffffff !important;
     border-bottom: 1px solid #e5e5e5 !important;
 }
-body:not(.dark-theme) .yt-header-nav-item {
-    color: #606060 !important;
-}
+body:not(.dark-theme) .yt-header-nav-item { color: #606060 !important; }
 body:not(.dark-theme) .yt-header-nav-item:hover,
-body:not(.dark-theme) .yt-header-nav-item.active {
-    color: #0f0f0f !important;
-}
+body:not(.dark-theme) .yt-header-nav-item.active { color: #0f0f0f !important; }
 body:not(.dark-theme) #nflxSearch {
     background: #f1f3f4 !important;
     border: 1px solid #d3d3d3 !important;
-    border-radius: 20px !important;
 }
-body:not(.dark-theme) #nflxSearchInput {
-    color: #0f0f0f !important;
-}
+body:not(.dark-theme) #nflxSearchInput { color: #0f0f0f !important; }
 body:not(.dark-theme) .yt-icon-btn,
-body:not(.dark-theme) .yt-menu-btn {
-    color: #0f0f0f !important;
-}
+body:not(.dark-theme) .yt-menu-btn { color: #0f0f0f !important; }
 body:not(.dark-theme) .yt-mic-btn:hover,
 body:not(.dark-theme) .yt-icon-btn:hover,
-body:not(.dark-theme) .yt-menu-btn:hover {
-    background: #f2f2f2 !important;
-}
+body:not(.dark-theme) .yt-menu-btn:hover { background: #f2f2f2 !important; }
 
 @media (max-width: 991px) {
     .yt-header { padding: 0 12px !important; gap: 12px !important; }

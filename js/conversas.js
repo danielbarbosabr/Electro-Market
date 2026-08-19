@@ -241,11 +241,12 @@ window.renderDirectChats = async function(opts = {}) {
         if (groupChats.length > 0) {
             html += `<div class="wa-contact-section-header">Grupos</div>`;
             html += groupChats.map(({ chat, lastMsg }) => {
+                const official = isCommunityChat(chat) || isGlobalGroupChat(chat);
                 const groupMeta = chat.messages?.[0]?.groupType === 'group' ? chat.messages[0] : {};
-                const groupName = groupMeta.groupName || chat.seller_name || 'Grupo';
-                const hasAvatar = !!groupMeta.groupAvatar;
+                const groupName = official ? COMMUNITY_DISPLAY_NAME : (groupMeta.groupName || chat.seller_name || 'Grupo');
+                const hasAvatar = !!groupMeta.groupAvatar || official;
                 const avatarInner = hasAvatar
-                    ? `<img src="${groupMeta.groupAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=%3F&size=45'">`
+                    ? `<img src="${official ? COMMUNITY_AVATAR : groupMeta.groupAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&size=45&bold=true'">`
                     : `<i class="bi bi-people-fill wa-header-group-icon"></i>`;
                 const lastSenderPrefix = (lastMsg && lastMsg.senderId && lastMsg.type !== 'system')
                     ? (String(lastMsg.senderId) === String(user.id) ? 'Você: ' : `${(lastMsg.senderName || 'Alguém').split(' ')[0]}: `)
@@ -505,7 +506,30 @@ let _allUsersCache = [];
 // ---------------------------------------------------------------
 
 const GLOBAL_GROUP_CHAT_ID = 'grupo_global_electromarket';
-const GLOBAL_GROUP_NAME = 'Grupo Geral ElectroMarket';
+const GLOBAL_GROUP_NAME = 'ElectroMarket';
+
+/** True quando o chat é o "Grupo Geral" (o grupo coletivo global): pelo id
+ *  fixo ou pelo nome antigo "Grupo Geral ElectroMarket" salvo em bases antigas. */
+function isGlobalGroupChat(chat) {
+    if (!chat) return false;
+    return String(chat.id) === GLOBAL_GROUP_CHAT_ID
+        || chat.seller_name === 'Grupo Geral ElectroMarket'
+        || chat.buyer_name === 'Grupo Geral ElectroMarket'
+        || chat.messages?.[0]?.groupName === 'Grupo Geral ElectroMarket';
+}
+
+/** Nome de exibição da Comunidade (grupo estilo WhatsApp) e sua foto. */
+const COMMUNITY_DISPLAY_NAME = 'ElectroMarket';
+const COMMUNITY_AVATAR = 'https://e7.pngegg.com/pngimages/962/981/png-clipart-red-angry-birds-art-vision-care-beak-bird-font-apps-angry-birds-video-game-desktop-wallpaper.png';
+
+/** True quando o chat é a Comunidade (grupo estilo WhatsApp), pelo nome
+ *  armazenado (seller_name/buyer_name) ou pelo meta do grupo. */
+function isCommunityChat(chat) {
+    if (!chat) return false;
+    return chat.seller_name === 'Comunidade ElectroMarket'
+        || chat.buyer_name === 'Comunidade ElectroMarket'
+        || chat.messages?.[0]?.groupName === 'Comunidade ElectroMarket';
+}
 
 /** Avatar padrão do grupo (ícone de pessoas em círculo verde) para os casos em
  *  que o grupo não tem foto própria — usado nos balões quando não há avatar do
@@ -539,7 +563,7 @@ async function ensureGlobalGroup() {
       groupType: 'group',
       groupName: GLOBAL_GROUP_NAME,
       groupDescription: '',
-      groupAvatar: '',
+      groupAvatar: COMMUNITY_AVATAR,
       groupCreatedAt: now,
       groupAdmins: [],
       groupSettings: {}
@@ -574,8 +598,10 @@ async function ensureGlobalGroup() {
     const meta = chat.messages?.[0];
     if (meta && typeof meta === 'object' && meta.type === 'direct_chat_meta') {
       meta.groupType = 'group';
-      meta.groupName = meta.groupName || GLOBAL_GROUP_NAME;
+      if (meta.groupName === 'Grupo Geral ElectroMarket') meta.groupName = GLOBAL_GROUP_NAME;
+      else meta.groupName = meta.groupName || GLOBAL_GROUP_NAME;
       meta.groupSettings = meta.groupSettings || {};
+      if (!meta.groupAvatar) meta.groupAvatar = COMMUNITY_AVATAR;
       chat.messages[0] = meta;
     }
     await supabaseFetch(`chats?id=eq.${GLOBAL_GROUP_CHAT_ID}`, {
@@ -858,10 +884,13 @@ window.toggleDirectChatParticipants = async function(chatId, forceReload) {
         const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
         const me = getSavedUser();
 
-        const groupName = directMeta?.groupName || chat.seller_name || 'Grupo';
-        const groupAvatarHtml = directMeta?.groupAvatar
-            ? `<img src="${directMeta.groupAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&bold=true'">`
-            : `<div class="wa-header-group-icon" style="width:44px;height:44px;flex-shrink:0;"><i class="bi bi-people-fill"></i></div>`;
+        const isOfficialGroup = community || isGlobalGroupChat(chat);
+        const groupName = isOfficialGroup ? COMMUNITY_DISPLAY_NAME : (directMeta?.groupName || chat.seller_name || 'Grupo');
+        const groupAvatarHtml = isOfficialGroup
+            ? `<img src="${COMMUNITY_AVATAR}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&bold=true'">`
+            : (directMeta?.groupAvatar
+                ? `<img src="${directMeta.groupAvatar}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&bold=true'">`
+                : `<div class="wa-header-group-icon" style="width:44px;height:44px;flex-shrink:0;"><i class="bi bi-people-fill"></i></div>`);
 
         const groupHeaderHtml = `
         <div class="chat-group-info-header" id="dGroupInfoView_${chatId}">
@@ -947,12 +976,17 @@ window.openDirectChat = async function(chatId) {
         }
 
         // Comunidade: configura header
-        if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
-            otherName = 'Comunidade ElectroMarket';
-            otherAvatar = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        if (isCommunityChat(chat)) {
+            otherName = COMMUNITY_DISPLAY_NAME;
+            otherAvatar = COMMUNITY_AVATAR;
+        }
+        // Grupo Geral (grupo coletivo global): sempre usa o nome/foto oficiais
+        if (isGlobalGroupChat(chat)) {
+            otherName = COMMUNITY_DISPLAY_NAME;
+            otherAvatar = COMMUNITY_AVATAR;
         }
         const msgsId = `dmsgs_${chatId}`;
-        const isCommunity = chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket';
+        const isCommunity = isCommunityChat(chat);
         const inputId = `dinput_${chatId}`;
         const previewId = `dpreview_${chatId}`;
         const attachId = `dattachPanel_${chatId}`;
@@ -1007,7 +1041,8 @@ window.openDirectChat = async function(chatId) {
             panel.classList.add('d-flex');
 
             // Grupo geral (sem foto própria): ícone de pessoas no lugar do avatar
-            if (isGroup && !isCommunity && !chat.messages?.[0]?.groupAvatar) {
+            // (o Grupo Geral oficial tem foto/avatar próprio e não entra aqui).
+            if (isGroup && !isCommunity && !isGlobalGroupChat(chat) && !chat.messages?.[0]?.groupAvatar) {
                 const avatarWrap = panel.querySelector('.chat-header-avatar-wrap');
                 if (avatarWrap) {
                     const img = avatarWrap.querySelector('img');
@@ -1022,20 +1057,18 @@ window.openDirectChat = async function(chatId) {
                 }
             }
 
-            // Comunidade: remove header, troca avatar e substitui input por composer
-            if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
+            // Comunidade: remove header, usa a foto oficial e substitui input por composer
+            if (isCommunity) {
                 panel.classList.add('tw-chat-community', 'community-active');
                 const avatarWrap = panel.querySelector('.chat-header-avatar-wrap');
                 if (avatarWrap) {
                     const img = avatarWrap.querySelector('img');
-                    if (img) img.style.display = 'none';
-                    let icon = avatarWrap.querySelector('.wa-header-group-icon');
-                    if (!icon) {
-                        icon = document.createElement('div');
-                        icon.className = 'wa-header-group-icon';
-                        icon.innerHTML = '<i class="bi bi-people-fill"></i>';
-                        avatarWrap.insertBefore(icon, avatarWrap.firstChild);
+                    if (img) {
+                        img.style.display = '';
+                        img.src = COMMUNITY_AVATAR;
                     }
+                    const icon = avatarWrap.querySelector('.wa-header-group-icon');
+                    if (icon) icon.remove();
                 }
                 // Substitui input bar pelo composer estilo Facebook
                 const inputBar = panel.querySelector('.chat-input-bar');
@@ -1176,7 +1209,7 @@ async function loadDirectChatMessages(chatId, silent = false) {
     if (!chat) return;
 
     // Comunidade: renderiza feed de posts em vez de mensagens
-    if (chat.seller_name === 'Comunidade ElectroMarket' || chat.buyer_name === 'Comunidade ElectroMarket') {
+    if (isCommunityChat(chat)) {
         await renderCommunityFeedInChat(container, silent);
         return;
     }

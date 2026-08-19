@@ -3,7 +3,7 @@
 // Fontes: Invidious (rotaciona instâncias),
 //         Piped (rotaciona instâncias),
 //         Odysee (Lighthouse),
-//         Pirate Bay, GamerPower, Jogos Retrô,
+//         GamerPower, Jogos Retrô,
 //         Rádios (Radio Browser)
 // CORRIGIDO PARA FUNCIONAR LOCALMENTE E NO VERCEL
 // ============================================
@@ -49,7 +49,7 @@
     function inLista(id) { return getLista().includes(id); }
 
     // Decodifica entidades HTML (ex.: "Exterm&iacute;nio" -> "Extermínio")
-    // vindas nas respostas das APIs (Pirate Bay, TV Maze, etc).
+    // vindas nas respostas das APIs (TV Maze, etc).
     function decodificarEntidades(s) {
         if (!s) return s;
         const mapa = {
@@ -92,7 +92,7 @@
     // (versão 2: descarta qualquer item antigo de fontes removidas)
     const POOL_KEY = 'electroFilmesPoolV2';
     // Fontes que já foram removidas: itens antigos delas saem do pool.
-    const FONTES_REMOVIDAS = new Set(['Steam (Oficial)', 'GOG (Oficial)', 'PokeAPI']);
+    const FONTES_REMOVIDAS = new Set(['Steam (Oficial)', 'GOG (Oficial)', 'PokeAPI', 'Pirate Bay', '1337x']);
     function salvarPool() {
         try {
             const arr = [...ITEMS_CACHE.values()].slice(0, 400);
@@ -511,120 +511,7 @@
     }
 
     // ---------------------------------------------------------------
-    // Helper: gera link magnético a partir do info_hash
-    // ---------------------------------------------------------------
-    function criarMagnetLink(infoHash, name) {
-        const trackers = [
-            'udp://tracker.opentrackr.org:1337/announce',
-            'udp://tracker.openbittorrent.com:6969/announce',
-            'udp://9.rarbg.to:2710/announce',
-            'udp://exodus.desync.com:6969/announce'
-        ];
-        const tr = trackers.map(t => `&tr=${encodeURIComponent(t)}`).join('');
-        return `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(name)}${tr}`;
-    }
-
-    // ---------------------------------------------------------------
-    // FONTE 5: The Pirate Bay (apibay.org - API funcional via proxy)
-    // ---------------------------------------------------------------
-    async function buscarTPB(termo = '', limite = 20) {
-        const query = termo || 'filme';
-        const urls = [
-            `https://apibay.org/q.php?q=${encodeURIComponent(query)}`,
-            `https://piratebay.org/q.php?q=${encodeURIComponent(query)}`
-        ];
-
-        let ultimoErro = null;
-        for (const url of urls) {
-            try {
-                const data = await fetchWithProxy(url, { timeout: 10000 });
-                if (!Array.isArray(data)) { ultimoErro = new Error('Resposta inválida'); continue; }
-                if (!data.length || data[0]?.id === '0') return [];
-
-                return data
-                    .filter(item => item.name && item.info_hash && Number(item.seeders) > 0)
-                    .sort((a, b) => Number(b.seeders) - Number(a.seeders))
-                    .slice(0, limite)
-                    .map(item => {
-                        const sizeGB = (Number(item.size) / 1073741824).toFixed(2);
-                        return {
-                            id: gerarId('TPB', item.name),
-                            titulo: item.name,
-                            descricao: `👤 ${item.seeders} seeds | 💾 ${sizeGB} GB`,
-                            ano: '',
-                            capa: null,
-                            poster: null,
-                            link: criarMagnetLink(item.info_hash, item.name),
-                            fonte: 'Pirate Bay',
-                            categoria: 'torrent',
-                            genero: 'Torrent',
-                            nota: Math.min(10, Math.round((Number(item.seeders) || 0) / 100) * 5 + 5),
-                            emoji: '🏴‍☠️',
-                            grad: ['#1a1a2e', '#16213e'],
-                            seeds: Number(item.seeders) || 0,
-                            sinopse: `${item.seeders} seeds, ${item.leechers} leeches`
-                        };
-                    });
-            } catch (error) {
-                ultimoErro = error;
-            }
-        }
-
-        throw ultimoErro || new Error('Pirate Bay indisponível');
-    }
-
-    // ---------------------------------------------------------------
-    // FONTE 5.1: 1337x (via API pública)
-    // ---------------------------------------------------------------
-    async function buscar1337x(termo = '', limite = 20) {
-        try {
-            const API_URL = 'https://1337x-proxy.com/api';
-            const query = termo || 'top-100';
-            const url = `${API_URL}/search/${encodeURIComponent(query)}/1/`;
-            const data = await fetchWithProxy(url, { timeout: 10000 });
-            if (!data || !data.data || !Array.isArray(data.data)) {
-                throw new Error('Resposta inválida da API 1337x');
-            }
-            const resultados = data.data;
-            if (resultados.length === 0) {
-                return [];
-            }
-            return resultados
-                .filter(item => item.name && item.magnet)
-                .slice(0, limite)
-                .map(item => {
-                    const sizeGB = parseFloat(item.size) || 0;
-                    return {
-                        id: gerarId('1337x', item.name),
-                        titulo: item.name,
-                        descricao: `👤 ${item.seeders || 0} seeds | 💾 ${sizeGB.toFixed(2)} GB`,
-                        ano: '',
-                        capa: null,
-                        poster: null,
-                        link: item.magnet,
-                        fonte: '1337x',
-                        categoria: 'torrent',
-                        genero: 'Torrent',
-                        nota: Math.min(10, Math.round((Number(item.seeders) || 0) / 100) * 5 + 5),
-                        emoji: '🏴‍☠️',
-                        grad: ['#1a1a2e', '#16213e'],
-                        seeds: Number(item.seeders) || 0,
-                        sinopse: `${item.seeders} seeds, ${item.leechers} leeches • ${item.size}`
-                    };
-                });
-        } catch (error) {
-            console.warn('Erro ao buscar 1337x:', error);
-            throw error;
-        }
-    }
-
-    // ---------------------------------------------------------------
-    // FONTE: YourBittorrent (via API pública)
-    // API: https://yourbittorrent.com/api
-    // ---------------------------------------------------------------
-    // ---------------------------------------------------------------
-    // FONTE: Bitsearch (via API pública)
-    // API: https://bitsearch.to/api
+    // FONTE: MangaDex
     // ---------------------------------------------------------------
     async function buscarMangaDex(termo = '', limite = 20) {
         try {
@@ -1204,8 +1091,6 @@
         { key: 'piped', heading: 'Vídeos (Piped)', filter: () => carregarFonte(buscarPiped, '', 20) },
         { key: 'odysee', heading: 'Vídeos (Odysee)', filter: () => carregarFonte(buscarOdysee, '', 20) },
         { key: 'animes', heading: 'Animes', filter: () => carregarFonte(buscarAnimes, '', 20) },
-        { key: 'piratebay', heading: 'Torrents (Pirate Bay)', filter: () => carregarFonte(buscarTPB, '', 20) },
-        { key: '1337x', heading: 'Torrents (1337x)', filter: () => carregarFonte(buscar1337x, '', 20) },
         { key: 'gamerpower', heading: 'Jogos Grátis (GamerPower)', filter: () => carregarFonte(buscarGamerPower, '', 20) },
         { key: 'internetarchive', heading: 'Jogos Retrô (Internet Archive)', filter: () => carregarFonte(buscarJogosRetro, '', 20) },
         { key: 'itunes', heading: 'Músicas (iTunes)', filter: () => carregarFonte(buscarItunes, '', 20) },
@@ -1225,8 +1110,6 @@ const ICONES_FONTE = {
         'Piped (YouTube)': '<i class="bi bi-youtube"></i>',
         'Odysee': '<i class="bi bi-camera-video"></i>',
         'MyAnimeList': '<i class="bi bi-film"></i>',
-        'Pirate Bay': '<i class="bi bi-magnet"></i>',
-        '1337x': '<i class="bi bi-magnet"></i>',
         'GamerPower': '<i class="bi bi-gift"></i>',
         'Internet Archive': '<i class="bi bi-archive"></i>',
         'iTunes': '<i class="bi bi-music-note-beamed"></i>',
@@ -1243,8 +1126,6 @@ const ICONES_FONTE = {
         { key: 'piped', label: 'Piped', icon: 'bi-youtube', heading: 'Vídeos (Piped)' },
         { key: 'odysee', label: 'Odysee', icon: 'bi-camera-video', heading: 'Vídeos (Odysee)' },
         { key: 'animes', label: 'Animes', icon: 'bi-film', heading: 'Animes' },
-        { key: 'piratebay', label: 'Pirate Bay', icon: 'bi-magnet', heading: 'Torrents (Pirate Bay)' },
-        { key: '1337x', label: '1337x', icon: 'bi-magnet', heading: 'Torrents (1337x)' },
         { key: 'gamerpower', label: 'GamerPower', icon: 'bi-gift', heading: 'Jogos Grátis (GamerPower)' },
         { key: 'internetarchive', label: 'Internet Archive', icon: 'bi-archive', heading: 'Jogos Retrô (Internet Archive)' },
         { key: 'itunes', label: 'iTunes', icon: 'bi-music-note-beamed', heading: 'Músicas (iTunes)' },
@@ -1339,8 +1220,7 @@ const ICONES_FONTE = {
         { id: 'audio', heading: 'Áudio & Rádio', icone: '<i class="bi bi-broadcast"></i>', tipo: 'categoria', categoria: 'audio', limite: 20 },
         { id: 'jogo', heading: 'Jogos', icone: '<i class="bi bi-controller"></i>', tipo: 'categoria', categoria: 'jogo', limite: 20 },
         { id: 'livro', heading: 'Livros & Curiosidades', icone: '<i class="bi bi-book-half"></i>', tipo: 'categoria', categoria: 'livro', limite: 20 },
-        { id: 'geek', heading: 'Geek: Animes & Mangás', icone: '<i class="bi bi-stars"></i>', tipo: 'categoria', categoria: 'geek', limite: 20 },
-        { id: 'torrent', heading: 'Torrents', icone: '<i class="bi bi-magnet"></i>', tipo: 'categoria', categoria: 'torrent', limite: 20 }
+        { id: 'geek', heading: 'Geek: Animes & Mangás', icone: '<i class="bi bi-stars"></i>', tipo: 'categoria', categoria: 'geek', limite: 20 }
     ];
     // Categorias "reais" da página (usadas pela nav de chips do mobile e pelo
     // header do desktop). Mantidas em um único lugar pra não duplicar a lista
@@ -1351,8 +1231,7 @@ const ICONES_FONTE = {
         { id: 'audio', label: 'Áudio', icone: 'bi-broadcast', acao: "window.nflxBuscarCategoria('audio')" },
         { id: 'jogo', label: 'Jogos', icone: 'bi-controller', acao: "window.nflxBuscarCategoria('jogo')" },
         { id: 'livro', label: 'Livros', icone: 'bi-book-half', acao: "window.nflxBuscarCategoria('livro')" },
-        { id: 'geek', label: 'Geek', icone: 'bi-stars', acao: "window.nflxBuscarCategoria('geek')" },
-        { id: 'torrent', label: 'Torrents', icone: 'bi-magnet', acao: "window.nflxBuscarCategoria('torrent')" }
+        { id: 'geek', label: 'Geek', icone: 'bi-stars', acao: "window.nflxBuscarCategoria('geek')" }
     ];
 
     // ---------------------------------------------------------------
@@ -1399,8 +1278,6 @@ const ICONES_FONTE = {
     }
 
     function labelFonte(f) {
-        if (f.categoria === 'software') return 'Copiar Magnet';
-        if (f.fonte === 'Pirate Bay' || f.fonte === '1337x') return 'Copiar Magnet';
         if (f.categoria === 'audio') return 'Ouvir';
         if (f.categoria === 'jogo') return 'Jogar / Resgatar';
         if (f.fonte === 'Open Library' || f.fonte === 'Wikipedia' || f.fonte === 'MangaDex') return 'Ler';
@@ -1563,7 +1440,7 @@ const ICONES_FONTE = {
             jogo: 'JOGO',
             audio: 'RÁDIO AO VIVO'
         };
-        const texto = f.fonte === 'Pirate Bay' ? 'TORRENT' : (map[f.categoria] || 'DESTAQUE');
+        const texto = map[f.categoria] || 'DESTAQUE';
         return `
             <div class="nflx-banner-badge">
                 <span class="nflx-banner-badge-mark"><i class="bi bi-play-fill"></i></span>
@@ -1579,7 +1456,7 @@ const ICONES_FONTE = {
                 <div class="nflx-banner-mask"></div>
                 <div class="nflx-banner-details">
                     <h1 class="nflx-banner-title">Bem-vindo ao Mídias</h1>
-                    <p class="nflx-banner-synopsis">Descubra vídeos, torrents, jogos grátis, jogos retrô e rádios em um só lugar.</p>
+                    <p class="nflx-banner-synopsis">Descubra vídeos, jogos grátis, jogos retrô e rádios em um só lugar.</p>
                 </div>
             </div>`;
         }
@@ -1625,7 +1502,6 @@ const ICONES_FONTE = {
                     <span class="nflx-nav-item" onclick="window.nflxBuscarGeek()">Geek</span>
                     <span class="nflx-nav-item" onclick="window.nflxBuscarMusicas()">Música</span>
                     <span class="nflx-nav-item" onclick="window.nflxBuscarCategoria('openlibrary')">Livros</span>
-                    <span class="nflx-nav-item" onclick="window.nflxBuscarCategoria('torrent')">Torrents</span>
                 </span>
             </div>
             <div class="nflx-nav-right">
@@ -1714,7 +1590,7 @@ const ICONES_FONTE = {
     // ---------------------------------------------------------------
     // PREENCHIMENTO DAS SEÇÕES DINÂMICAS
     //   Em Alta (mais acessados), Recentes, Recomendados e categorias
-    //   (Vídeos, Jogos, Rádios, Torrents) — sem repetir itens entre elas.
+    //   (Vídeos, Jogos, Rádios) — sem repetir itens entre elas.
     // ---------------------------------------------------------------
     function preencherSecoesDinamicas() {
         const acessos = getAcessos();
@@ -2094,16 +1970,26 @@ const ICONES_FONTE = {
         }
         wrap.innerHTML = `
             <div class="nflx-modal-backdrop" onclick="window.nflxFecharFontes()"></div>
-            <div class="nflx-modal nflx-fontes-modal">
-                <div class="nflx-fontes-head">
-                    <div>
-                        <h2 class="nflx-modal-title" style="margin:0;"><i class="bi bi-sliders me-2"></i>Gerenciar fontes</h2>
-                        <p class="nflx-fontes-sub">Somente as fontes ativas aparecem no menu e carregam no Mídias. <strong>${countAtivas} de ${FONTES_SIDEBAR.length}</strong> ativas.</p>
+            <div class="modal-content border-0 shadow-lg" style="width:min(90vw,460px);border-radius:16px;max-height:86vh;overflow:hidden;">
+                <div class="modal-header border-0 pb-0 justify-content-center position-relative">
+                    <div class="text-center">
+                        <h5 class="modal-title fw-bold" style="font-size:1.1rem;"><i class="bi bi-sliders me-2"></i>Gerenciar fontes</h5>
+                        <p class="text-muted small mb-0">Somente as fontes ativas aparecem no menu e carregam no Mídias. <strong>${countAtivas} de ${FONTES_SIDEBAR.length}</strong> ativas.</p>
                     </div>
-                    <div class="nflx-modal-x" onclick="window.nflxFecharFontes()"><i class="bi bi-x-lg"></i></div>
+                    <button type="button" class="ml-auth-close" onclick="window.nflxFecharFontes()" aria-label="Fechar"><i class="bi bi-x-lg"></i></button>
                 </div>
-                <div class="nflx-fontes-list">
-                    ${lista}
+                <div class="modal-body pt-2" style="overflow-y:auto;">
+                    <div class="create-ad-section">
+                        <div class="create-ad-section-title"><i class="bi bi-sliders"></i><span>Fontes disponíveis</span></div>
+                        <div class="create-ad-section-body" style="padding:10px;">
+                            <div style="display:flex;flex-direction:column;gap:6px;">
+                                ${lista}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="button" class="ml-btn ml-btn-primary flex-grow-1" onclick="window.nflxFecharFontes()"><i class="bi bi-check-lg me-2"></i>Concluir</button>
+                    </div>
                 </div>
             </div>`;
         wrap.classList.remove('d-none');
@@ -2202,19 +2088,6 @@ const ICONES_FONTE = {
         if (!f) { showToast('Item não encontrado.', 'warning'); return; }
         registrarAcesso(id);
 
-        if (f.fonte === 'Pirate Bay') {
-            if (f.link && f.link.startsWith('magnet:')) {
-                navigator.clipboard.writeText(f.link).then(() => {
-                    showToast('<i class="bi bi-link-45deg"></i> Link magnético copiado!', 'success', 2500);
-                }).catch(() => {
-                    prompt('Copie o link magnético manualmente:', f.link);
-                });
-            } else {
-                showToast('<i class="bi bi-magnet"></i> Torrent disponível!', 'info', 2000);
-            }
-            return;
-        }
-
         if (f.fonte === 'iTunes') {
             window.open(f.link, '_blank', 'noopener');
             showToast('<i class="bi bi-music-note-beamed"></i> Abrindo no iTunes / Apple Music', 'info', 2500);
@@ -2283,14 +2156,13 @@ const ICONES_FONTE = {
 
     // ---------------------------------------------------------------
     // BUSCA — pesquisa de verdade nas fontes (Invidious, Piped,
-    // Odysee, Pirate Bay, GamerPower, Jogos Retrô, Rádios), com debounce
+    // Odysee, GamerPower, Jogos Retrô, Rádios), com debounce
     // ---------------------------------------------------------------
     const FONTES_BUSCA = [
         { key: 'invidious', icone: ICONES_FONTE['Invidious (YouTube)'], heading: 'Vídeos (Invidious)', busca: (q) => carregarFonte(buscarInvidious, q, 12) },
         { key: 'piped', icone: ICONES_FONTE['Piped (YouTube)'], heading: 'Vídeos (Piped)', busca: (q) => carregarFonte(buscarPiped, q, 12) },
         { key: 'odysee', icone: ICONES_FONTE['Odysee'], heading: 'Vídeos (Odysee)', busca: (q) => carregarFonte(buscarOdysee, q, 12) },
         { key: 'animes', icone: ICONES_FONTE['MyAnimeList'], heading: 'Animes', busca: (q) => carregarFonte(buscarAnimes, q, 12) },
-        { key: 'piratebay', icone: ICONES_FONTE['Pirate Bay'], heading: 'Torrents (Pirate Bay)', busca: (q) => carregarFonte(buscarTPB, q, 12) },
         { key: 'gamerpower', icone: ICONES_FONTE['GamerPower'], heading: 'Jogos Grátis (GamerPower)', busca: (q) => carregarFonte(buscarGamerPower, q, 12) },
         { key: 'internetarchive', icone: ICONES_FONTE['Internet Archive'], heading: 'Jogos Retrô (Internet Archive)', busca: (q) => carregarFonte(buscarJogosRetro, q, 12) },
         { key: 'epic_oficial', icone: ICONES_FONTE['Epic Games (Oficial)'], heading: 'Epic Games (Oficial)', busca: (q) => carregarFonte(buscarEpic_Oficial, q, 12) }
@@ -2610,8 +2482,6 @@ const ICONES_FONTE = {
         piped: { heading: 'Vídeos (Piped)', carregar: () => buscarPiped('', 24) },
         odysee: { heading: 'Vídeos (Odysee)', carregar: () => buscarOdysee('', 24) },
         animes: { heading: 'Animes', carregar: () => buscarAnimes('', 24) },
-        piratebay: { heading: 'Torrents (Pirate Bay)', carregar: () => buscarTPB('', 24) },
-        '1337x': { heading: 'Torrents (1337x)', carregar: () => buscar1337x('', 24) },
         gamerpower: { heading: 'Jogos Grátis (GamerPower)', carregar: () => buscarGamerPower('', 24) },
         internetarchive: { heading: 'Jogos Retrô (Internet Archive)', carregar: () => buscarJogosRetro('', 24) },
         itunes: { heading: 'Mídias (Música)', carregar: () => buscarItunes('', 24) },
@@ -2625,13 +2495,11 @@ const ICONES_FONTE = {
 
     window.nflxBuscarCategoria = async function(categoria) {
         window.nflxLimparBusca();
-        const sectionMap = { video: 'video', jogo: 'jogo', geek: 'geek', audio: 'audio', livro: 'livro', torrent: 'torrent' };
+        const sectionMap = { video: 'video', jogo: 'jogo', geek: 'geek', audio: 'audio', livro: 'livro' };
         const sourceMap = {
             invidious: 'Vídeos (Invidious)',
             piped: 'Vídeos (Piped)',
             odysee: 'Vídeos (Odysee)',
-            piratebay: 'Torrents (Pirate Bay)',
-            '1337x': 'Torrents (1337x)',
             gamerpower: 'Jogos Grátis (GamerPower)',
             internetarchive: 'Jogos Retrô (Internet Archive)',
             radiobrowser: 'Mídias (Rádios)',
@@ -2784,8 +2652,7 @@ const ICONES_FONTE = {
         setupCarousels();
     };
 
-    // Navegação "Vídeos": junta Vídeos (Invidious/Piped/Odysee) + Torrents
-    // (Pirate Bay/1337x) em uma única tela.
+    // Navegação "Vídeos": junta Invidious/Piped/Odysee em uma única tela.
     window.nflxBuscarVideos = async function() {
         const browse = document.getElementById('nflxBrowseContent');
         const results = document.getElementById('nflxSearchContent');
@@ -2793,11 +2660,11 @@ const ICONES_FONTE = {
 
         browse.classList.add('d-none');
         results.classList.remove('d-none');
-        results.innerHTML = `<div class="yt-loading"><i class="bi bi-hourglass-split"></i> Carregando "<strong>Vídeos & Torrents</strong>"...</div>`;
+        results.innerHTML = `<div class="yt-loading"><i class="bi bi-hourglass-split"></i> Carregando "<strong>Vídeos</strong>"...</div>`;
 
-        const fontes = ['invidious', 'piped', 'odysee', 'piratebay', '1337x'].filter(k => isFonteAtiva(k));
+        const fontes = ['invidious', 'piped', 'odysee'].filter(k => isFonteAtiva(k));
         if (!fontes.length) {
-            results.innerHTML = `<div class="yt-loading"><i class="bi bi-emoji-frown"></i> As fontes de Vídeos e Torrents estão desativadas. Ative-as em "Gerenciar fontes".</div>`;
+            results.innerHTML = `<div class="yt-loading"><i class="bi bi-emoji-frown"></i> As fontes de Vídeos estão desativadas. Ative-as em "Gerenciar fontes".</div>`;
             return;
         }
 
@@ -2826,7 +2693,7 @@ const ICONES_FONTE = {
         if (!secoesHtml) {
             results.innerHTML = `<div class="yt-loading"><i class="bi bi-wifi-off"></i> Serviço temporariamente indisponível — tente novamente em instantes.</div>`;
         } else {
-            results.innerHTML = `<div class="yt-loading"><i class="bi bi-play-btn-fill"></i> Vídeos & Torrents</div>${secoesHtml}`;
+            results.innerHTML = `<div class="yt-loading"><i class="bi bi-play-btn-fill"></i> Vídeos</div>${secoesHtml}`;
         }
         setupCarousels();
     };
@@ -3003,8 +2870,6 @@ const ICONES_FONTE = {
     window.buscarInvidious = buscarInvidious;
     window.buscarPiped = buscarPiped;
     window.buscarOdysee = buscarOdysee;
-    window.buscarTPB = buscarTPB;
-    window.buscar1337x = buscar1337x;
     window.buscarGamerPower = buscarGamerPower;
     window.buscarJogosRetro = buscarJogosRetro;
     window.buscarItunes = buscarItunes;
