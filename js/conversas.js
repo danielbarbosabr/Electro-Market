@@ -1375,13 +1375,14 @@ window.sendDirectChatImage = async function(urlParam) {
     const url = normalizeImageUrl(rawUrl);
     const user = getSavedUser();
     if (!user || !window.currentChat) return;
-    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+    const isDrive = /drive\.google\.com/i.test(url);
+    const isVideo = isDrive || /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
     const isGif = /\.gif$/i.test(url);
     try {
         const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
         const chat = chatResult?.[0];
         if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
-        const msg = { senderId: user.id, senderName: user.nome, text: isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem'), timestamp: new Date().toISOString() };
+        const msg = { senderId: user.id, senderName: user.nome, text: isDrive ? 'Google Drive' : (isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem')), timestamp: new Date().toISOString() };
         if (isVideo) { msg.type = 'video'; msg.video = url; }
         else { msg.type = 'image'; msg.image = url; }
         chat.messages.push(msg);
@@ -1418,19 +1419,19 @@ window.detectAudioSource = function(url) {
     if (host.includes('spotify.com')) {
         const m = u.match(/spotify\.com\/(?:intl-[\w-]+\/)?track\/([A-Za-z0-9]+)/);
         const id = m ? m[1] : null;
-        return { source: 'spotify', label: 'Spotify', playable: false, embedUrl: id ? `https://open.spotify.com/embed/track/${id}` : '' };
+        return { source: 'spotify', label: 'Spotify', playable: false, embedUrl: id ? `https://open.spotify.com/embed/track/${id}?autoplay=1` : '' };
     }
     if (host === 'music.youtube.com' || host.endsWith('.music.youtube.com')) {
         const m = u.match(/[?&]v=([A-Za-z0-9_-]{11})/);
         const id = m ? m[1] : null;
-        return { source: 'ytmusic', label: 'YouTube Music', playable: false, embedUrl: id ? `https://www.youtube.com/embed/${id}` : '' };
+        return { source: 'ytmusic', label: 'YouTube Music', playable: false, embedUrl: id ? `https://www.youtube.com/embed/${id}?autoplay=1` : '' };
     }
     if (host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com')) {
         const m = u.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([A-Za-z0-9_-]{11})/);
         const id = m ? m[1] : null;
-        return { source: 'youtube', label: 'YouTube', playable: false, embedUrl: id ? `https://www.youtube.com/embed/${id}` : '' };
+        return { source: 'youtube', label: 'YouTube', playable: false, embedUrl: id ? `https://www.youtube.com/embed/${id}?autoplay=1` : '' };
     }
-    if (host.includes('soundcloud.com')) return { source: 'soundcloud', label: 'SoundCloud', playable: false, embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}` };
+    if (host.includes('soundcloud.com')) return { source: 'soundcloud', label: 'SoundCloud', playable: false, embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=true` };
     return { source: 'link', label: 'Link', playable: false };
 };
 
@@ -1442,6 +1443,7 @@ window.fetchAudioMeta = async function(url) {
     if (host.includes('spotify.com')) cands.push('https://open.spotify.com/oembed?url=' + encodeURIComponent(url));
     if (host.includes('youtube.com') || host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'music.youtube.com') cands.push('https://www.youtube.com/oembed?url=' + encodeURIComponent(url) + '&format=json');
     if (host.includes('soundcloud.com')) cands.push('https://soundcloud.com/oembed?url=' + encodeURIComponent(url) + '&format=json');
+    if (host.includes('vimeo.com')) cands.push('https://vimeo.com/api/oembed.json?url=' + encodeURIComponent(url));
     for (const c of cands) {
         try {
             const r = await fetch(c, { headers: { 'Accept': 'application/json' } });
@@ -1525,6 +1527,71 @@ window.sendChatExternalAudio = async function(rawUrl) {
         playable: !!src.playable
     };
     await saveChatAudioMessage(audioObj);
+};
+
+// Identifica o tipo de um link colado no anexo de Fotos e vídeos
+// (mesma ideia do detectAudioSource, só que pra imagem/gif/vídeo).
+window.detectImageSource = function(url) {
+    const u = url.toLowerCase();
+    let host = '';
+    try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { }
+    if (/\.gif(\?|$)/i.test(u)) return { type: 'gif', label: 'GIF' };
+    if (/\.(jpe?g|png|webp|bmp|svg)(\?|$)/i.test(u) || u.startsWith('data:image')) return { type: 'image', label: 'Imagem' };
+    if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(u)) return { type: 'video', label: 'Vídeo' };
+    if (host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com')) return { type: 'youtube', label: 'YouTube' };
+    if (host.includes('vimeo.com')) return { type: 'vimeo', label: 'Vimeo' };
+    if (host === 'drive.google.com') {
+        // Aceita ".../file/d/ID/view" e "...?id=ID" — mesma extração usada
+        // no embed (buildChatVideoIframe), pra pegar o ID do arquivo.
+        let fileId = '';
+        try {
+            const parsed = new URL(url);
+            const m = parsed.pathname.match(/\/file\/d\/([^/]+)/);
+            fileId = m ? m[1] : (parsed.searchParams.get('id') || '');
+        } catch (e) { }
+        return { type: 'drive', label: 'Google Drive', fileId };
+    }
+    return { type: 'link', label: 'Link' };
+};
+
+// Prévia ao vivo do link colado em Fotos e vídeos: mostra miniatura + tipo
+// identificado, igual ao que já acontece no anexo de Áudio.
+window.previewChatImageLink = async function(input) {
+    const url = (input.value || '').trim();
+    const prev = document.getElementById('chatImageLinkPreview');
+    if (!prev) return;
+    if (!url || !/^https?:\/\//i.test(url)) { prev.classList.add('d-none'); prev.innerHTML = ''; return; }
+    prev.classList.remove('d-none');
+    prev.innerHTML = '<div class="chat-audio-preview-loading"><i class="bi bi-arrow-repeat spin"></i> Analisando link…</div>';
+    const src = window.detectImageSource(url);
+    let thumb = '';
+    let title = src.label;
+    if (src.type === 'image' || src.type === 'gif') {
+        thumb = url;
+        title = decodeURIComponent(url.split('/').pop() || src.label);
+    } else if (src.type === 'youtube' || src.type === 'vimeo') {
+        const meta = window.fetchAudioMeta ? await window.fetchAudioMeta(url) : null;
+        thumb = meta?.thumbnail || '';
+        title = meta?.title || src.label;
+    } else if (src.type === 'drive' && src.fileId) {
+        // Miniatura pública do Drive (funciona pra imagem e vídeo, desde
+        // que o arquivo esteja compartilhado como "qualquer pessoa com o link").
+        thumb = `https://drive.google.com/thumbnail?id=${src.fileId}&sz=w200`;
+        title = 'Arquivo do Google Drive';
+    }
+    const iconClass = (src.type === 'video' || src.type === 'youtube' || src.type === 'vimeo' || src.type === 'drive') ? 'bi-camera-video' : 'bi-image';
+    const thumbInner = thumb
+        ? `<img src="${thumb.replace(/"/g, '%22')}" alt="" onerror="this.parentElement.innerHTML='<i class=\\'bi ${iconClass}\\'></i>'">`
+        : `<i class="bi ${iconClass}"></i>`;
+    prev.innerHTML = `
+        <div class="wa-audio is-them is-preview">
+            <div class="wa-avatar">${thumbInner}</div>
+            <div class="wa-play"><i class="bi bi-link-45deg"></i></div>
+            <div class="wa-audio-body">
+                <div class="wa-info">${window.escapeHtml ? window.escapeHtml(title) : title}</div>
+                <div class="wa-meta"><span class="wa-dur">${src.label}</span></div>
+            </div>
+        </div>`;
 };
 
 window.confirmDirectChatAttach = async function() {

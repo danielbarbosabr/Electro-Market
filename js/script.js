@@ -3046,13 +3046,14 @@ window.sendChatImage = async function(urlParam) {
     const url = normalizeImageUrl(rawUrl);
     const user = getSavedUser();
     if (!user || !window.currentChat) return;
-    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+    const isDrive = /drive\.google\.com/i.test(url);
+    const isVideo = isDrive || /\.(mp4|webm|ogg|mov)$/i.test(url) || /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
     const isGif = /\.gif$/i.test(url);
     try {
         const chatResult = await supabaseFetch(`chats?order_id=eq.${window.currentChat}&limit=1`);
         const chat = chatResult?.[0];
         if (!chat) { showToast('Chat não encontrado.', 'error'); return; }
-        const msg = {senderId: user.id, senderName: user.nome, text: isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem'), timestamp: new Date().toISOString()};
+        const msg = {senderId: user.id, senderName: user.nome, text: isDrive ? 'Google Drive' : (isVideo ? 'Vídeo' : (isGif ? 'GIF' : 'Imagem')), timestamp: new Date().toISOString()};
         if (isVideo) { msg.type = 'video'; msg.video = url; }
         else { msg.type = 'image'; msg.image = url; }
         chat.messages.push(msg);
@@ -3117,7 +3118,9 @@ window.setChatAttachType = function(type, panelId) {
 };
 
 window.abrirDocHost = function(host) {
-    const url = host === 'Google Drive' ? 'https://drive.google.com/u/0/?usp=upload' : 'https://onedrive.live.com/?auth=1&id=root&cid=&action=upload';
+    // Link fixo de "upload direto" do Drive (usp=upload) não é mais suportado
+    // pelo Google; abrir a raiz do Drive é o link que funciona de verdade.
+    const url = host === 'Google Drive' ? 'https://drive.google.com/drive/my-drive' : 'https://onedrive.live.com/?auth=1&id=root&cid=&action=upload';
     window.open(url, '_blank', 'noopener');
     showToast(`Abra o ${host}, copie o link e cole em Documentos.`, 'info');
 };
@@ -6485,9 +6488,10 @@ window.renderChatContainer = function(opts) {
             <div id="${attachPanelId}ImageBox" class="d-none">
                 <div class="input-group input-group-sm mb-2">
                     <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
-                    <input type="url" id="${attachLinkId}" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF...">
+                    <input type="url" id="${attachLinkId}" class="form-control" placeholder="Cole o link da imagem, vídeo ou GIF..." oninput="window.previewChatImageLink(this)">
                     <button type="button" class="ml-attach" onclick="${onConfirmAttach}"><i class="bi bi-send"></i></button>
                 </div>
+                <div id="chatImageLinkPreview" class="chat-audio-preview d-none mt-2"></div>
                 <div class="d-flex gap-2">
                     <label class="ml-attach flex-grow-1" style="cursor:pointer;">
                         <i class="bi bi-cloud-upload"></i>Escolher arquivos
@@ -6526,8 +6530,8 @@ window.renderChatContainer = function(opts) {
                 </div>
                 <div id="audioLinkPreview" class="chat-audio-preview d-none mt-2"></div>
                 <div class="d-flex gap-2 mt-2">
-                    <button type="button" class="ml-attach flex-grow-1" onclick="window.open('https://www.youtube.com','_blank','noopener')"><i class="bi bi-youtube" style="color:#ff0000;"></i> YouTube</button>
-                    <button type="button" class="ml-attach flex-grow-1" onclick="window.open('https://open.spotify.com','_blank','noopener')"><i class="bi bi-music-note-beamed" style="color:#1db954;"></i> Spotify</button>
+                    <button type="button" class="ml-attach flex-grow-1" onclick="window.open('https://soundcloud.com','_blank','noopener')"><i class="bi bi-soundwave"></i> SoundCloud</button>
+                    <button type="button" class="ml-attach flex-grow-1" onclick="window.open('https://open.spotify.com','_blank','noopener')"><i class="bi bi-spotify"></i> Spotify</button>
                 </div>
             </div>
         </div>
