@@ -884,7 +884,7 @@ window.toggleDirectChatParticipants = async function(chatId, forceReload) {
         const directMeta = chat.messages?.[0]?.type === 'direct_chat_meta' ? chat.messages[0] : null;
         const me = getSavedUser();
 
-        const isOfficialGroup = community || isGlobalGroupChat(chat);
+        const isOfficialGroup = isCommunityChat(chat) || isGlobalGroupChat(chat);
         const groupName = isOfficialGroup ? COMMUNITY_DISPLAY_NAME : (directMeta?.groupName || chat.seller_name || 'Grupo');
         const groupAvatarHtml = isOfficialGroup
             ? `<img src="${COMMUNITY_AVATAR}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&background=00A884&color=fff&bold=true'">`
