@@ -2891,6 +2891,7 @@ async function loadChatMessages(orderId, silent = false) {
                 useDropdown: true, enableGrouping: false
             });
         }).join('');
+
         if (wasNearBottom) {
             container.scrollTop = container.scrollHeight;
         } else if (isNewIncoming) {
@@ -3107,7 +3108,7 @@ window.setChatAttachType = function(type, panelId) {
     }
     chatAttachType = type;
     panel.setAttribute('data-attach-view', 'content');
-    const mapping = { image: `${panel.id}ImageBox`, file: `${panel.id}FileBox`, location: `${panel.id}LocationBox` };
+    const mapping = { image: `${panel.id}ImageBox`, file: `${panel.id}FileBox`, location: `${panel.id}LocationBox`, audio: `${panel.id}AudioBox` };
     Object.entries(mapping).forEach(([t, id]) => {
         const el = document.getElementById(id);
         if (el) el.classList.toggle('d-none', type !== t);
@@ -5349,7 +5350,7 @@ function buildChatVideoIframe(rawUrl) {
     const safeEmbed = embedSrc.replace(/"/g, '&quot;');
     return `
         <div class="chat-video-embed">
-            <iframe src="${safeEmbed}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen
+            <iframe src="${safeEmbed}" width="100%" height="100%" frameborder="0" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen
                     onerror="this.parentElement.outerHTML='<a href=\\'${safeUrl}\\' target=\\'_blank\\' class=\\'small text-break\\'>${safeUrl}</a>'"></iframe>
         </div>`;
 }
@@ -5451,11 +5452,30 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             <span class="chat-file-name">${cleanText.replace(/^Arquivo:\s*/, '') || msg.file.name || 'Arquivo'}</span>
         </a>` : '';
 
-    const locationChipHtml = (msg.type === 'location') ? `
-        <a href="${msg.location || '#'}" target="_blank" rel="noopener" class="chat-location-chip mb-2" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:rgba(230,126,34,0.12);color:#e67e22;padding:6px 10px;border-radius:8px;font-weight:600;">
-            <i class="bi bi-geo-alt-fill"></i>
-            <span>${window.escapeHtml?.(cleanText || 'Localização compartilhada') ?? (cleanText || 'Localização compartilhada')}</span>
-        </a>` : '';
+    const buildGoogleEmbedSrc = (url) => {
+        if (!url || !/^https?:\/\//i.test(url)) return '';
+        try {
+            const u = new URL(url);
+            let q = u.searchParams.get('q') || u.searchParams.get('query');
+            if (!q) {
+                const sp = u.pathname.match(/\/maps\/search\/(.+)$/);
+                q = sp ? decodeURIComponent(sp[1]) : url;
+            }
+            return `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=16&hl=pt-BR&t=m&output=embed`;
+        } catch (e) { return ''; }
+    };
+
+    const isLocationMsg = msg.type === 'location';
+    const locationEmbedSrc = isLocationMsg ? buildGoogleEmbedSrc(msg.location) : '';
+    const locationTime = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const locationChipHtml = isLocationMsg ? `
+        <div class="chat-location-card mb-2">
+            <a href="${msg.location || '#'}" target="_blank" rel="noopener" class="chat-location-card-link" title="Abrir no Google Maps" aria-label="Abrir no Google Maps">
+                <iframe class="chat-location-iframe" src="${locationEmbedSrc || ''}" width="100%" height="100%" frameborder="0" loading="lazy" referrerpolicy="no-referrer" tabindex="-1" title="Localização"></iframe>
+                <span class="chat-location-pin" aria-hidden="true"><i class="bi bi-geo-alt-fill"></i></span>
+                <span class="chat-location-time">${locationTime}<i class="bi bi-check2 chat-location-check"></i></span>
+            </a>
+        </div>` : '';
 
     const searchResultsHtml = (msg.searchResults?.length) ? `
         <div class="d-flex flex-column gap-2 mt-2">
@@ -5467,7 +5487,45 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             `).join('')}
         </div>` : '';
 
-    const showTextCaption = cleanText && !(msg.type === 'image' && (cleanText === 'Imagem' || cleanText === 'GIF')) && !(msg.type === 'file' && msg.file) && !(msg.type === 'video') && !msg.searchResults;
+    const showTextCaption = cleanText && !(msg.type === 'image' && (cleanText === 'Imagem' || cleanText === 'GIF')) && !(msg.type === 'file' && msg.file) && !(msg.type === 'video') && !msg.searchResults && !(msg.type === 'location') && !(msg.type === 'audio');
+
+    const audioCardHtml = (msg.type === 'audio' && msg.audio) ? (() => {
+        const a = msg.audio;
+        const key = 'audio-' + index;
+        window._chatAudioData = window._chatAudioData || {};
+        window._chatAudioData[key] = a;
+        const isTts = a.audioType === 'tts';
+        const senderAvatarSrc = isMe ? myAvatar : avatarForThem;
+        const avatarInner = a.thumbnail
+            ? `<img src="${String(a.thumbnail).replace(/"/g, '%22')}" alt="" onerror="this.style.display='none'">`
+            : (senderAvatarSrc
+                ? `<img src="${String(senderAvatarSrc).replace(/"/g, '%22')}" alt="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement('i'),{className:'bi ${isTts ? 'bi-soundwave' : 'bi-music-note-beamed'}'}))">`
+                : (isTts ? '<i class="bi bi-soundwave"></i>' : '<i class="bi bi-music-note-beamed"></i>'));
+        const wave = (a.waveform && a.waveform.length ? a.waveform : makeFakeWaveform());
+        const bars = wave.map((h, i) => `<span class="wa-bar" data-i="${i}" style="height:${(Math.max(0.18, Math.min(1, h)) * 100).toFixed(0)}%"></span>`).join('');
+        const dur = a.duration ? formatChatDur(a.duration) : '0:00';
+        const info = (!isTts && (a.title || a.artist)) ? [a.title, a.artist].filter(Boolean).join(' — ') : '';
+        const playTitle = isTts ? 'Ouvir voz sintetizada' : (a.embedUrl ? 'Reproduzir' : 'Abrir');
+        const clockTime = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+        const ticksHtml = isMe ? `<span class="wa-ticks">${msg.visto ? '<i class="bi bi-check-all"></i>' : '<i class="bi bi-check"></i>'}</span>` : '';
+        return `
+        <div class="wa-audio ${isMe ? 'is-me' : 'is-them'}" data-audio-key="${key}">
+            <div class="wa-avatar">${avatarInner}${isTts ? '<span class="wa-mic-badge"><i class="bi bi-mic-fill"></i></span>' : ''}</div>
+            <button type="button" class="wa-play" onclick="window.toggleChatAudio('${key}', this)" title="${playTitle}"><i class="bi bi-play-fill"></i></button>
+            <div class="wa-audio-body">
+                ${info ? `<div class="wa-info">${window.escapeHtml ? window.escapeHtml(info) : info}</div>` : ''}
+                <div class="wa-wave" onclick="window.seekChatAudio(event, '${key}', this)">
+                    <span class="wa-progress-dot"></span>
+                    ${bars}
+                </div>
+                <div class="wa-meta">
+                    <span class="wa-time" id="${key}-time" data-dur="${dur}">${dur}</span>
+                    ${clockTime ? `<span class="wa-clock">${clockTime}</span>` : ''}
+                    ${ticksHtml}
+                </div>
+            </div>
+        </div>`;
+    })() : '';
 
     // Reação
     const reaction = msg.reaction || null;
@@ -5506,11 +5564,11 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
     <div class="msg-row ${isMe ? 'is-me' : 'is-them'}${isGrouped ? ' msg-grouped' : ''}" data-msg-index="${index}">
         ${!isMe && !isGrouped ? `<img class="msg-avatar" src="${avatarForThem}" referrerpolicy="no-referrer"${avatarClickAttr(avatarForThem)} onerror="this.onerror=null;this.style.display='none'">` : ''}
         ${!isMe && isGrouped ? '<div class="msg-avatar-spacer"></div>' : ''}
-        <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''} ${bubblePosition}" style="margin-bottom:${reaction ? '10px' : '0'}">
-            <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+        <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}${isStaff ? ' is-staff' : ''}${audioCardHtml ? ' is-audio' : ''} ${bubblePosition}" style="margin-bottom:${reaction ? '10px' : '0'}">
+            ${audioCardHtml ? '' : `<div class="d-flex justify-content-between align-items-center mb-1 gap-2">
                 ${!isGrouped ? `<span class="msg-sender">${senderLabel}${isStaff ? ' <i class="bi bi-patch-check-fill" title="Suporte"></i>' : ''}</span>` : '<span></span>'}
                 ${buildActions()}
-            </div>
+            </div>`}
             ${replyHtml}
             ${msg.image ? `
                 <img src="${msg.image}" class="img-fluid rounded mb-2" referrerpolicy="no-referrer"
@@ -5519,19 +5577,389 @@ window.renderMsgBubble = function(msg, index, opts = {}) {
             ${msg.video ? buildChatVideoIframe(msg.video) : ''}
             ${fileChipHtml}
             ${locationChipHtml}
+            ${audioCardHtml}
             ${showTextCaption ? `<div class="chat-bubble-text" style="white-space:pre-wrap;">${window.formatLinks?.(cleanText) ?? cleanText}</div>` : ''}
             ${searchResultsHtml}
-            <div class="msg-time">
+            ${isLocationMsg ? '' : (audioCardHtml
+                // Áudio já mostra horário + tiques dentro do próprio player (wa-meta);
+                // aqui só sobra espaço para os indicadores extras, se existirem.
+                ? ((msg.starred || msg.edited) ? `<div class="msg-time">
+                    ${msg.starred ? '<i class="bi bi-star-fill text-warning me-1" style="font-size:0.65rem;" title="Favoritada"></i>' : ''}
+                    ${msg.edited ? '<span>(editada)</span>' : ''}
+                </div>` : '')
+                : `<div class="msg-time">
                 ${msg.starred ? '<i class="bi bi-star-fill text-warning me-1" style="font-size:0.65rem;" title="Favoritada"></i>' : ''}
                 ${isMe ? `<span class="msg-status me-1">${msg.visto ? '<span class="text-info"><i class="bi bi-check-all"></i> Visto</span>' : '<span class="text-muted"><i class="bi bi-check"></i> Entregue</span>'}</span>` : ''}
                 ${msg.edited ? '<span>(editada)</span>' : ''}
                 ${new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}
-            </div>
+            </div>`)}
             ${reactionBadgeHtml}
         </div>
             ${isMe && showAvatar ? `<img class="msg-avatar" src="${myAvatar}" referrerpolicy="no-referrer"${avatarClickAttr(myAvatar)} onerror="this.onerror=null;this.style.display='none'">` : ''}
             ${isMe && !showAvatar ? '<div class="msg-avatar-spacer"></div>' : ''}
         </div>`;
+};
+
+/* ---------- Áudios (TTS + link externo, sem binário no banco) ---------- */
+
+function makeFakeWaveform(len) {
+    len = len || 26;
+    const out = [];
+    for (let i = 0; i < len; i++) out.push(0.22 + 0.6 * Math.abs(Math.sin(i * 0.7)) * (0.6 + 0.4 * Math.random()));
+    return out;
+}
+
+function formatChatDur(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return m + ':' + String(s).padStart(2, '0');
+}
+
+// Estima a duração de uma fala TTS a partir da contagem de palavras
+// (~150 palavras por minuto), pra já mostrar um tempo plausível antes
+// mesmo de o áudio tocar pela primeira vez.
+window.estimateTtsDuration = function(text) {
+    const words = (text || '').trim().split(/\s+/).filter(Boolean).length;
+    if (!words) return 1;
+    return Math.max(1, Math.round((words / 150) * 60));
+};
+
+window._chatAudioData = window._chatAudioData || {};
+window._chatAudio = { key: null, el: null };
+window._ttsState = null;
+
+window.toggleChatAudio = function(key, btn) {
+    const data = window._chatAudioData[key];
+    if (!data) return;
+    const card = btn.closest('.wa-audio');
+    if (data.audioType === 'tts') { window._speakTts(data, card); return; }
+    if (data.embedUrl) { window.openAudioEmbed(data, card); return; }
+    if (data.playable && data.url) { window._playUploadedAudio(key, data, card); return; }
+    if (data.originalUrl) window.open(data.originalUrl, '_blank', 'noopener');
+};
+
+window._speakTts = function(data, card) {
+    if (!('speechSynthesis' in window)) { showToast('Este navegador não suporta texto em voz.', 'warning'); return; }
+    if (window._ttsState && (card ? window._ttsState.card === card : true) && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        if (window._ttsState.timer) clearInterval(window._ttsState.timer);
+        if (card) setTtsPlaying(card, false);
+        window._ttsState = null;
+        return;
+    }
+    window.speechSynthesis.cancel();
+    if (window._ttsState?.timer) clearInterval(window._ttsState.timer);
+
+    const u = new SpeechSynthesisUtterance(data.text || '');
+    u.lang = data.language || 'pt-BR';
+    window._applyTtsVoice(u, data.voice);
+
+    const estimatedDur = data.duration || window.estimateTtsDuration(data.text);
+    const startedAt = performance.now();
+
+    window._ttsState = { card, utter: u, timer: null };
+
+    u.onstart = () => {
+        if (!card) return;
+        setTtsPlaying(card, true);
+        window._ttsState.timer = setInterval(() => {
+            const elapsed = (performance.now() - startedAt) / 1000;
+            updateTtsProgress(card, Math.min(elapsed, estimatedDur), estimatedDur);
+        }, 200);
+    };
+    u.onend = () => {
+        if (window._ttsState?.timer) clearInterval(window._ttsState.timer);
+        const realDur = Math.max(1, Math.round((performance.now() - startedAt) / 1000));
+        data.duration = realDur;
+        if (card) {
+            setTtsPlaying(card, false);
+            const t = card.querySelector('.wa-time');
+            if (t) { t.dataset.dur = formatChatDur(realDur); t.textContent = t.dataset.dur; }
+            const idxMatch = card.dataset?.audioKey?.match(/^audio-(\d+)$/);
+            if (idxMatch && window._updateAudioDurationInChat) {
+                window._updateAudioDurationInChat(window.currentChat, parseInt(idxMatch[1], 10), realDur);
+            }
+        }
+        window._ttsState = null;
+    };
+    u.onerror = () => {
+        if (window._ttsState?.timer) clearInterval(window._ttsState.timer);
+        if (card) setTtsPlaying(card, false);
+        window._ttsState = null;
+    };
+    window.speechSynthesis.speak(u);
+};
+
+window._applyTtsVoice = function(u, voiceName) {
+    if (!voiceName || !window.speechSynthesis) return;
+    const v = window.speechSynthesis.getVoices().find(x => x.name === voiceName || x.voiceURI === voiceName);
+    if (v) u.voice = v;
+};
+
+function updateTtsProgress(card, elapsedSec, totalSec) {
+    const frac = totalSec > 0 ? Math.min(1, elapsedSec / totalSec) : 0;
+    const bars = card.querySelectorAll('.wa-bar');
+    bars.forEach((b, i) => b.classList.toggle('on', bars.length ? (i / bars.length) <= frac : false));
+    const dot = card.querySelector('.wa-progress-dot');
+    if (dot) dot.style.left = `${Math.min(100, Math.max(0, frac * 100))}%`;
+    const t = card.querySelector('.wa-time');
+    if (t) t.textContent = formatChatDur(elapsedSec);
+}
+
+function setTtsPlaying(card, on) {
+    if (!card) return;
+    card.classList.toggle('is-playing', on);
+    const b = card.querySelector('.wa-play i');
+    if (b) b.className = on ? 'bi bi-pause-fill' : 'bi bi-play-fill';
+    if (!on) {
+        // Volta a mostrar a duração total (padrão do WhatsApp) quando pausa/termina
+        const t = card.querySelector('.wa-time');
+        if (t) t.textContent = t.dataset.dur || '0:00';
+        const dot = card.querySelector('.wa-progress-dot');
+        if (dot) dot.style.left = '0%';
+        card.querySelectorAll('.wa-bar').forEach(b2 => b2.classList.remove('on'));
+    }
+}
+
+window._playUploadedAudio = function(key, data, card) {
+    if (window._chatAudio.key === key && window._chatAudio.el && !window._chatAudio.el.paused) {
+        window._chatAudio.el.pause();
+        setAudioPlaying(card, false);
+        return;
+    }
+    if (window._chatAudio.el) { window._chatAudio.el.pause(); document.querySelectorAll('.wa-audio.is-playing').forEach(c => setAudioPlaying(c, false)); }
+    const audio = new Audio(data.url);
+    window._chatAudio = { key, el: audio };
+    audio.addEventListener('timeupdate', () => updateAudioWave(key, audio));
+    audio.addEventListener('ended', () => setAudioPlaying(card, false));
+    audio.play().catch(() => showToast('Não foi possível reproduzir o áudio.', 'error'));
+    setAudioPlaying(card, true);
+};
+
+function setAudioPlaying(card, on) {
+    if (!card) return;
+    card.classList.toggle('is-playing', on);
+    const b = card.querySelector('.wa-play i');
+    if (b) b.className = on ? 'bi bi-pause-fill' : 'bi bi-play-fill';
+    if (!on) {
+        // Volta a mostrar a duração total (padrão do WhatsApp) quando pausa/termina
+        const t = card.querySelector('.wa-time');
+        if (t) t.textContent = t.dataset.dur || '0:00';
+        const dot = card.querySelector('.wa-progress-dot');
+        if (dot) dot.style.left = '0%';
+        card.querySelectorAll('.wa-bar').forEach(b2 => b2.classList.remove('on'));
+    }
+}
+
+function updateAudioWave(key, audio) {
+    const card = document.querySelector(`.wa-audio[data-audio-key="${key}"]`);
+    if (!card) return;
+    const bars = card.querySelectorAll('.wa-bar');
+    const frac = audio.duration ? audio.currentTime / audio.duration : 0;
+    bars.forEach((b, i) => b.classList.toggle('on', bars.length ? (i / bars.length) <= frac : false));
+    const dot = card.querySelector('.wa-progress-dot');
+    if (dot) dot.style.left = `${Math.min(100, Math.max(0, frac * 100))}%`;
+    const t = card.querySelector('.wa-time');
+    if (t) t.textContent = formatChatDur(audio.currentTime);
+}
+
+window.seekChatAudio = function(ev, key, waveEl) {
+    const data = window._chatAudioData[key];
+    const audio = window._chatAudio.el;
+    if (!data || !audio || !audio.duration) return;
+    const rect = waveEl.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+    audio.currentTime = frac * audio.duration;
+};
+
+window.openAudioEmbed = function(data, card) {
+    const url = data.embedUrl || data.originalUrl;
+    if (!url) { if (data.originalUrl) window.open(data.originalUrl, '_blank', 'noopener'); return; }
+    const revert = () => { if (card) setAudioPlaying(card, false); };
+    const old = document.getElementById('chatAudioEmbedRoot');
+    if (old) { old.remove(); }
+    const back = document.createElement('div');
+    back.className = 'chat-audio-embed-backdrop';
+    back.id = 'chatAudioEmbedRoot';
+    back.innerHTML = `<div class="chat-audio-embed-modal">
+        <div class="chat-audio-embed-head"><span class="chat-audio-src"><i class="bi bi-music-note-beamed me-1"></i>${data.sourceLabel || 'Áudio'}</span>
+        <button class="chat-audio-modal-close" onclick="document.getElementById('chatAudioEmbedRoot').remove()"><i class="bi bi-x-lg"></i></button></div>
+        <iframe class="chat-audio-embed-frame" src="${url}" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe>
+    </div>`;
+    back.addEventListener('click', e => { if (e.target === back) { back.remove(); revert(); } });
+    const closeBtn = back.querySelector('.chat-audio-modal-close');
+    if (closeBtn) { const fn = closeBtn.onclick; closeBtn.onclick = () => { revert(); back.remove(); }; }
+    if (card) setAudioPlaying(card, true);
+    document.body.appendChild(back);
+};
+
+window.previewChatAudioLink = async function(input) {
+    const url = (input.value || '').trim();
+    const prev = document.getElementById('audioLinkPreview');
+    if (!prev) return;
+    if (!url || !/^https?:\/\//i.test(url)) { prev.classList.add('d-none'); prev.innerHTML = ''; return; }
+    prev.classList.remove('d-none');
+    prev.innerHTML = '<div class="chat-audio-preview-loading"><i class="bi bi-arrow-repeat spin"></i> Analisando link…</div>';
+    const src = window.detectAudioSource ? window.detectAudioSource(url) : { source: 'link', label: 'Link', playable: false };
+    const meta = (window.fetchAudioMeta && !src.playable) ? await window.fetchAudioMeta(url) : null;
+    const title = meta?.title || (src.playable ? decodeURIComponent(url.split('/').pop() || 'Áudio') : 'Áudio (' + src.label + ')');
+    const artist = meta?.artist || (src.playable ? '' : src.label);
+    const thumb = meta?.thumbnail || '';
+    const thumbInner = thumb ? `<img src="${thumb.replace(/"/g, '%22')}" alt="" onerror="this.style.display='none'">` : '<i class="bi bi-music-note-beamed"></i>';
+    prev.innerHTML = `
+        <div class="wa-audio is-them is-preview">
+            <div class="wa-avatar">${thumbInner}</div>
+            <div class="wa-play"><i class="bi bi-link-45deg"></i></div>
+            <div class="wa-audio-body">
+                <div class="wa-info">${window.escapeHtml ? window.escapeHtml(title) : title}</div>
+                <div class="wa-meta"><span class="wa-dur">${src.label}</span>${src.playable ? '<span class="wa-dur">link direto</span>' : ''}</div>
+            </div>
+        </div>`;
+};
+
+window.sendChatExternalFromModal = function() {
+    const url = document.getElementById('audioLinkInput')?.value?.trim();
+    if (!url) { showToast('Cole um link válido.', 'warning'); return; }
+    document.getElementById('audioLinkInput').value = '';
+    const prev = document.getElementById('audioLinkPreview');
+    if (prev) { prev.classList.add('d-none'); prev.innerHTML = ''; }
+    if (window.sendChatExternalAudio) window.sendChatExternalAudio(url);
+};
+
+window._syncChatVozBtn = function(inputId) {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById('voz_' + inputId);
+    if (!input || !btn) return;
+    btn.style.display = input.value.trim() ? 'flex' : 'none';
+};
+
+/* ===== Compositor de áudio "falado" (TTS) acionado pelo card ===== */
+function _buildAudioModal(innerHtml) {
+    const old = document.getElementById('chatAudioModalRoot');
+    if (old) old.remove();
+    const back = document.createElement('div');
+    back.className = 'chat-audio-modal-backdrop';
+    back.id = 'chatAudioModalRoot';
+    back.innerHTML = `<div class="chat-audio-modal" role="dialog" aria-modal="true">${innerHtml}</div>`;
+    back.addEventListener('click', e => { if (e.target === back) back.remove(); });
+    document.body.appendChild(back);
+    return back;
+}
+
+window.openChatTtsComposer = function(prefill) {
+    window._ttsPrefillText = prefill || '';
+    const selId = 'ttsVoiceSel_' + Date.now();
+    _buildAudioModal(`
+        <div class="chat-audio-modal-head wa-head">
+            <span class="chat-audio-modal-badge wa-badge"><i class="bi bi-soundwave"></i></span>
+            <h6 class="mb-0">Enviar áudio falado</h6>
+            <button class="chat-audio-modal-close" onclick="document.getElementById('chatAudioModalRoot').remove()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="chat-audio-modal-body">
+            <div class="chat-audio-quote">${window.escapeHtml ? window.escapeHtml(window._ttsPrefillText) : window._ttsPrefillText}</div>
+            <label class="form-label small mb-1 mt-2">Voz</label>
+            <select id="${selId}" class="form-select form-select-sm"></select>
+            <div class="chat-audio-actions mt-3">
+                <button type="button" class="ml-attach wa-btn-outline" onclick="window.previewChatTts()"><i class="bi bi-play-fill"></i>Ouvir prévia</button>
+                <button type="button" class="ml-attach wa-btn" onclick="window.sendChatTtsFromModal()"><i class="bi bi-send-fill"></i>Enviar áudio</button>
+            </div>
+        </div>`);
+    _populateTtsVoices(selId);
+};
+
+function _populateTtsVoices(selId) {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const fill = () => {
+        const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+        sel.innerHTML = '';
+        if (!voices.length) { sel.innerHTML = '<option value="">Voz padrão do navegador</option>'; return; }
+        const pt = voices.filter(v => /pt/i.test(v.lang));
+        const list = pt.length ? pt : voices;
+        list.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = `${v.name} (${v.lang})`; sel.appendChild(o); });
+        if (pt.length) sel.value = pt[0].name;
+    };
+    if (window.speechSynthesis && window.speechSynthesis.getVoices().length) fill();
+    else if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = fill;
+    else fill();
+}
+
+function _ttsLangFromVoice(sel) {
+    sel = sel || document.getElementById('ttsVoiceSel');
+    if (sel && sel.selectedOptions[0]) { const m = sel.selectedOptions[0].textContent.match(/\(([a-z]{2}-[A-Z]{2})\)/); if (m) return m[1]; }
+    return 'pt-BR';
+}
+
+// Escolhe automaticamente a melhor voz disponível no navegador para o
+// idioma/país de quem está usando o app (via navigator.language), sem
+// precisar que a pessoa selecione manualmente. Prioriza: voz do mesmo
+// país > voz do mesmo idioma > vozes "Google" (normalmente mais naturais)
+// > primeira voz local disponível > voz padrão do navegador.
+window._pickBestTtsVoice = function() {
+    const locale = (navigator.language || 'pt-BR');
+    const langPrefix = locale.split('-')[0].toLowerCase();
+    const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    if (!voices.length) return { voice: '', language: locale };
+
+    const sameCountry = voices.filter(v => v.lang && v.lang.toLowerCase() === locale.toLowerCase());
+    const sameLang = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(langPrefix));
+    const pool = sameCountry.length ? sameCountry : (sameLang.length ? sameLang : voices);
+
+    const googleVoice = pool.find(v => /google/i.test(v.name));
+    const localVoice = pool.find(v => v.localService);
+    const chosen = googleVoice || localVoice || pool[0];
+
+    return { voice: chosen ? chosen.name : '', language: chosen ? chosen.lang : locale };
+};
+
+// Aguarda a lista de vozes do navegador carregar (em alguns navegadores
+// ela só fica disponível após o evento 'voiceschanged').
+window._waitForTtsVoices = function() {
+    return new Promise((resolve) => {
+        if (!window.speechSynthesis) return resolve([]);
+        const existing = window.speechSynthesis.getVoices();
+        if (existing.length) return resolve(existing);
+        let done = false;
+        window.speechSynthesis.onvoiceschanged = () => {
+            if (done) return;
+            done = true;
+            resolve(window.speechSynthesis.getVoices());
+        };
+        setTimeout(() => { if (!done) { done = true; resolve(window.speechSynthesis.getVoices()); } }, 800);
+    });
+};
+
+// Ícone de voz dentro do campo de digitação: converte e envia o texto
+// como áudio na hora, sem abrir o compositor, já escolhendo a melhor
+// voz para o idioma/país de quem está enviando.
+window.sendQuickChatTts = async function(inputId) {
+    const input = document.getElementById(inputId);
+    const text = (input?.value || '').trim();
+    if (!text) return;
+    if (input) input.value = '';
+    window._syncChatVozBtn(inputId);
+    await window._waitForTtsVoices();
+    const { voice, language } = window._pickBestTtsVoice();
+    if (window.sendChatTtsAudio) window.sendChatTtsAudio(text, voice, language);
+};
+
+window.previewChatTts = function() {
+    const text = (window._ttsPrefillText || '').trim();
+    if (!text) { showToast('Não há texto para falar.', 'warning'); return; }
+    const sel = document.getElementById('ttsVoiceSel');
+    const data = { audioType: 'tts', text, voice: sel?.value || '', language: _ttsLangFromVoice(sel) };
+    window._speakTts(data, null);
+};
+
+window.sendChatTtsFromModal = function() {
+    const text = (window._ttsPrefillText || '').trim();
+    if (!text) { showToast('Não há texto para enviar.', 'warning'); return; }
+    const sel = document.getElementById('ttsVoiceSel');
+    const voice = sel?.value || '';
+    const lang = _ttsLangFromVoice(sel) || 'pt-BR';
+    document.getElementById('chatAudioModalRoot')?.remove();
+    if (window.sendChatTtsAudio) window.sendChatTtsAudio(text, voice, lang);
 };
 
 /* ---------- Reactions ---------- */
@@ -6043,6 +6471,10 @@ window.renderChatContainer = function(opts) {
                 <span class="chat-attach-icon-circle" style="background:#7f66ff;"><i class="bi bi-file-earmark-text-fill"></i></span>
                 <span>Documento</span>
             </button>
+            <button type="button" class="chat-attach-popup-item" onclick="window.setChatAttachType('audio','${attachPanelId}')">
+                <span class="chat-attach-icon-circle" style="background:#ff9800;"><i class="bi bi-music-note-beamed"></i></span>
+                <span>Áudios</span>
+            </button>
             <button type="button" class="chat-attach-popup-item" onclick="window.setChatAttachType('location','${attachPanelId}')">
                 <span class="chat-attach-icon-circle" style="background:#fa4b4b;"><i class="bi bi-geo-alt-fill"></i></span>
                 <span>Localização</span>
@@ -6086,6 +6518,18 @@ window.renderChatContainer = function(opts) {
                     <button type="button" class="ml-attach flex-grow-1" onclick="${onSendLocation}('stored')"><i class="bi bi-house-door"></i>Endereço cadastrado</button>
                 </div>
             </div>
+            <div id="${attachPanelId}AudioBox" class="d-none">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text"><i class="bi bi-link-45deg text-muted"></i></span>
+                    <input type="url" id="audioLinkInput" class="form-control" placeholder="Cole o link (Spotify, YouTube, SoundCloud...)" oninput="window.previewChatAudioLink(this)">
+                    <button type="button" class="ml-attach" onclick="window.sendChatExternalFromModal()"><i class="bi bi-send"></i></button>
+                </div>
+                <div id="audioLinkPreview" class="chat-audio-preview d-none mt-2"></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="ml-attach flex-grow-1" onclick="window.open('https://www.youtube.com','_blank','noopener')"><i class="bi bi-youtube" style="color:#ff0000;"></i> YouTube</button>
+                    <button type="button" class="ml-attach flex-grow-1" onclick="window.open('https://open.spotify.com','_blank','noopener')"><i class="bi bi-music-note-beamed" style="color:#1db954;"></i> Spotify</button>
+                </div>
+            </div>
         </div>
     </div>` : '';
 
@@ -6095,9 +6539,12 @@ window.renderChatContainer = function(opts) {
             ${showAttach ? `<button type="button" class="chat-icon-btn" onclick="${onToggleAttachPanel}" title="Anexar"><i class="bi bi-paperclip"></i></button>` : ''}
             ${onChatActions ? `<button type="button" class="chat-icon-btn" onclick="${onChatActions}" title="Opções do pedido"><i class="bi bi-plus-circle"></i></button>` : ''}
             <button type="button" class="chat-icon-btn" data-voice-input="${inputId}" onclick="${onVoiceInput}('${inputId}')" title="Gravar áudio"><i class="bi bi-mic"></i></button>
-            <input type="text" id="${inputId}" class="chat-text-input" placeholder="Digite sua mensagem..." autocomplete="off"
-                   onkeypress="if(event.key==='Enter'){event.preventDefault();${onSend}}"${onTyping ? ` oninput="${onTyping}"` : ''}>
-            <button type="button" class="chat-send-btn" onclick="${onSend}"><i class="bi bi-send-fill"></i></button>
+            <div class="chat-text-input-wrap">
+                <input type="text" id="${inputId}" class="chat-text-input" placeholder="Digite sua mensagem..." autocomplete="off"
+                       onkeypress="if(event.key==='Enter'){event.preventDefault();window._syncChatVozBtn('${inputId}');${onSend}}"${onTyping ? ` oninput="${onTyping};window._syncChatVozBtn('${inputId}')"` : ` oninput="window._syncChatVozBtn('${inputId}')"`}>
+                <button type="button" class="chat-voz-inline-btn" id="voz_${inputId}" style="display:none;" onclick="window.sendQuickChatTts('${inputId}')" title="Enviar como áudio falado"><i class="bi bi-soundwave"></i></button>
+            </div>
+            <button type="button" class="chat-send-btn" onclick="window._syncChatVozBtn('${inputId}');${onSend}"><i class="bi bi-send-fill"></i></button>
         </div>
     </div>` : '';
 

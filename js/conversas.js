@@ -1407,6 +1407,126 @@ window.sendDirectChatFile = async function(urlParam) {
     } catch { showToast('Erro ao enviar arquivo.', 'error'); }
 };
 
+/* ---------- Mensagens de Áudio (sem binário no banco) ---------- */
+
+// Identifica a plataforma de um link de áudio/música.
+window.detectAudioSource = function(url) {
+    let host = '';
+    try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { }
+    const u = url.toLowerCase();
+    if (/\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(u) || u.startsWith('data:audio')) return { source: 'link', label: 'Link direto', playable: true };
+    if (host.includes('spotify.com')) {
+        const m = u.match(/spotify\.com\/(?:intl-[\w-]+\/)?track\/([A-Za-z0-9]+)/);
+        const id = m ? m[1] : null;
+        return { source: 'spotify', label: 'Spotify', playable: false, embedUrl: id ? `https://open.spotify.com/embed/track/${id}` : '' };
+    }
+    if (host === 'music.youtube.com' || host.endsWith('.music.youtube.com')) {
+        const m = u.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+        const id = m ? m[1] : null;
+        return { source: 'ytmusic', label: 'YouTube Music', playable: false, embedUrl: id ? `https://www.youtube.com/embed/${id}` : '' };
+    }
+    if (host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com')) {
+        const m = u.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([A-Za-z0-9_-]{11})/);
+        const id = m ? m[1] : null;
+        return { source: 'youtube', label: 'YouTube', playable: false, embedUrl: id ? `https://www.youtube.com/embed/${id}` : '' };
+    }
+    if (host.includes('soundcloud.com')) return { source: 'soundcloud', label: 'SoundCloud', playable: false, embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}` };
+    return { source: 'link', label: 'Link', playable: false };
+};
+
+// Busca metadados oficiais via oEmbed (sem baixar o áudio).
+window.fetchAudioMeta = async function(url) {
+    let host = '';
+    try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { }
+    const cands = [];
+    if (host.includes('spotify.com')) cands.push('https://open.spotify.com/oembed?url=' + encodeURIComponent(url));
+    if (host.includes('youtube.com') || host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'music.youtube.com') cands.push('https://www.youtube.com/oembed?url=' + encodeURIComponent(url) + '&format=json');
+    if (host.includes('soundcloud.com')) cands.push('https://soundcloud.com/oembed?url=' + encodeURIComponent(url) + '&format=json');
+    for (const c of cands) {
+        try {
+            const r = await fetch(c, { headers: { 'Accept': 'application/json' } });
+            if (r.ok) {
+                const j = await r.json();
+                if (j && j.title) return { title: j.title, artist: j.author_name || '', thumbnail: j.thumbnail_url || '' };
+            }
+        } catch (e) { }
+    }
+    return null;
+};
+
+// Salva qualquer mensagem de áudio (metadados apenas, sem binário).
+async function saveChatAudioMessage(audioObj) {
+    const user = getSavedUser();
+    if (!user || !window.currentChat) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${window.currentChat}&limit=1`);
+        const chat = chatResult?.[0];
+        if (!chat) { showToast('Conversa não encontrada.', 'error'); return; }
+        const text = audioObj.audioType === 'tts' ? audioObj.text : (audioObj.title || 'Áudio');
+        chat.messages.push({ senderId: user.id, senderName: user.nome, text, timestamp: new Date().toISOString(), type: 'audio', audio: audioObj, seenBy: [user.id] });
+        await supabaseFetch(`chats?id=eq.${chat.id}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+        await loadDirectChatMessages(window.currentChat);
+        if (chat.participants?.some(p => String(p) === AI_USER_ID)) _respondIfAiChat(chat);
+    } catch (e) { showToast('Erro ao enviar áudio.', 'error'); }
+}
+
+// Texto → voz (TTS). Armazena apenas texto, voz e idioma (sem binário).
+window.sendChatTtsAudio = async function(text, voice, language) {
+    if (!text || !text.trim()) { showToast('Digite um texto.', 'warning'); return; }
+    const cleanText = text.trim();
+    const audioObj = {
+        audioType: 'tts',
+        text: cleanText,
+        voice: voice || '',
+        language: language || 'pt-BR',
+        // Estimativa inicial pela contagem de palavras (~150 palavras/min);
+        // é corrigida pelo tempo real assim que a fala terminar de tocar.
+        duration: window.estimateTtsDuration ? window.estimateTtsDuration(cleanText) : 0,
+        waveform: makeFakeWaveform(),
+        playable: false,
+        sourceLabel: 'Texto → voz'
+    };
+    showToast('Enviando voz sintetizada...', 'info');
+    await saveChatAudioMessage(audioObj);
+};
+
+// Corrige, em segundo plano, a duração exibida de um áudio TTS já enviado
+// (a duração real só é conhecida depois que a fala termina de tocar).
+window._updateAudioDurationInChat = async function(chatId, index, duration) {
+    if (!chatId || !Number.isFinite(index)) return;
+    try {
+        const chatResult = await supabaseFetch(`chats?id=eq.${chatId}&limit=1`);
+        const chat = chatResult?.[0];
+        const msg = chat?.messages?.[index];
+        if (!msg || msg.type !== 'audio' || !msg.audio) return;
+        msg.audio.duration = duration;
+        await supabaseFetch(`chats?id=eq.${chatId}`, { method: 'PATCH', body: JSON.stringify({ messages: chat.messages }) });
+    } catch (e) { /* correção de duração não é crítica: falha silenciosamente */ }
+};
+
+// Link de plataforma externa. Armazena apenas link + metadados (oEmbed).
+window.sendChatExternalAudio = async function(rawUrl) {
+    if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) { showToast('Cole um link válido (http).', 'warning'); return; }
+    const src = window.detectAudioSource(rawUrl);
+    showToast('Analisando link de áudio...', 'info');
+    const meta = src.playable ? null : await window.fetchAudioMeta(rawUrl);
+    const audioObj = {
+        audioType: 'external',
+        source: src.source,
+        sourceLabel: src.label,
+        url: rawUrl,
+        originalUrl: rawUrl,
+        embedUrl: src.embedUrl || '',
+        title: meta?.title || (src.playable ? decodeURIComponent(rawUrl.split('/').pop() || 'Áudio') : 'Áudio (' + src.label + ')'),
+        artist: meta?.artist || (src.playable ? '' : src.label),
+        thumbnail: meta?.thumbnail || '',
+        duration: 0,
+        waveform: makeFakeWaveform(),
+        playable: !!src.playable
+    };
+    await saveChatAudioMessage(audioObj);
+};
+
 window.confirmDirectChatAttach = async function() {
     const suffix = chatAttachType === 'file' ? 'File' : '';
     const input = document.getElementById(`dattachLink_${window.currentChat}${suffix}`) || document.getElementById(`attachLink_${window.currentChat}${suffix}`);

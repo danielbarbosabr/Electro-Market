@@ -963,3 +963,25 @@
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
 }
+
+/* Card de localização: em telas pequenas reduz a largura mantendo a
+   proporção horizontal (nunca vira quadrado/estreito). */
+@media (max-width: 576px) {
+    .chat-location-card {
+        width: 300px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+    }
+    .chat-location-pin {
+        font-size: 1.9rem;
+    }
+}
+
+/* Vídeos enviados: mesma escala do card de localização no mobile. */
+@media (max-width: 576px) {
+    .chat-video-embed {
+        width: 300px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+    }
+}
