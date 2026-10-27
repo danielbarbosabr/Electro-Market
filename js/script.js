@@ -271,6 +271,18 @@ function showToast(message, type = 'info', duration = 3500) {
 // FETCH SUPABASE
 // ============================================
 
+/**
+ * Escapa texto vindo do usuário (título de produto, descrição, mensagens,
+ * comentários, nomes etc.) antes de inserir em innerHTML, pra evitar XSS.
+ * Uso: `<h6>${escapeHTML(item.titulo)}</h6>`
+ */
+function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+}
+window.escapeHTML = escapeHTML;
+
 async function supabaseFetch(path, options = {}) {
     const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${path}`, {
         ...options,
@@ -641,13 +653,13 @@ function renderCard(item) {
             </div>
             <div class="product-card-img-container">
                 ${thumb
-                    ? `<img src="${thumb}" alt="${item.titulo}" loading="lazy" referrerpolicy="no-referrer"
+                    ? `<img src="${thumb}" alt="${escapeHTML(item.titulo)}" loading="lazy" referrerpolicy="no-referrer"
                            onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'bi bi-box-seam text-secondary\\' style=\\'font-size:2.5rem;\\'></i>'">`
                     : `<i class="bi bi-box-seam text-secondary" style="font-size:2.5rem;"></i>`
                 }
             </div>
             <div class="card-body product-card-body">
-                <h6 class="product-title-grid">${item.titulo}</h6>
+                <h6 class="product-title-grid">${escapeHTML(item.titulo)}</h6>
                 ${condMatch ? `<span class="ml-cond-badge ml-cond-${condToClass(condMatch[1])}">${condMatch[1]}</span>` : ''}
                 <div class="current-price">
                     ${temOferta
@@ -1864,7 +1876,7 @@ window.showDetail = async function(pid) {
                 </div>
 
                     <div class="ml-title-row">
-                        <h1 class="ml-title">${item.titulo}</h1>
+                        <h1 class="ml-title">${escapeHTML(item.titulo)}</h1>
                         <div class="ml-like-share">
                             <i class="bi bi-heart${likedProducts.includes(pid) ? '-fill text-danger' : ''} ml-heart" onclick="window.toggleLike('${pid}')" title="Curtir"></i>
                             <i class="bi bi-share ml-share-icon" onclick="window.shareProduct('${pid}')" title="Compartilhar"></i>
@@ -1953,7 +1965,7 @@ window.showDetail = async function(pid) {
 
                 <div class="ml-panel-desc">
                     <h5 class="fw-bold">Descrição</h5>
-                    <p class="text-muted" style="line-height:1.7;white-space:pre-line;">${(item.descricao || '').replace(REGEX_CONDICAO, '') || 'Sem descrição detalhada.'}</p>
+                    <p class="text-muted" style="line-height:1.7;white-space:pre-line;">${escapeHTML((item.descricao || '').replace(REGEX_CONDICAO, '')) || 'Sem descrição detalhada.'}</p>
                 </div>
             </div>
 
@@ -5097,14 +5109,14 @@ document.addEventListener('submit', async (e) => {
             inputBanner.value = bannerUrl;
         }
 
-        const payload = {
-            id:       crypto.randomUUID(),
-            tipo:     document.getElementById('v2CadTipo').value,
+        const dadosCadastro = {
+            action:   'registrar',
+            tipoConta: document.getElementById('v2CadTipo').value, // servidor confere, não confia cegamente
             nome:     document.getElementById('v2CadNome').value,
             cpf:      document.getElementById('v2CadCPF').value.replace(/\D/g, ''),
             email:    document.getElementById('v2CadEmail').value,
             telefone: document.getElementById('v2CadTelefone').value.replace(/\D/g, ''),
-            senha_hash: btoa(document.getElementById('v2CadPass').value),
+            senha:    document.getElementById('v2CadPass').value,
             endereco: `${document.getElementById('v2CadEnd').value}, ${document.getElementById('v2CadNum').value} - ${document.getElementById('v2CadBairro').value}`,
             cep:      document.getElementById('v2CadCEP').value.replace(/\D/g, ''),
             cidade:   document.getElementById('v2CadCid').value,
@@ -5113,40 +5125,34 @@ document.addEventListener('submit', async (e) => {
             pagamento: document.getElementById('v2CadPagamento').value
         };
 
-        // Validação de segurança do CPF antes de enviar ao banco
-        if (!validarCPF(payload.cpf)) {
+        // Validação de CPF também no cliente, só pra feedback rápido
+        // (a validação que realmente protege o banco acontece no servidor, em /api/auth)
+        if (!validarCPF(dadosCadastro.cpf)) {
             showToast('CPF inválido! Por favor, verifique os números.', 'error');
             if (btn) { btn.disabled = false; btn.textContent = orig; }
             return;
         }
 
-        // Verifica se o e-mail já está cadastrado
-        const emailExiste = await window.checkEmailExists(payload.email);
-        if (emailExiste.exists) {
-            showToast('Este e-mail já está cadastrado. Faça login ou use outro e-mail.', 'error');
-            document.getElementById('v2CadEmail')?.classList.add('is-invalid');
-            if (btn) { btn.disabled = false; btn.textContent = orig; }
-            return;
-        }
-
         try {
-            await supabaseFetch('users', { method: 'POST', body: JSON.stringify(payload) });
-            
-            // LOGIN AUTOMÁTICO: Salva o novo usuário localmente
-            localStorage.setItem('electroUser', JSON.stringify(payload));
-            
-            // Atualiza a interface imediatamente e fecha a tela de auth
+            const r = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dadosCadastro)
+            });
+            const data = await r.json();
+            if (!r.ok) throw data;
+
+            // LOGIN AUTOMÁTICO: salva o usuário retornado pelo servidor (sem a senha)
+            localStorage.setItem('electroUser', JSON.stringify(data.user));
+
             updateUI();
             window.hideAuthScreen();
 
-            await createPersistentNotification(`Bem-vindo à ElectroMarket, ${payload.nome.split(' ')[0]}!`, 'success', payload.id);
+            await createPersistentNotification(`Bem-vindo à ElectroMarket, ${data.user.nome.split(' ')[0]}!`, 'success', data.user.id);
             setTimeout(() => location.reload(), 1000);
         } catch (err) {
             console.error("Erro no cadastro:", err);
-            // Mostra o motivo real devolvido pelo Supabase/Postgres (ex: coluna
-            // inexistente, CPF/e-mail duplicado, campo obrigatório faltando etc.)
-            // em vez de um texto genérico, para facilitar o diagnóstico.
-            const motivo = err?.message || err?.hint || err?.details || err?.error_description || 'Verifique os dados e tente novamente.';
+            const motivo = err?.error || err?.message || 'Verifique os dados e tente novamente.';
             showToast(`Erro no cadastro: ${motivo}`, 'error');
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = orig; }
@@ -5165,22 +5171,21 @@ document.addEventListener('submit', async (e) => {
         passInput?.classList.remove('input-error');
 
         const identifier = emailInput.value.trim();
-        const hash        = btoa(passInput.value);
-
-        // Detecta se o usuário digitou e-mail ou telefone e monta a consulta certa
-        const isEmail   = identifier.includes('@');
-        const loginField = isEmail
-            ? `email=eq.${encodeURIComponent(identifier)}`
-            : `telefone=eq.${encodeURIComponent(identifier.replace(/\D/g, ''))}`;
 
         try {
-            const users = await supabaseFetch(`users?select=*&${loginField}&senha_hash=eq.${hash}&limit=1`);
-            if (users?.length) {
-                localStorage.setItem('electroUser', JSON.stringify(users[0]));
+            const r = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'login', identifier, senha: passInput.value })
+            });
+            const data = await r.json();
+
+            if (r.ok && data.user) {
+                localStorage.setItem('electroUser', JSON.stringify(data.user));
                 window.hideAuthScreen();
                 requestNotificationPermission();
-                
-                await createPersistentNotification(`Novo acesso detectado em sua conta.`, 'info', users[0].id);
+
+                await createPersistentNotification(`Novo acesso detectado em sua conta.`, 'info', data.user.id);
                 setTimeout(() => location.reload(), 400);
             } else {
                 showToast('E-mail/telefone ou senha incorretos.', 'error');
