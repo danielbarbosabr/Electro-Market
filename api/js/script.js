@@ -3623,12 +3623,6 @@ function syncHeaderHeightVar() {
 }
 
 function bootstrapApp() {
-    // OAuth callback: se a URL contiver access_token, processa login Google
-    if (window.location.hash && window.location.hash.includes('access_token')) {
-        handleGoogleOAuthCallback();
-        return;
-    }
-
     // Veio de "Trocar conta": abre a tela de login automaticamente pra
     // escolher/entrar com outra conta.
     if (sessionStorage.getItem('openLoginAfterReload')) {
@@ -4526,36 +4520,45 @@ window.showProfileEdit = () => {
 };
 
 window.changeProfilePassword = async function() {
-    const user = getSavedUser();
-    if (!user?.id) { showToast('Entre na sua conta para alterar a senha.', 'warning'); return; }
     const cpf = (document.getElementById('profilePasswordCPF')?.value || '').replace(/\D/g, '');
-    const senhaAtual = document.getElementById('profileCurrentPassword')?.value || '';
-    const novaSenha = document.getElementById('profileNewPassword')?.value || '';
-    const confirmar = document.getElementById('profileConfirmPassword')?.value || '';
-    if (cpf.length !== 11) { showToast('Informe o CPF cadastrado com 11 números.', 'warning'); return; }
-    if (!senhaAtual) { showToast('Informe sua senha atual.', 'warning'); return; }
-    if (novaSenha.length < 8) { showToast('A nova senha precisa ter pelo menos 8 caracteres.', 'warning'); return; }
-    if (novaSenha !== confirmar) { showToast('A confirmação da nova senha não confere.', 'error'); return; }
+    if (!validarCPF(cpf)) { showToast('Informe um CPF válido.', 'warning'); return; }
     const btn = document.getElementById('changeProfilePasswordBtn');
     const original = btn?.innerHTML;
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>ALTERANDO...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>ENVIANDO...'; }
     try {
-        const response = await fetch('/api/auth', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'alterar_senha', userId: user.id, cpf, senhaAtual, novaSenha })
-        });
+        const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'solicitar_redefinicao', cpf }) });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'Não foi possível alterar a senha.');
-        ['profilePasswordCPF','profileCurrentPassword','profileNewPassword','profileConfirmPassword'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.value = '';
-        });
-        showToast('Sua senha foi alterada com sucesso!', 'success');
-    } catch (error) {
-        showToast(error.message || 'Erro ao alterar a senha.', 'error');
-    } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = original; }
-    }
+        if (!response.ok) throw new Error(result.error || 'Não foi possível solicitar a recuperação.');
+        const cpfEl = document.getElementById('profilePasswordCPF'); if (cpfEl) cpfEl.value = '';
+        showToast(result.message || 'Confira o e-mail cadastrado para criar uma nova senha.', 'success', 6000);
+    } catch (error) { showToast(error.message || 'Erro ao solicitar a recuperação.', 'error', 6000); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = original; } }
 };
+
+function validarPoliticaSenha(senha) {
+    return senha.length >= 10 && senha.length <= 128 && /[a-z]/.test(senha) && /[A-Z]/.test(senha) && /\d/.test(senha) && /[^A-Za-z0-9]/.test(senha);
+}
+
+async function processarTokenRedefinicao() {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('resetToken');
+    if (!token) return;
+    // Retira o token da barra de endereço assim que lido.
+    history.replaceState({}, document.title, window.location.pathname);
+    const novaSenha = window.prompt('Crie sua nova senha (10–128 caracteres, com maiúscula, minúscula, número e símbolo):');
+    if (novaSenha === null) return;
+    if (!validarPoliticaSenha(novaSenha)) { showToast('A senha deve ter 10–128 caracteres e incluir maiúscula, minúscula, número e símbolo.', 'error', 7000); return; }
+    const confirmar = window.prompt('Digite novamente a nova senha para confirmar:');
+    if (confirmar === null) return;
+    if (novaSenha !== confirmar) { showToast('As senhas não coincidem. Abra novamente o link do e-mail para tentar outra vez.', 'error', 7000); return; }
+    try {
+        const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'redefinir_senha', token, novaSenha }) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Não foi possível redefinir a senha.');
+        showToast('Senha redefinida! Agora você pode entrar com a nova senha.', 'success', 7000);
+    } catch (error) { showToast(error.message || 'Link inválido ou expirado.', 'error', 7000); }
+}
+window.addEventListener('DOMContentLoaded', processarTokenRedefinicao);
 
 window.hideProfileEditScreen = function() {
     document.getElementById('profileEditScreen').classList.add('d-none');
@@ -4727,84 +4730,50 @@ window.mlCadPrevStep = function() {
     window.mlCadGoToStep(1);
 };
 
-window.forgotPassword = function(event) {
+window.forgotPassword = async function(event) {
   event?.preventDefault();
-  const user = getSavedUser();
-  const nome = user?.nome || 'Usuário';
-  const userEmail = user?.email || '';
-  const body = `
-Nova solicitação de suporte:
-
-━━━━ DADOS DO SOLICITANTE ━━━━
-Nome: ${nome}
-E-mail: ${userEmail || 'não informado'}
-Tipo: ${user?.tipo || 'Visitante'}
-
-━━━━ SOLICITAÇÃO ━━━━
-Assunto: Esqueci minha senha
-Mensagem: Olá, esqueci minha senha e preciso de ajuda para recuperar o acesso à minha conta.
-
-━━━━━━━━━━━━━━━━━━━━━━
-ElectroMarket - Plataforma de E-commerce
-  `.trim();
-  const mailto = `mailto:dannybarbosalimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] Esqueci minha senha')}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
-  showToast('E-mail aberto no seu programa de e-mail para solicitar recuperação de senha.', 'success');
-};
-
-// ============================================
-// GOOGLE LOGIN (via Supabase OAuth)
-// ============================================
-
-window.loginWithGoogle = function() {
-    const redirectTo = window.location.origin + window.location.pathname;
-    window.location.href =
-        `${CONFIG.SUPABASE_URL}/auth/v1/authorize` +
-        `?provider=google` +
-        `&redirect_to=${encodeURIComponent(redirectTo)}`;
-};
-
-/** Processa o retorno do OAuth do Google (access_token na hash da URL) */
-async function handleGoogleOAuthCallback() {
-    const params = new URLSearchParams(window.location.hash.replace('#', '?'));
-    const accessToken = params.get('access_token');
-    if (!accessToken) return;
-
-    try {
-        const res = await fetch(`${CONFIG.SUPABASE_URL}/auth/v1/user`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': CONFIG.SUPABASE_KEY }
-        });
-        const authUser = await res.json();
-        if (!authUser?.email) return;
-
-        const existing = await supabaseFetch(`users?email=eq.${encodeURIComponent(authUser.email)}&limit=1`);
-        if (existing?.length) {
-            localStorage.setItem('electroUser', JSON.stringify(existing[0]));
-        } else {
-            const newUser = {
-                id: crypto.randomUUID(),
-                tipo: 'CLIENTE',
-                nome: authUser.user_metadata?.full_name || authUser.email,
-                email: authUser.email,
-                avatar: JSON.stringify([authUser.user_metadata?.avatar_url || '', '']),
-                telefone: '',
-                senha_hash: '',
-                created_at: new Date().toISOString()
-            };
-            await supabaseFetch('users', { method: 'POST', body: JSON.stringify(newUser) });
-            localStorage.setItem('electroUser', JSON.stringify(newUser));
-        }
-        requestNotificationPermission();
-
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-        updateUI();
-        showToast('Login com Google realizado!', 'success');
-        setTimeout(() => location.reload(), 500);
-    } catch {
-        showToast('Erro ao autenticar com Google.', 'error');
-        setTimeout(() => location.reload(), 1500);
+  const cpfInformado = window.prompt('Para recuperar sua senha, informe o CPF cadastrado:');
+  if (cpfInformado === null) return;
+  const cpf = String(cpfInformado).replace(/\D/g, '');
+  if (!validarCPF(cpf)) {
+    const abrirEmail = window.confirm('O CPF informado não passou na validação. Deseja enviar uma solicitação ao suporte por e-mail?');
+    if (abrirEmail) {
+      const subject = '[Suporte ElectroMarket] Recuperação de senha';
+      const body = `Olá, preciso de ajuda para recuperar o acesso à minha conta ElectroMarket.\n\nO CPF informado não foi aceito pelo formulário. Por favor, orientem-me sobre a recuperação segura da conta.`;
+      window.location.href = `mailto:dannybarbosalimabr@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
-}
+    return;
+  }
+  try {
+    const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'iniciar_redefinicao_codigo', cpf }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Não foi possível iniciar a recuperação.');
+    if (!result.found) {
+      const abrirEmail = window.confirm('Não foi possível localizar uma conta com esse CPF. Deseja enviar uma solicitação ao suporte por e-mail?');
+      if (abrirEmail) {
+        const subject = '[Suporte ElectroMarket] Recuperação de senha';
+        const body = `Olá, preciso de ajuda para recuperar minha senha do ElectroMarket.\n\nNão consegui concluir a recuperação pelo CPF. Por favor, orientem-me sobre os próximos passos.`;
+        window.location.href = `mailto:dannybarbosalimabr@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      }
+      return;
+    }
+    showToast(result.message, 'success', 6000);
+    const codigo = window.prompt('Digite o código de 6 dígitos enviado ao e-mail cadastrado:');
+    if (codigo === null) return;
+    const novaSenha = window.prompt('Crie a nova senha (mínimo 10 caracteres, maiúscula, minúscula, número e símbolo):');
+    if (novaSenha === null) return;
+    const confirmarSenha = window.prompt('Digite novamente a nova senha para confirmar:');
+    if (confirmarSenha === null) return;
+    if (novaSenha !== confirmarSenha) { showToast('As senhas não coincidem.', 'error'); return; }
+    if (novaSenha.length < 10 || novaSenha.length > 128 || !/[a-z]/.test(novaSenha) || !/[A-Z]/.test(novaSenha) || !/\d/.test(novaSenha) || !/[^A-Za-z0-9]/.test(novaSenha)) {
+      showToast('A senha precisa ter 10–128 caracteres, maiúscula, minúscula, número e símbolo.', 'error', 7000); return;
+    }
+    const resetResponse = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'redefinir_com_codigo', cpf, codigo: String(codigo).trim(), novaSenha }) });
+    const resetResult = await resetResponse.json().catch(() => ({}));
+    if (!resetResponse.ok) throw new Error(resetResult.error || 'Não foi possível redefinir a senha.');
+    showToast(resetResult.message || 'Senha redefinida. Entre com a nova senha.', 'success', 7000);
+  } catch (error) { showToast(error.message || 'Erro ao solicitar a recuperação.', 'error', 7000); }
+};
 
 // ============================================
 // IA — ASSISTENTE DE SUPORTE (Transformers.js — 100% local, sem API key)
