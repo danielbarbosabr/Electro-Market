@@ -26,7 +26,7 @@ function validarProduto(b, parcial) {
     if (b.id !== undefined) { if (!ID_RE.test(String(b.id))) throw bad(400, 'ID de produto inválido.'); out.id = String(b.id); }
     if (need('titulo')) { out.titulo = strip(b.titulo, 120).trim(); if (out.titulo.length < 3) throw bad(400, 'Título muito curto.'); }
     if (b.descricao !== undefined) out.descricao = strip(b.descricao, 5000);
-    if (need('preco')) { const p = Number(b.preco); if (!Number.isFinite(p) || p < 0.01 || p > 1000000) throw bad(400, 'Preço inválido (use um valor maior que zero).'); out.preco = Math.round(p * 100) / 100; }
+    if (need('preco')) { const p = Number(b.preco); if (!Number.isFinite(p) || p < 0 || p > 1000000) throw bad(400, 'Preço inválido (use 0 para doação ou um valor positivo).'); out.preco = Math.round(p * 100) / 100; }
     if (b.preco_original !== undefined) { if (b.preco_original === null) out.preco_original = null; else { const p = Number(b.preco_original); if (!Number.isFinite(p) || p < 0 || p > 1000000) throw bad(400, 'Preço original inválido.'); out.preco_original = p; } }
     if (need('quantidade')) { const q = Number(b.quantidade); if (!Number.isInteger(q) || q < 0 || q > 100000) throw bad(400, 'Quantidade inválida.'); out.quantidade = q; }
     if (b.categoria !== undefined) out.categoria = strip(b.categoria, 250);
@@ -237,7 +237,8 @@ async function handle(table, method, params, body, me, prefer) {
             if (!Number.isInteger(qtd) || qtd < 1 || qtd > 1000) throw bad(400, 'Quantidade inválida.');
             if (!['pending', 'offer_pending'].includes(b.status)) throw bad(400, 'Status inicial inválido.');
             const total = Number(b.total);
-            if (!Number.isFinite(total) || total <= 0) throw bad(400, 'Valor inválido.');
+            if (!Number.isFinite(total) || total < 0) throw bad(400, 'Valor inválido.');
+            if (!b.product_id && total <= 0) throw bad(400, 'Valor inválido.');
             if (b.product_id) {
                 const [p] = await L.dbFetch(`products?select=vendedor_id,preco,quantidade&id=eq.${encodeURIComponent(b.product_id)}&limit=1`);
                 if (!p) throw bad(400, 'Produto não encontrado.');
@@ -247,6 +248,8 @@ async function handle(table, method, params, body, me, prefer) {
                 if (total > cheio + 0.01) throw bad(400, 'Valor acima do preço do produto.');
                 if ((b.offer_amount === undefined || b.offer_amount === null) && Math.abs(total - cheio) > 0.01) throw bad(400, 'Valor não confere com o preço do produto.');
             }
+            // doações (total 0): limite anti-spam por usuário (a memória é por instância da Vercel; para algo mais forte use Upstash/Vercel KV)
+            if (total === 0 && !admin && !L.rateLimit('free:' + me.id, 5, 60 * 60 * 1000)) throw bad(429, 'Limite de pedidos de doação por hora atingido. Tente mais tarde.');
             for (const k of ['seller_name', 'buyer_name', 'product_title']) if (b[k] !== undefined) b[k] = strip(b[k], 200);
             return write('orders', params, 'POST', b, prefer);
         }
@@ -263,7 +266,7 @@ async function handle(table, method, params, body, me, prefer) {
                 const t = Number(b.total);
                 for (const r of rows) {
                     const [p] = r.product_id ? await L.dbFetch(`products?select=preco&id=eq.${encodeURIComponent(r.product_id)}&limit=1`) : [];
-                    if (!Number.isFinite(t) || t <= 0 || (p && t > Number(p.preco) * (r.quantity || 1) + 0.01)) throw bad(400, 'Valor inválido.');
+                    if (!Number.isFinite(t) || t < 0 || (p && t > Number(p.preco) * (r.quantity || 1) + 0.01)) throw bad(400, 'Valor inválido.');
                 }
             }
             return write('orders', params, 'PATCH', b, prefer);

@@ -73,3 +73,6 @@ css/  js/  index.html  vercel.json  .env.example  .gitignore
 ```
 - Só 3 funções (auth, db, health): o plano Hobby da Vercel aceita até 12.
 - **Apague do repositório** `api/config.js`, `api/password_migration.sql` e `api/password_reset_migration.sql` (versões antigas) e qualquer pasta duplicada (ex.: `Electro-Market/`).
+
+## Doações
+Anúncios com preço 0 são doações e são permitidos. Cada usuário (exceto ADMIN) pode criar até 5 pedidos de doação por hora (limite em memória, por instância da Vercel).
