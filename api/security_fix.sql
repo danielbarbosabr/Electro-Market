@@ -37,20 +37,9 @@ create index if not exists password_reset_codes_user_idx on public.password_rese
 -- Os hashes Base64 vazaram. Eles já não funcionam para entrar; aqui eles são APAGADOS do banco.
 -- Quem tinha conta antiga usa "Esqueceu sua senha?" (CPF + código no e-mail) para criar uma senha nova.
 -- Contas criadas depois (formato "salt:hash") NÃO são tocadas.
--- a coluna pode ter sido criada como NOT NULL; contas antigas ficam sem senha até redefinirem
-alter table public.users alter column senha_hash drop not null;
-do $$ begin
-  if exists (select 1 from information_schema.columns where table_schema='public' and table_name='users' and column_name='senha') then
-    execute 'alter table public.users alter column senha drop not null';
-  end if;
-end $$;
 update public.users set senha_hash = null where senha_hash is not null and senha_hash not like '%:%';
 -- se existir a coluna antiga "senha" com texto/Base64, esvazie também:
-do $$ begin
-  if exists (select 1 from information_schema.columns where table_schema='public' and table_name='users' and column_name='senha') then
-    execute 'update public.users set senha = null where senha is not null';
-  end if;
-end $$;
+update public.users set senha = null where senha is not null;
 
 -- ---------------------------------------------------------------- 3) Quem é ADMIN? Confira e rebaixe quem não deveria
 select id, nome, email, tipo, created_at from public.users where tipo = 'ADMIN';
@@ -63,8 +52,8 @@ update public.products set
   loja      = regexp_replace(coalesce(loja,''),      '[<>]', '', 'g')
 where titulo ~ '[<>]' or descricao ~ '[<>]' or loja ~ '[<>]';
 update public.users set nome = regexp_replace(nome, '[<>]', '', 'g') where nome ~ '[<>]';
--- Anúncios inválidos (preço nulo ou negativo). Preço 0 é permitido: é doação.
-select id, titulo, preco, vendedor_id from public.products where preco is null or preco < 0;
+-- Anúncios inválidos (preço <= 0) — veja e apague/corrija à mão:
+select id, titulo, preco, vendedor_id from public.products where preco is null or preco <= 0;
 
 -- ---------------------------------------------------------------- 5) O PASSO MAIS IMPORTANTE: RLS ligado e NENHUMA policy
 -- Com RLS ligado e sem policies, as chaves públicas (anon/publishable) NÃO leem nem gravam nada.

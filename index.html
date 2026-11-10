@@ -1638,7 +1638,9 @@
     </footer>
 
     <!-- Scripts na ordem correta -->
-    <!-- O navegador não recebe nenhuma chave: todo acesso ao banco passa por /api/db (servidor). -->
+    <!-- Config do Supabase: buscada da função serverless em api/config.js,
+         que lê as variáveis de ambiente do servidor — a chave não fica
+         exposta aqui no HTML/JS do front-end. -->
     <script>
         // O navegador não recebe mais nenhuma chave do Supabase: todo acesso ao banco passa por /api/db (servidor).
         window.CONFIG = {};

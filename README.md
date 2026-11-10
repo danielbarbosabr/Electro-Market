@@ -1,4 +1,4 @@
-# <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> [Electro-Market](https://mercado-elecmarket.vercel.app/)
+# <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> [Electro-Market](https://mercado-electro.vercel.app/)
 
 ![Status](https://img.shields.io/badge/status-alpha-green)
 [![Deployments](https://img.shields.io/badge/deployments-175-blue)](https://github.com/danielbarbosabr/Electro-Market/deployments)
