@@ -333,13 +333,6 @@
                     <button type="submit" class="ml-btn-primary mt-3">Entrar</button>
                 </form>
 
-                <div class="ml-auth-divider"><span>ou</span></div>
-
-                <button type="button" class="ml-btn-google" onclick="window.loginWithGoogle()">
-                    <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
-                    Entrar com Google
-                </button>
-
                 <button type="button" class="ml-btn-outline" onclick="window.toggleAuthMode('cadastro')">Criar conta</button>
             </div>
 
@@ -407,8 +400,8 @@
                             <span class="ml-field-msg" id="v2CadEmailMsg"></span>
                         </div>
                         <div class="ml-field">
-                            <input type="password" id="v2CadPass" placeholder=" " required>
-                            <label for="v2CadPass">Senha</label>
+                            <input type="password" id="v2CadPass" placeholder=" " required minlength="10" maxlength="128" autocomplete="new-password" title="10 a 128 caracteres, com maiúscula, minúscula, número e símbolo">
+                            <label for="v2CadPass">Senha (mín. 10, com Aa 1 @)</label>
                             <i class="bi bi-eye ml-eye-icon" onmousedown="event.preventDefault()" onclick="window.toggleAuthPass('v2CadPass', this)"></i>
                         </div>
 
@@ -1481,6 +1474,26 @@
                 </div>
             </div>
 
+            <!-- Seção: Segurança da conta -->
+            <div class="profile-link-section">
+                <button type="button" class="profile-link-header" onclick="window.toggleProfileSection(this)">
+                    <span><i class="bi bi-shield-lock-fill me-2"></i>Segurança e senha</span>
+                    <i class="bi bi-chevron-down profile-link-chevron"></i>
+                </button>
+                <div class="profile-link-body">
+                    <p class="small text-muted">Informe seu CPF cadastrado. Enviaremos um link de segurança ao e-mail da conta para você criar uma nova senha sem precisar informar a senha antiga.</p>
+                    <div class="ml-field">
+                        <input type="text" id="profilePasswordCPF" placeholder=" " maxlength="14" inputmode="numeric" autocomplete="off">
+                        <label for="profilePasswordCPF">CPF cadastrado</label>
+                    </div>
+
+                    <button type="button" id="changeProfilePasswordBtn" class="btn btn-ml-primary w-100" onclick="window.changeProfilePassword()">
+                        <i class="bi bi-envelope-lock me-2"></i>ENVIAR LINK PARA CRIAR NOVA SENHA
+                    </button>
+                    <small class="text-muted d-block mt-2">O link expira em 30 minutos e só pode ser usado uma vez. A nova senha deverá conter letras maiúsculas e minúsculas, número e símbolo.</small>
+                </div>
+            </div>
+
             <!-- Seção: Preferências -->
             <div class="profile-link-section">
                 <button type="button" class="profile-link-header" onclick="window.toggleProfileSection(this)">
@@ -1625,50 +1638,12 @@
     </footer>
 
     <!-- Scripts na ordem correta -->
-    <!-- Config do Supabase: buscada da função serverless em api/config.js,
-         que lê as variáveis de ambiente do servidor — a chave não fica
-         exposta aqui no HTML/JS do front-end. -->
+    <!-- O navegador não recebe nenhuma chave: todo acesso ao banco passa por /api/db (servidor). -->
     <script>
-        // Em produção (Vercel): busca a config do Supabase na função
-        // serverless (api/config.js), que lê a chave do servidor.
-        // Em dev local com Live Server (servidor estático, sem função
-        // serverless): cai no fallback js/config.local.js (fora do Git).
-        function setConfig(cfg) {
-            window.CONFIG = { SUPABASE_URL: cfg.SUPABASE_URL, SUPABASE_KEY: cfg.SUPABASE_KEY };
-            window.dispatchEvent(new Event('config:ready'));
-        }
-        function tryLocalDevFallback() {
-            return new Promise(function (resolve, reject) {
-                var s = document.createElement('script');
-                s.src = 'js/config.local.js';
-                s.onload = function () {
-                    var local = window.CONFIG_LOCAL_FALLBACK;
-                    if (local && local.SUPABASE_URL && local.SUPABASE_KEY) {
-                        setConfig(local);
-                        resolve();
-                    } else {
-                        reject(new Error('js/config.local.js existe mas está sem os valores.'));
-                    }
-                };
-                s.onerror = function () { reject(new Error('js/config.local.js não encontrado.')); };
-                document.head.appendChild(s);
-            });
-        }
-        window._configReady = fetch('/api/config', { cache: 'no-store' })
-            .then(function (res) {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.json();
-            })
-            .then(function (cfg) {
-                if (!cfg.SUPABASE_URL || !cfg.SUPABASE_KEY) throw new Error('Config incompleta.');
-                setConfig(cfg);
-            })
-            .catch(function (err) {
-                console.warn('api/config indisponível (' + err.message + '), usando fallback de dev local (js/config.local.js)...');
-                return tryLocalDevFallback();
-            });
+        // O navegador não recebe mais nenhuma chave do Supabase: todo acesso ao banco passa por /api/db (servidor).
+        window.CONFIG = {};
+        window._configReady = Promise.resolve();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Chart.js: usado no Relatório Gráfico do Painel Admin -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>

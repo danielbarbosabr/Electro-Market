@@ -1,4 +1,4 @@
-# <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> [Electro-Market](https://mercado-electro.vercel.app/)
+# <img src="https://static.vecteezy.com/system/resources/previews/073/450/732/non_2x/bold-yellow-lightning-bolt-symbol-integrated-with-stylized-black-letter-e-isolated-on-white-background-vector.jpg" width="32" height="32" valign="middle"> [Electro-Market](https://mercado-elecmarket.vercel.app/)
 
 ![Status](https://img.shields.io/badge/status-alpha-green)
 [![Deployments](https://img.shields.io/badge/deployments-175-blue)](https://github.com/danielbarbosabr/Electro-Market/deployments)
@@ -103,7 +103,6 @@ electromarket/
 │   ├── admin.js                 # Painel administrativo e chat de suporte
 │   ├── seller.js                 # Funções exclusivas do vendedor
 │   ├── cliente.js                # Funções exclusivas do comprador
-│   └── config.local.js           # Fallback só para testes locais (fora do Git, veja .gitignore)
 ├── css/
 │   ├── style.desktop.css        # Estilos para desktop
 │   └── style.mobile.css         # Estilos e ajustes responsivos para mobile
@@ -130,27 +129,17 @@ O projeto utiliza o **Supabase** como backend (PostgreSQL). Para rodar, crie um 
 
 O mesmo script também configura o trigger e o job do `pg_cron` que apagam automaticamente chats com 14+ dias sem atividade.
 
-### Credenciais (sem hardcode)
+### Credenciais e segurança (sem chave no navegador)
 
-As credenciais **não ficam escritas no código**. Elas são lidas via variáveis de ambiente na função serverless `api/config.js`:
-
-```bash
-SUPABASE_URL=https://SEU_PROJETO.supabase.co
-SUPABASE_KEY=SUA_CHAVE_ANON
-GOOGLE_CLIENT_ID=SEU_CLIENT_ID_GOOGLE
-```
-
-Configure-as em **Vercel → Settings → Environment Variables**. Para testes locais sem a função serverless, use o `js/config.local.js` (mantido fora do Git via `.gitignore`).
+O navegador **não recebe nenhuma chave do Supabase**. Todo acesso ao banco passa por `/api/db` e todo login/cadastro/recuperação de senha por `/api/auth` — funções serverless que guardam a chave `service_role` como variável de ambiente e aplicam as regras de permissão no servidor. Veja **`SEGURANCA-E-DEPLOY.md`** para o passo a passo (rotacionar chaves, variáveis da Vercel, SQL do Supabase, testes).
 
 ---
 
 ## <img src="https://api.iconify.design/bi/display.svg?color=%234FC3F7" width="20" height="20"> Como Executar Localmente
 
-1. Configure o `js/config.local.js` com suas próprias credenciais de teste (esse arquivo não vai para o GitHub).
+1. Copie `.env.example` para `.env` e preencha com as credenciais de um projeto Supabase **de teste**.
 
-2. Abra o `index.html` com a extensão **Live Server** do VS Code (ou qualquer servidor estático).
-
-3. Para simular o ambiente de produção (com a função serverless), use a CLI da Vercel:
+2. O site precisa das funções `/api`, então não funciona só com Live Server. Para simular o ambiente de produção (com a função serverless), use a CLI da Vercel:
 
 ```bash
 vercel dev

@@ -283,18 +283,32 @@ function escapeHTML(str) {
 }
 window.escapeHTML = escapeHTML;
 
+// Todo acesso ao banco passa por /api/db: o servidor confere a sessão e aplica as regras.
+// O navegador não tem (e não precisa de) nenhuma chave do Supabase.
 async function supabaseFetch(path, options = {}) {
-    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${path}`, {
-        ...options,
-        headers: {
-            'apikey': CONFIG.SUPABASE_KEY,
-            'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            ...options.headers
-        }
+    const method = (options.method || 'GET').toUpperCase();
+    let body;
+    if (options.body !== undefined && options.body !== null) {
+        try { body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body; } catch { body = undefined; }
+    }
+    const prefer = (options.headers && (options.headers.Prefer || options.headers.prefer)) || undefined;
+    const token = localStorage.getItem('electroToken');
+    const res = await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ method, path, body, prefer })
     });
-    if (!res.ok) throw await res.json().catch(() => ({ message: 'Erro na requisição' }));
-    if (options.method === 'DELETE' || res.status === 204) return true;
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Erro na requisição' }));
+        // sessão expirada/inválida: limpa e pede login de novo (só se havia usuário salvo)
+        if (res.status === 401 && localStorage.getItem('electroUser')) {
+            localStorage.removeItem('electroUser'); localStorage.removeItem('electroToken'); localStorage.removeItem('electroToken');
+            sessionStorage.setItem('openLoginAfterReload', '1');
+            setTimeout(() => location.reload(), 300);
+        }
+        throw err;
+    }
+    if (method === 'DELETE' || res.status === 204) return true;
     const text = await res.text();
     return text ? JSON.parse(text) : [];
 }
@@ -3623,12 +3637,6 @@ function syncHeaderHeightVar() {
 }
 
 function bootstrapApp() {
-    // OAuth callback: se a URL contiver access_token, processa login Google
-    if (window.location.hash && window.location.hash.includes('access_token')) {
-        handleGoogleOAuthCallback();
-        return;
-    }
-
     // Veio de "Trocar conta": abre a tela de login automaticamente pra
     // escolher/entrar com outra conta.
     if (sessionStorage.getItem('openLoginAfterReload')) {
@@ -3876,7 +3884,9 @@ function bootstrapApp() {
             if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'SALVAR ALTERAÇÕES'; }
             return;
         }
-        localStorage.setItem('electroUser', JSON.stringify(updated));
+        let salvo = updated;
+        try { const fresh = await supabaseFetch(`users?select=*&id=eq.${user.id}&limit=1`); if (fresh && fresh[0]) salvo = { ...updated, ...fresh[0] }; } catch (e) {}
+        localStorage.setItem('electroUser', JSON.stringify(salvo));
         window.hideProfileEditScreen();
         updateUI();
         createPersistentNotification('Suas informações de perfil foram atualizadas.', 'success');
@@ -4042,18 +4052,10 @@ function bootstrapApp() {
     }
 }
 
-// window.CONFIG e carregado de forma assincrona (fetch em /api/config ou,
-// no dev local com Live Server, fallback em js/config.local.js — ver o
-// loader inline em index.html). Por isso esperamos a Promise
-// window._configReady terminar antes de inicializar o app, garantindo que
-// CONFIG.SUPABASE_URL/KEY ja estejam definidos quando o app comecar a
-// fazer chamadas pro Supabase. Se a config falhar, o proprio loader ja
-// mostra uma tela de erro, entao nem tentamos inicializar o app.
+// O app inicia assim que o DOM estiver pronto (não há mais config remota: tudo passa por /api/db).
 (function startWhenReady() {
     function start() {
-        Promise.resolve(window._configReady).then(function () {
-            if (window.CONFIG) bootstrapApp();
-        });
+        bootstrapApp();
     }
     if (document.readyState !== 'loading') {
         start();
@@ -4427,14 +4429,14 @@ window.applyFilters      = applyFilters;
 window.clearFilters      = clearFilters;
 window.showToast         = showToast;
 window.logout            = () => {
-    localStorage.removeItem('electroUser');
+    localStorage.removeItem('electroUser'); localStorage.removeItem('electroToken');
     showToast('Sessão encerrada com sucesso', 'info', 2000);
     setTimeout(() => location.reload(), 600);
 };
 
 /** Encerra a sessão atual e já abre a tela de login em seguida, pra entrar com outra conta */
 window.switchAccount = () => {
-    localStorage.removeItem('electroUser');
+    localStorage.removeItem('electroUser'); localStorage.removeItem('electroToken');
     sessionStorage.setItem('openLoginAfterReload', '1');
     showToast('Escolha a conta para entrar', 'info', 2000);
     setTimeout(() => location.reload(), 600);
@@ -4525,6 +4527,47 @@ window.showProfileEdit = () => {
     }
 };
 
+window.changeProfilePassword = async function() {
+    const cpf = (document.getElementById('profilePasswordCPF')?.value || '').replace(/\D/g, '');
+    if (!validarCPF(cpf)) { showToast('Informe um CPF válido.', 'warning'); return; }
+    const btn = document.getElementById('changeProfilePasswordBtn');
+    const original = btn?.innerHTML;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>ENVIANDO...'; }
+    try {
+        const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('electroToken') || ''}` }, body: JSON.stringify({ action: 'solicitar_redefinicao', cpf }) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Não foi possível solicitar a recuperação.');
+        const cpfEl = document.getElementById('profilePasswordCPF'); if (cpfEl) cpfEl.value = '';
+        showToast(result.message || 'Confira o e-mail cadastrado para criar uma nova senha.', 'success', 6000);
+    } catch (error) { showToast(error.message || 'Erro ao solicitar a recuperação.', 'error', 6000); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = original; } }
+};
+
+function validarPoliticaSenha(senha) {
+    return senha.length >= 10 && senha.length <= 128 && /[a-z]/.test(senha) && /[A-Z]/.test(senha) && /\d/.test(senha) && /[^A-Za-z0-9]/.test(senha);
+}
+
+async function processarTokenRedefinicao() {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('resetToken');
+    if (!token) return;
+    // Retira o token da barra de endereço assim que lido.
+    history.replaceState({}, document.title, window.location.pathname);
+    const novaSenha = window.prompt('Crie sua nova senha (10–128 caracteres, com maiúscula, minúscula, número e símbolo):');
+    if (novaSenha === null) return;
+    if (!validarPoliticaSenha(novaSenha)) { showToast('A senha deve ter 10–128 caracteres e incluir maiúscula, minúscula, número e símbolo.', 'error', 7000); return; }
+    const confirmar = window.prompt('Digite novamente a nova senha para confirmar:');
+    if (confirmar === null) return;
+    if (novaSenha !== confirmar) { showToast('As senhas não coincidem. Abra novamente o link do e-mail para tentar outra vez.', 'error', 7000); return; }
+    try {
+        const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'redefinir_senha', token, novaSenha }) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Não foi possível redefinir a senha.');
+        showToast('Senha redefinida! Agora você pode entrar com a nova senha.', 'success', 7000);
+    } catch (error) { showToast(error.message || 'Link inválido ou expirado.', 'error', 7000); }
+}
+window.addEventListener('DOMContentLoaded', processarTokenRedefinicao);
+
 window.hideProfileEditScreen = function() {
     document.getElementById('profileEditScreen').classList.add('d-none');
     document.body.style.overflow = '';
@@ -4605,7 +4648,7 @@ window.deleteAccount = async function() {
         // Por fim, o próprio usuário
         await supabaseFetch(`users?id=eq.${user.id}`, { method: 'DELETE' });
 
-        localStorage.removeItem('electroUser');
+        localStorage.removeItem('electroUser'); localStorage.removeItem('electroToken');
         showToast('Conta excluída. Sentiremos sua falta!', 'success');
         setTimeout(() => location.reload(), 1200);
     } catch (err) {
@@ -4695,84 +4738,62 @@ window.mlCadPrevStep = function() {
     window.mlCadGoToStep(1);
 };
 
-window.forgotPassword = function(event) {
-  event?.preventDefault();
-  const user = getSavedUser();
-  const nome = user?.nome || 'Usuário';
-  const userEmail = user?.email || '';
-  const body = `
-Nova solicitação de suporte:
+const SUPORTE_EMAIL = 'dannybarbosalimabr@gmail.com';
 
-━━━━ DADOS DO SOLICITANTE ━━━━
-Nome: ${nome}
-E-mail: ${userEmail || 'não informado'}
-Tipo: ${user?.tipo || 'Visitante'}
-
-━━━━ SOLICITAÇÃO ━━━━
-Assunto: Esqueci minha senha
-Mensagem: Olá, esqueci minha senha e preciso de ajuda para recuperar o acesso à minha conta.
-
-━━━━━━━━━━━━━━━━━━━━━━
-ElectroMarket - Plataforma de E-commerce
-  `.trim();
-  const mailto = `mailto:dannybarbosalimabr@gmail.com?subject=${encodeURIComponent('[Suporte ElectroMarket] Esqueci minha senha')}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
-  showToast('E-mail aberto no seu programa de e-mail para solicitar recuperação de senha.', 'success');
-};
-
-// ============================================
-// GOOGLE LOGIN (via Supabase OAuth)
-// ============================================
-
-window.loginWithGoogle = function() {
-    const redirectTo = window.location.origin + window.location.pathname;
-    window.location.href =
-        `${CONFIG.SUPABASE_URL}/auth/v1/authorize` +
-        `?provider=google` +
-        `&redirect_to=${encodeURIComponent(redirectTo)}`;
-};
-
-/** Processa o retorno do OAuth do Google (access_token na hash da URL) */
-async function handleGoogleOAuthCallback() {
-    const params = new URLSearchParams(window.location.hash.replace('#', '?'));
-    const accessToken = params.get('access_token');
-    if (!accessToken) return;
-
-    try {
-        const res = await fetch(`${CONFIG.SUPABASE_URL}/auth/v1/user`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'apikey': CONFIG.SUPABASE_KEY }
-        });
-        const authUser = await res.json();
-        if (!authUser?.email) return;
-
-        const existing = await supabaseFetch(`users?email=eq.${encodeURIComponent(authUser.email)}&limit=1`);
-        if (existing?.length) {
-            localStorage.setItem('electroUser', JSON.stringify(existing[0]));
-        } else {
-            const newUser = {
-                id: crypto.randomUUID(),
-                tipo: 'CLIENTE',
-                nome: authUser.user_metadata?.full_name || authUser.email,
-                email: authUser.email,
-                avatar: JSON.stringify([authUser.user_metadata?.avatar_url || '', '']),
-                telefone: '',
-                senha_hash: '',
-                created_at: new Date().toISOString()
-            };
-            await supabaseFetch('users', { method: 'POST', body: JSON.stringify(newUser) });
-            localStorage.setItem('electroUser', JSON.stringify(newUser));
-        }
-        requestNotificationPermission();
-
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-        updateUI();
-        showToast('Login com Google realizado!', 'success');
-        setTimeout(() => location.reload(), 500);
-    } catch {
-        showToast('Erro ao autenticar com Google.', 'error');
-        setTimeout(() => location.reload(), 1500);
-    }
+// Abre o e-mail de suporte (fluxo antigo) quando a pessoa não sabe o CPF, errou o CPF ou o código não funcionou.
+function oferecerEmailSuporte(pergunta, detalhe) {
+  if (!window.confirm(pergunta + '\n\nDeseja enviar uma solicitação ao suporte por e-mail?')) return;
+  const subject = '[Suporte ElectroMarket] Recuperação de senha';
+  const body = `Olá, preciso de ajuda para recuperar o acesso à minha conta ElectroMarket.\n\n${detalhe}\n\nNome completo:\nE-mail cadastrado:\nTelefone cadastrado:\n\nPor favor, orientem-me sobre a recuperação segura da conta.`;
+  window.location.href = `mailto:${SUPORTE_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
+
+// Tela de login: CPF -> código de 6 dígitos enviado ao e-mail da conta -> nova senha forte.
+// (Nesta tela não existe link de recuperação; o link por e-mail é só da área logada do perfil.)
+window.forgotPassword = async function(event) {
+  event?.preventDefault();
+  const cpfInformado = window.prompt('Para recuperar sua senha, informe o CPF cadastrado.\n\n(Se não souber o CPF, cancele ou deixe em branco para falar com o suporte.)');
+  if (cpfInformado === null || String(cpfInformado).trim() === '') {
+    oferecerEmailSuporte('Sem o CPF não conseguimos enviar o código automático.', 'Não sei o CPF cadastrado na minha conta e preciso de ajuda para recuperar o acesso.');
+    return;
+  }
+  const cpf = String(cpfInformado).replace(/\D/g, '');
+  if (!validarCPF(cpf)) {
+    oferecerEmailSuporte('O CPF informado não é válido.', 'O CPF informado não foi aceito pelo formulário.');
+    return;
+  }
+  try {
+    const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'iniciar_redefinicao_codigo', cpf }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Não foi possível iniciar a recuperação.');
+    if (!result.found) {
+      oferecerEmailSuporte('Não encontramos uma conta com esse CPF.', 'Informei um CPF, mas o sistema não localizou minha conta.');
+      return;
+    }
+    showToast(result.message, 'success', 6000);
+    const codigo = window.prompt('Digite o código de 6 dígitos enviado ao e-mail cadastrado:');
+    if (codigo === null) return;
+    const novaSenha = window.prompt('Crie a nova senha (mínimo 10 caracteres, com maiúscula, minúscula, número e símbolo):');
+    if (novaSenha === null) return;
+    const confirmarSenha = window.prompt('Digite novamente a nova senha para confirmar:');
+    if (confirmarSenha === null) return;
+    if (novaSenha !== confirmarSenha) { showToast('As senhas não coincidem. Tente novamente.', 'error'); return; }
+    if (!validarPoliticaSenha(novaSenha)) {
+      showToast('A senha precisa ter 10–128 caracteres, maiúscula, minúscula, número e símbolo.', 'error', 7000); return;
+    }
+    const resetResponse = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'redefinir_com_codigo', cpf, codigo: String(codigo).trim(), novaSenha }) });
+    const resetResult = await resetResponse.json().catch(() => ({}));
+    if (!resetResponse.ok) {
+      showToast(resetResult.error || 'Não foi possível redefinir a senha.', 'error', 7000);
+      oferecerEmailSuporte('O código não funcionou (errado, expirado ou bloqueado) ou você não recebeu o e-mail.', 'Tentei recuperar a senha pelo código enviado ao e-mail, mas não consegui concluir.');
+      return;
+    }
+    showToast(resetResult.message || 'Senha redefinida. Entre com a nova senha.', 'success', 7000);
+  } catch (error) {
+    showToast(error.message || 'Erro ao solicitar a recuperação.', 'error', 7000);
+    oferecerEmailSuporte('Não foi possível concluir a recuperação automática agora.', 'A recuperação automática por código falhou.');
+  }
+};
 
 // ============================================
 // IA — ASSISTENTE DE SUPORTE (Transformers.js — 100% local, sem API key)
@@ -4946,8 +4967,9 @@ async function _respondIfAiChat(chat) {
 window.checkEmailExists = async function(email) {
     if (!email) return { exists: false };
     try {
-        const data = await supabaseFetch(`users?select=id&email=eq.${encodeURIComponent(email)}&limit=1`);
-        return { exists: data && data.length > 0 };
+        const r = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'verificar_email', email }) });
+        const d = await r.json();
+        return { exists: !!d.exists };
     } catch { return { exists: false }; }
 };
 
@@ -5125,6 +5147,12 @@ document.addEventListener('submit', async (e) => {
             pagamento: document.getElementById('v2CadPagamento').value
         };
 
+        if (!validarPoliticaSenha(dadosCadastro.senha)) {
+            showToast('A senha deve ter 10–128 caracteres e incluir maiúscula, minúscula, número e símbolo.', 'error', 7000);
+            if (btn) { btn.disabled = false; btn.textContent = orig; }
+            return;
+        }
+
         // Validação de CPF também no cliente, só pra feedback rápido
         // (a validação que realmente protege o banco acontece no servidor, em /api/auth)
         if (!validarCPF(dadosCadastro.cpf)) {
@@ -5144,6 +5172,7 @@ document.addEventListener('submit', async (e) => {
 
             // LOGIN AUTOMÁTICO: salva o usuário retornado pelo servidor (sem a senha)
             localStorage.setItem('electroUser', JSON.stringify(data.user));
+            localStorage.setItem('electroToken', data.token || '');
 
             updateUI();
             window.hideAuthScreen();
@@ -5182,11 +5211,16 @@ document.addEventListener('submit', async (e) => {
 
             if (r.ok && data.user) {
                 localStorage.setItem('electroUser', JSON.stringify(data.user));
+                localStorage.setItem('electroToken', data.token || '');
                 window.hideAuthScreen();
                 requestNotificationPermission();
 
                 await createPersistentNotification(`Novo acesso detectado em sua conta.`, 'info', data.user.id);
                 setTimeout(() => location.reload(), 400);
+            } else if (data.code === 'RESET_REQUIRED') {
+                showToast(data.error, 'warning', 9000);
+            } else if (r.status === 429) {
+                showToast(data.error || 'Muitas tentativas. Aguarde alguns minutos.', 'warning', 7000);
             } else {
                 showToast('E-mail/telefone ou senha incorretos.', 'error');
                 emailInput?.classList.add('input-error');
