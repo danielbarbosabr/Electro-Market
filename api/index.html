@@ -400,8 +400,8 @@
                             <span class="ml-field-msg" id="v2CadEmailMsg"></span>
                         </div>
                         <div class="ml-field">
-                            <input type="password" id="v2CadPass" placeholder=" " required>
-                            <label for="v2CadPass">Senha</label>
+                            <input type="password" id="v2CadPass" placeholder=" " required minlength="10" maxlength="128" autocomplete="new-password" title="10 a 128 caracteres, com maiúscula, minúscula, número e símbolo">
+                            <label for="v2CadPass">Senha (mín. 10, com Aa 1 @)</label>
                             <i class="bi bi-eye ml-eye-icon" onmousedown="event.preventDefault()" onclick="window.toggleAuthPass('v2CadPass', this)"></i>
                         </div>
 
@@ -1642,46 +1642,10 @@
          que lê as variáveis de ambiente do servidor — a chave não fica
          exposta aqui no HTML/JS do front-end. -->
     <script>
-        // Em produção (Vercel): busca a config do Supabase na função
-        // serverless (api/config.js), que lê a chave do servidor.
-        // Em dev local com Live Server (servidor estático, sem função
-        // serverless): cai no fallback js/config.local.js (fora do Git).
-        function setConfig(cfg) {
-            window.CONFIG = { SUPABASE_URL: cfg.SUPABASE_URL, SUPABASE_KEY: cfg.SUPABASE_KEY };
-            window.dispatchEvent(new Event('config:ready'));
-        }
-        function tryLocalDevFallback() {
-            return new Promise(function (resolve, reject) {
-                var s = document.createElement('script');
-                s.src = 'js/config.local.js';
-                s.onload = function () {
-                    var local = window.CONFIG_LOCAL_FALLBACK;
-                    if (local && local.SUPABASE_URL && local.SUPABASE_KEY) {
-                        setConfig(local);
-                        resolve();
-                    } else {
-                        reject(new Error('js/config.local.js existe mas está sem os valores.'));
-                    }
-                };
-                s.onerror = function () { reject(new Error('js/config.local.js não encontrado.')); };
-                document.head.appendChild(s);
-            });
-        }
-        window._configReady = fetch('/api/config', { cache: 'no-store' })
-            .then(function (res) {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.json();
-            })
-            .then(function (cfg) {
-                if (!cfg.SUPABASE_URL || !cfg.SUPABASE_KEY) throw new Error('Config incompleta.');
-                setConfig(cfg);
-            })
-            .catch(function (err) {
-                console.warn('api/config indisponível (' + err.message + '), usando fallback de dev local (js/config.local.js)...');
-                return tryLocalDevFallback();
-            });
+        // O navegador não recebe mais nenhuma chave do Supabase: todo acesso ao banco passa por /api/db (servidor).
+        window.CONFIG = {};
+        window._configReady = Promise.resolve();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Chart.js: usado no Relatório Gráfico do Painel Admin -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
